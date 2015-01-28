@@ -1,4 +1,4 @@
-library(survival); library(frailtypack)
+library(survival); library(frailtypack); library(data.table); library(dplyr)
 ## Make a trial population with a given number of clusters of a given size. Put the people in
 ## clusters, give them individual IDs and also id # within cluster
 makePop <- function(numClus=20, clusSize=300){
@@ -136,11 +136,11 @@ doCoxPH <- function(csd, browse=F) { ## take censored survival object and return
 
 ## Do a binary search for the number of infections before the stopping point is reached: this is
 ## assumed to be when 95% CI of vaccine efficacy goes above 0
-firstStop <- function(parms, min=7, max=12, verbose = 0) { ## using days to facilitate easier rounding
+firstStop <- function(parms, min=7, max=365, verbose = 0) { ## using days to facilitate easier rounding
     if (min >= max) return(min)
     mid <- floor((min+max)/2) ## floor to days
     lciMod <- doCoxPH(censSurvDat(parms$st, mid))['lci'] ## converting mid to days from months
-    if(verbose>0) print(paste0('lower 95% of vaccine efficacy at ', signif(mid,2), ' months =', signif(lciMod,2)))
+    if(verbose>0) print(paste0('lower 95% of vaccine efficacy at ', signif(mid,2), ' days =', signif(lciMod,2)))
     if(lciMod>=0)
         return(firstStop(parms, min, mid, verbose))
     return(firstStop(parms, mid+1, max, verbose)) ## output in months
