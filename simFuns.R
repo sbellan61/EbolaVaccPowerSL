@@ -70,7 +70,7 @@ makeSurvDat <- function(p) {
 }
 
 ## Take a survival data from above function and censor it by a specified time in months
-truncSurvDat <- function(st, censorTime = 6) {
+censSurvDat <- function(st, censorTime = 6) {
     intervalNotStarted <- st[,startTime] > censorTime
     st <- st[!intervalNotStarted,] 
     noInfectionBeforeCensor <- st[,endTime] > censorTime
@@ -79,8 +79,17 @@ truncSurvDat <- function(st, censorTime = 6) {
     return(st)
 }
 
-## Analyze survival table with coxph
-'Surv(startTime, endTime, infected) ~ cluster(cluster) + '
+coxPH <- function(csd) { ## take censored survival object and return vacc effectiveness estimates
+    ## mod <- coxph(Surv(startTime, endTime, infected) ~ vacc, data=csd) ## without frailty
+    modF <- coxph(Surv(startTime, endTime, infected) ~ 
+                  vacc + frailty.gamma(cluster, eps=1e-10, method="em", sparse=0),
+                  outer.max=1000, iter.max=10000,
+                  data=csd)
+    ## 1-summary(mod)$conf.int[,c(1,3:4)], ## without frailty
+    vaccEffEst <- 1-summary(modF)$conf.int['vacc',c(1,3:4)] ## gamma frailty
+    names(vaccEffEst) <- c('mean','lci','uci')
+    return(vaccEffEst)
+}
 
 # Make a population and simulate all of the stepped-wedge intervals
 
