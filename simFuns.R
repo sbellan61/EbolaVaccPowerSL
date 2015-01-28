@@ -1,4 +1,4 @@
-library(survival); library(frailtypack); library(data.table); library(dplyr)
+library(survival); library(frailtypack); library(data.table); library(dplyr); library(parallel)
 ## Make a trial population with a given number of clusters of a given size. Put the people in
 ## clusters, give them individual IDs and also id # within cluster
 makePop <- function(numClus=20, clusSize=300){
@@ -39,6 +39,7 @@ setHazs <- function(pop, mu, varClus, varIndiv) {
     iHind <- which(names(pop)=='indivHaz')
     for(ii in unique(pop$cluster)) set(pop, i=which(pop[,cluster]==ii), cHind, reParmRgamma(1, mean = mu, var = varClus))
     pop[,indivHaz:= reParmRgamma(length(indiv), mean = clusHaz, var = varIndiv)]
+    pop[indivHaz==0, indivHaz:=10e-5] ## can't have zero hazard in rexp so make it very small
     return(pop)
 }
 
@@ -105,12 +106,6 @@ simTrial <- function(parms=makeParms(), browse = F) {
     return(parms)
 }
 
-makeParms <- function(trial='RCT', mu=.0065, varClus=2e-05, varIndiv = 5e-06, vaccEff = .8, maxInfectDay = 12*30,
-                      numClus=20, clusSize=300){
-    list(mu=mu, varClus=varClus, varIndiv = varIndiv, trial=trial, vaccEff = vaccEff, maxInfectDay=maxInfectDay,
-         numClus=numClus, clusSize=clusSize)
-}
-
 ## Take a survival data from above function and censor it by a specified time in months
 censSurvDat <- function(st, censorDay = 6*30) {
     intervalNotStarted <- st[,startDay] > censorDay
@@ -118,6 +113,7 @@ censSurvDat <- function(st, censorDay = 6*30) {
     noInfectionBeforeCensor <- st[,endDay] > censorDay
     st[noInfectionBeforeCensor, infected:=0]
     st[noInfectionBeforeCensor, endDay:=censorDay]
+    st <- st[endDay > startDay,] ## remove individuals with no person-time observed
     return(st)
 }
 
@@ -134,16 +130,54 @@ doCoxPH <- function(csd, browse=F) { ## take censored survival object and return
     return(vaccEffEst)
 }
 
+summTrial <- function(st) list(summarise(group_by(st, cluster), sum(infected))
+                               , summarise(group_by(st, cluster, vacc), sum(infected))
+                               , summarise(group_by(st, vacc), sum(infected))
+                               )
+
 ## Do a binary search for the number of infections before the stopping point is reached: this is
 ## assumed to be when 95% CI of vaccine efficacy goes above 0
-firstStop <- function(parms, min=7, max=365, verbose = 0) { ## using days to facilitate easier rounding
-    if (min >= max) return(min)
-    mid <- floor((min+max)/2) ## floor to days
-    lciMod <- doCoxPH(censSurvDat(parms$st, mid))['lci'] ## converting mid to days from months
-    if(verbose>0) print(paste0('lower 95% of vaccine efficacy at ', signif(mid,2), ' days =', signif(lciMod,2)))
+firstStop <- function(parms, minDay=min(parms$pop$immuneDay) + 30, maxDay=365, verbose = 0) { ## using days to facilitate easier rounding
+    midDay <- floor((minDay+maxDay)/2) ## floor to days
+    vaccEffEst <- doCoxPH(censSurvDat(parms$st, midDay)) ## converting midDay to days from months
+    if (minDay >= maxDay) return(c(stopDay=minDay, vaccEffEst))
+    lciMod <- vaccEffEst['lci']
+    if(verbose>0) print(paste0('lower 95% of vaccine efficacy at ', signif(midDay,2), ' days =', signif(lciMod,2)))
     if(lciMod>=0)
-        return(firstStop(parms, min, mid, verbose))
-    return(firstStop(parms, mid+1, max, verbose)) ## output in months
+        return(firstStop(parms, minDay, midDay, verbose))
+    return(firstStop(parms, midDay+1, maxDay, verbose)) ## output in months
 }
 
-casesInTrial <- function(parms, maxCaseDay = 6*30) sum(with(parms$pop, infectDay < maxCaseDay))
+casesInTrial <- function(parms, maxDayCaseDay = 6*30) sum(with(parms$pop, infectDay < maxDayCaseDay))
+
+
+yearToDays <- 1/365.25
+monthToDays <- 1/30
+makeParms <- function(trial='RCT', 
+                      mu=.1 / 365.25, varClus=mu^2/2, varIndiv = mu^2/8,  ## hazards
+                      vaccEff = .6, maxInfectDay = 12*30,
+                      numClus=20, clusSize=300){
+    list(mu=mu, varClus=varClus, varIndiv = varIndiv, trial=trial, vaccEff = vaccEff, maxInfectDay=maxInfectDay,
+         numClus=numClus, clusSize=clusSize)
+}
+
+simNtrials <- function(seed = 1, parms=makeParms(), N = 2, check=F) {
+    set.seed(seed)
+    for(ii in 1:N) {
+        res <- simTrial(parms)
+        stopPoint <- firstStop(res)
+        if(ii==1) out <- stopPoint else out <- rbind(out, stopPoint)
+        if(check) {
+            doCoxPH(censSurvDat(res$st, stopPoint$stopDay))
+            doCoxPH(censSurvDat(res$st, stopPoint$stopDay+1))
+        }
+    }
+    rownames(out) <- NULL
+    return(out)
+}
+
+simNwrp <- function(parms=makeParms(), NperCore = 10, check=F, ncores=12) {
+    out <- mclapply(1:ncores, simNtrials, N = NperCore, mc.cores = ncores)
+    out <- do.call(rbind.data.frame, out)
+}
+
