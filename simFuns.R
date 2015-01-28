@@ -99,8 +99,9 @@ censSurvDat <- function(st, censorTime = 6) {
     return(st)
 }
 
-doCoxPH <- function(csd) { ## take censored survival object and return vacc effectiveness estimates
+doCoxPH <- function(csd, browse=F) { ## take censored survival object and return vacc effectiveness estimates
     ## mod <- coxph(Surv(startTime, endTime, infected) ~ vacc, data=csd) ## without frailty
+    if(browse) browser()
     modF <- coxph(Surv(startTime, endTime, infected) ~ 
                   vacc + frailty.gamma(cluster, eps=1e-10, method="em", sparse=0),
                   outer.max=1000, iter.max=10000,
@@ -109,6 +110,18 @@ doCoxPH <- function(csd) { ## take censored survival object and return vacc effe
     vaccEffEst <- 1-summary(modF)$conf.int['vacc',c(1,4:3)] ## gamma frailty
     names(vaccEffEst) <- c('mean','lci','uci')
     return(vaccEffEst)
+}
+
+## Do a binary search for the number of infections before the stopping point is reached: this is
+## assumed to be when 95% CI of vaccine efficacy goes above 0
+firstStop <- function(parms, min=7, max=12*30, verbose = 0) { ## using days to facilitate easier rounding
+    if (min >= max) return(min)
+    mid <- floor((min+max)/2) ## floor to days
+    lciMod <- doCoxPH(censSurvDat(parms$st, mid/30))['lci'] ## converting mid to days from months
+    if(verbose>0) print(paste0('lower 95% of vaccine efficacy at ', signif(mid/30,2), ' months =', signif(lciMod,2)))
+    if(lciMod>=0)
+        return(firstStop(parms, min, mid, verbose))
+    return(firstStop(parms, mid+1, max, verbose)/30) ## output in months
 }
 
 ## # Given a model fit, return a one-tailed P value (goes from 0 for vaccine highly protective to 1 for vaccine highly risky). This is a copy from the other project, which is bad.
