@@ -1,62 +1,87 @@
 # Make a trial population with a given number of clusters of a given size. Put the people in clusters; each cluster has a beta-distributed underlying antibody proportion, which is applied to the people.
 makePop <- function(numClus, clusSize){
-	pop <- data.frame(indiv=as.factor(1:(numClus*clusSize))
+	pop <- data.table(indiv=as.factor(1:(numClus*clusSize))
 		, cluster=as.numeric(gl(n=numClus, k=clusSize))
 	)
 	return(pop)
 }
 
-# Simulate the stepped wedge trial for one person
-# Currently we have no individual, cluster or time effects (other than proportion immune)
-# We cut off each person's time series once they get sick (using cumsum), if they do
+## Set vaccination time for SWCT by cluster
+setSW <- function(p, delayUnit = 7/30, immunoDelay = 21/30) within(p, {
+    vaccTime <- delayUnit*(cluster-1)
+    immuneTime <- vaccTime + immunoDelay
+})
 
-# drop (as an argument) is purely for debugging. In real life, we don't observe people once they've had illness, we drop them.
-simulateIndiv <- function(p, numClus, drop=TRUE){
-
-	pf <- data.frame(period=1:(numClus-1))
-	pf <- with(as.list(p), within(pf, {
-		vacc <- ifelse(period>=p$cluster, 1, 0)
-		prob <- ifelse(vacc==1, p$postProb, p$preProb)
-		dis <- rbinom(length(period), size=1, p=prob)
-		predis <- c(0, cumsum(dis[-length(dis)]))
-	}))
-
-	if (drop){
-		pf <- subset(pf, predis==0)
-	}
-	pf <- subset(pf, select=c(period, vacc, dis))
-
-	pf <- with(as.list(p), within(pf, {
-		abx=abx
-		indiv=indiv
-		cluster=as.factor(cluster)
-	}))
-
-	return(pf)
+## reparameterize a gamma by mean/var to simulate spatial variation in underlying hazards (change
+## later to something more reasonable or based on real data)
+reParmRgamma <- function(n, mean, var) {
+    theta <- var/mean
+    k <- mean/theta
+    rgamma(n, shape = k, scale = theta)
 }
+
+## Set hazards (monthly units)
+setHazs <- function(p, mean, varClus, varIndiv) {
+    p[,clusHaz:=NA]
+    for(ii in unique(p$cluster)) p <- within(p, { ## set average hazard in cluster
+        clusHaz[cluster==ii] <- reParmRgamma(1, mean = mean, var = varClus) 
+    })
+    p <- within(p, {## individual hazard
+        indivHaz <- reParmRgamma(length(indiv), mean = clusHaz, var = varIndiv) 
+    })
+    return(p)
+}
+
+## Simulate SWCT
+simSWCT <- function(p, vaccEff = .8, maxInfectTime = 12) {
+    vaccRed <- 1 - vaccEff
+    p <- within(p, {
+        infectTime <- rexp(length(indiv), rate = indivHaz) ## infection pre-vaccination
+        notInfectedBeforeVacc <- infectTime > immuneTime ## 
+        infectTime[notInfectedBeforeVacc] <- immuneTime[notInfectedBeforeVacc] + rexp(sum(notInfectedBeforeVacc), indivHaz*vaccRed)
+        infectTimeTrunc <- infectTime
+        infectTimeTrunc[infectTime > maxInfectTime] <- NA
+        rm(notInfectedBeforeVacc)
+    })
+    return(p)
+}
+
+## Construct survival data from waiting times
+makeSurvDat <- function(p) {
+    ## Waiting time up until immune time or vaccination time
+    pf <- within(p, {
+        startTime <- 0
+        endTime <- pmin(immuneTime, infectTime) 
+        infected <- as.numeric(infectTime < immuneTime)
+        vacc <- 0
+    })
+    pf <- select(pf, indiv, cluster, vaccTime, immuneTime, startTime, endTime, infected, vacc)
+    ## For individuals who experienced vaccination time at risk, tabulate
+    pf2 <- within(p[infectTime > immuneTime,], {
+        startTime <- immuneTime
+        endTime <- infectTime 
+        infected <- 1 ## everyone gets infected eventually, but will truncate this in a separate function
+        vacc <- 1
+    })
+    pf2 <- select(pf2, indiv, cluster, vaccTime, immuneTime, startTime, endTime, infected, vacc)
+    pf <- rbind(pf, pf2)
+    return(pf)
+}
+
+## Take a survival data from above function and censor it by a specified time in months
+truncSurvDat <- function(st, censorTime = 6) {
+    intervalNotStarted <- st[,startTime] > censorTime
+    st <- st[!intervalNotStarted,] 
+    noInfectionBeforeCensor <- st[,endTime] > censorTime
+    st[noInfectionBeforeCensor, infected:=0]
+    st[noInfectionBeforeCensor, endTime:=censorTime]
+    return(st)
+}
+
+
 
 # Make a population and simulate all of the stepped-wedge intervals
-simulatePop <- function(numClus, clusSize, pAbx, sAbx
-	, vaccProt, abxProt, suscFun, nProb, drop=TRUE
-){
-	people <- makePop(numClus, clusSize, pAbx, sAbx)
 
-	# Calculate susceptibility of each person before and after
-	# vaccination
-	people <- within(people, {
-		preProb <- nProb*suscWrapper(
-			suscFun, abx, vacc=0*abx, abxProt, vaccProt)
-		postProb <- nProb*suscWrapper(
-			suscFun, abx, vacc=1+0*abx, abxProt, vaccProt)
-	})
-
-	outcomes <- simulateIndiv(people[1, ], numClus, drop)
-	for(p in 2:nrow(people)){
-		outcomes <- rbind(outcomes, 
-			simulateIndiv(people[p, ], numClus))
-	}
-	return(outcomes)
-}
 
 # Given a model fit, return a one-tailed P value (goes from 0 for vaccine highly protective to 1 for vaccine highly risky). This is a copy from the other project, which is bad.
 oneTailP <- function(m){
