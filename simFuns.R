@@ -1,4 +1,4 @@
-library(survival); library(frailtypack); library(data.table); library(dplyr); library(parallel)
+library(survival); library(data.table); library(dplyr); library(parallel)
 ## Make a trial population with a given number of clusters of a given size. Put the people in
 ## clusters, give them individual IDs and also id # within cluster
 makePop <- function(numClus=20, clusSize=300){
