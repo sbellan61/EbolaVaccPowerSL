@@ -1,3 +1,4 @@
+library(survival); library(frailtypack)
 # Make a trial population with a given number of clusters of a given size. Put the people in clusters; each cluster has a beta-distributed underlying antibody proportion, which is applied to the people.
 makePop <- function(numClus, clusSize){
 	pop <- data.table(indiv=as.factor(1:(numClus*clusSize))
@@ -78,7 +79,8 @@ truncSurvDat <- function(st, censorTime = 6) {
     return(st)
 }
 
-
+## Analyze survival table with coxph
+'Surv(startTime, endTime, infected) ~ cluster(cluster) + '
 
 # Make a population and simulate all of the stepped-wedge intervals
 
