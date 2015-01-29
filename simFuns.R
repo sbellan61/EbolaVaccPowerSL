@@ -6,6 +6,7 @@ makeParms <- function(trial='RCT', delayUnit = 7,
                       mu=.1 / 365.25, varClus=mu^2, varIndiv = mu^2/8,  ## hazards
                       vaccEff = .6, maxInfectDay = 12*30, immunoDelay = 21,
                       numClus=20, clusSize=300){
+    if(trial=='FRCT') delayUnit <- delayUnit/2 ## rolling out vaccines as quickly as you would if you were vaccinating whole clusters
     	return(as.list(environment()))
 }
 
@@ -104,12 +105,6 @@ addDefArgs <- function(parms, fxn) { ## add default arguments to parameter list 
     return(parms)
 }
 
-## runFxn <- function(fxn, parms) {
-##     do.call(fxn, args=subsArgs(parms, fxn))
-##     parms <- addDefArgs(parms, fxn)
-##     return(parms)
-## }
-
 ## simulate whole trial and return with all parameters used
 simTrial <- function(parms=makeParms(), browse = F) suppressWarnings({
     if(browse) browser()
@@ -118,7 +113,7 @@ simTrial <- function(parms=makeParms(), browse = F) suppressWarnings({
     if(parms$trial=='SWCT') {
         parms$pop <- do.call(setSWCTvaccDays, args=subsArgs(parms, setSWCTvaccDays))
         parms <- addDefArgs(parms, setSWCTvaccDays) }
-    if(parms$trial=='RCT') {
+    if(parms$trial %in% c('RCT','FRCT')) {
         parms$pop <- do.call(setRCTvaccDays, args=subsArgs(parms, setRCTvaccDays))
         parms <- addDefArgs(parms, setRCTvaccDays)
     }
