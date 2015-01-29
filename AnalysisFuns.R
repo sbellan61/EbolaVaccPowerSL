@@ -25,7 +25,7 @@ doCoxPH <- function(csd, pkg='coxme', browse=F) { ## take censored survival obje
         vaccEffEst <- c(vaccEffEst, pval)
     }
     if(pkg=='coxme') {
-        mod <- coxme(Surv(startDay, endDay, infected) ~ vacc + (1|cluster), data = csd)
+        mod <- suppressWarnings(coxme(Surv(startDay, endDay, infected) ~ vacc + (1|cluster), data = csd))
         pval <- pnorm(mod$coef/sqrt(vcov(mod)))*2
         vaccEffEst <- 1-exp(mod$coef + c(0, 1.96, -1.96)*sqrt(vcov(mod)))
         vaccEffEst <- c(vaccEffEst, pval)
@@ -79,32 +79,34 @@ firstStop <- function(parms, minDay=min(parms$pop$immuneDay) + 30, maxDay=365, v
     return(firstStop(parms, midDay+1, maxDay, verbose)) ## output in months
 }
 
-seqStop <- function(parms, start = parms$immunoDelay + 14, checkIncrement = 7, verbose = 0, maxDay = 365, returnAll=T) {
+seqStop <- function(parms, start = parms$immunoDelay + 14, checkIncrement = 7, verbose = 0, maxDay = 365) {
     trialOngoing <- T
     checkDay <- start
     first <- T
     while(trialOngoing) {
         if(verbose>1) browser()
         temp <- censSurvDat(parms, checkDay)
-        vaccEffEst <- doCoxPH(temp) ## converting midDay to days from months
-        if(first) out <- compileStopInfo(checkDay, vaccEffEst, temp) else out <- rbind(out, compileStopInfo(checkDay, vaccEffEst, temp))
-        first <- F
-        ##        if(!is.na(out['P'])) if(out['P'] < .05) trialOngoing <- F
-        if(!is.na(out['P'])) if(out['lci'] > 0) trialOngoing <- F
-        if(checkDay > maxDay) trialOngoing <- F
+        vaccEffEst <- try(doCoxPH(temp), silent=T) ## converting midDay to days from months
+        if(!inherits(vaccEffEst, 'try-error')) { ## if cox model has enough info to converge check for stopping criteria
+            newout <- compileStopInfo(checkDay, vaccEffEst, temp) 
+            if(first) out <- newout else out <- rbind(out, newout)
+            first <- F
+            if(newout['p'] < .05) trialOngoing <- F
+            if(checkDay > maxDay) trialOngoing <- F
+        }
         checkDay <- checkDay + 7
     }
-    if(returnAll)    return(out) else return(out[nrow(out),])
+    rownames(out) <- NULL
+    return(out)
 }
 
 casesInTrial <- function(parms, maxDayCaseDay = 6*30) sum(with(parms$pop, infectDay < maxDayCaseDay))
-
 
 simNtrials <- function(seed = 1, parms=makeParms(), N = 2, check=F) {
     set.seed(seed)
     for(ii in 1:N) {
         res <- simTrial(parms)
-        stopPoint <- firstStop(res)
+        stopPoint <- tail(seqStop(res),1)
         if(ii==1) out <- stopPoint else out <- rbind(out, stopPoint)
         if(check) {
             doCoxPH(censSurvDat(res$st, stopPoint$stopDay))

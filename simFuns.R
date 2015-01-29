@@ -2,12 +2,12 @@ library(blme); library(survival); library(coxme); library(data.table); library(d
 
 yearToDays <- 1/365.25
 monthToDays <- 1/30
-makeParms <- function(trial='RCT', 
-                      mu=.1 / 365.25, varClus=mu^2/2, varIndiv = mu^2/8,  ## hazards
+makeParms <- function(trial='RCT', delayUnit = 7,
+                      mu=.1 / 365.25, varClus=mu^2, varIndiv = mu^2/8,  ## hazards
                       vaccEff = .6, maxInfectDay = 12*30, immunoDelay = 21,
                       numClus=20, clusSize=300){
     list(mu=mu, varClus=varClus, varIndiv = varIndiv, trial=trial, vaccEff = vaccEff, maxInfectDay=maxInfectDay,
-         numClus=numClus, clusSize=clusSize)
+         numClus=numClus, clusSize=clusSize, delayUnit=delayUnit)
 }
 
 ## Make a trial population with a given number of clusters of a given size. Put the people in
@@ -31,6 +31,14 @@ setSWCTvaccDays <- function(pop, delayUnit = 7, immunoDelay = 21) {
 setRCTvaccDays <- function(pop, delayUnit = 7, immunoDelay = 21, clusSize) {
     pop[idByClus <= clusSize/2, vaccDay := Inf]
     pop[idByClus > clusSize/2, vaccDay := delayUnit*(cluster-1)]
+    pop[, immuneDay := vaccDay + immunoDelay]
+    return(pop)
+}
+
+## Set vaccination time for CRCT assuming same speed rollout as SWCT (1 cluster per week)
+setCRCTvaccDays <- function(pop, delayUnit = 7, immunoDelay = 21, numClus) {
+    pop[cluster <= numClus/2 , vaccDay := delayUnit*(cluster-1)]
+    pop[cluster > numClus/2 , vaccDay := Inf]
     pop[, immuneDay := vaccDay + immunoDelay]
     return(pop)
 }
@@ -96,6 +104,12 @@ addDefArgs <- function(parms, fxn) { ## add default arguments to parameter list 
     return(parms)
 }
 
+## runFxn <- function(fxn, parms) {
+##     do.call(fxn, args=subsArgs(parms, fxn))
+##     parms <- addDefArgs(parms, fxn)
+##     return(parms)
+## }
+
 ## simulate whole trial and return with all parameters used
 simTrial <- function(parms=makeParms(), browse = F) {
     if(browse) browser()
@@ -107,6 +121,10 @@ simTrial <- function(parms=makeParms(), browse = F) {
     if(parms$trial=='RCT') {
         parms$pop <- do.call(setRCTvaccDays, args=subsArgs(parms, setRCTvaccDays))
         parms <- addDefArgs(parms, setRCTvaccDays)
+    }
+    if(parms$trial=='CRCT') {
+        parms$pop <- do.call(setCRCTvaccDays, args=subsArgs(parms, setCRCTvaccDays))
+        parms <- addDefArgs(parms, setCRCTvaccDays)
     }
     parms$pop <- do.call(setHazs, args=subsArgs(parms, setHazs))
     parms <- addDefArgs(parms, setHazs)
