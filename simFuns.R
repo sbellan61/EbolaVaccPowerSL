@@ -1,5 +1,4 @@
-library(blme); library(survival); library(coxme); library(data.table); library(parallel); 
-#library(dplyr); 
+library(blme); library(survival); library(coxme); library(data.table); library(parallel); library(dplyr); 
 
 yearToDays <- 1/365.25
 monthToDays <- 1/30
@@ -7,8 +6,7 @@ makeParms <- function(trial='RCT', delayUnit = 7,
                       mu=.1 / 365.25, varClus=mu^2, varIndiv = mu^2/8,  ## hazards
                       vaccEff = .6, maxInfectDay = 12*30, immunoDelay = 21,
                       numClus=20, clusSize=300){
-    list(mu=mu, varClus=varClus, varIndiv = varIndiv, trial=trial, vaccEff = vaccEff, maxInfectDay=maxInfectDay,
-         numClus=numClus, clusSize=clusSize, delayUnit=delayUnit)
+    	return(as.list(environment()))
 }
 
 ## Make a trial population with a given number of clusters of a given size. Put the people in
@@ -68,9 +66,8 @@ simInfection <- function(pop, vaccEff = .8, maxInfectDay = 12*30) {
     vaccRed <- 1 - vaccEff
     ## infection pre-vaccination
     pop[, infectDay := rexp(length(indiv), rate = indivHaz)] 
-    notInfectedBeforeVacc <- with(pop, infectDay > immuneDay) 
     ## infction post-vaccination
-    if(sum(notInfectedBeforeVacc)>0) pop[notInfectedBeforeVacc, infectDay := immuneDay + rexp(sum(notInfectedBeforeVacc), indivHaz*vaccRed)]
+    pop[infectDay > immuneDay, infectDay := immuneDay + rexp(length(infectDay), indivHaz*vaccRed)]
     pop[, infectDayTrunc := infectDay]
     pop[infectDay > maxInfectDay, infectDayTrunc := NA]
     return(pop)
@@ -84,14 +81,16 @@ makeSurvDat <- function(pop) {
     st[,endDay:=pmin(immuneDay, infectDay)]
     st[,infected:=as.numeric(infectDay < immuneDay)]
     st[,vacc:=0]
-    st <- select(st, indiv, cluster, idByClus, vaccDay, immuneDay, startDay, endDay, infected, vacc)
+#    st <- select(st, indiv, cluster, idByClus, vaccDay, immuneDay, startDay, endDay, infected, vacc)
+    st <- st[,list(indiv, cluster, idByClus, vaccDay, immuneDay, startDay, endDay, infected, vacc)]
     ## For individuals who experienced vaccination time at risk, tabulate
     st2 <- copy(pop)[infectDay > immuneDay,]
     st2[,startDay:=immuneDay]
     st2[, endDay := infectDay]
     st2[, infected := 1] ## everyone gets infected eventually, but will truncate this in a separate function
     st2[, vacc := 1]
-    st2 <- select(st2, indiv, cluster, idByClus, vaccDay, immuneDay, startDay, endDay, infected, vacc)
+    #st2 <- select(st2, indiv, cluster, idByClus, vaccDay, immuneDay, startDay, endDay, infected, vacc)
+    st2 <- st2[,list(indiv, cluster, idByClus, vaccDay, immuneDay, startDay, endDay, infected, vacc)]
     st <- rbind(st, st2)
     return(st)
 }
@@ -112,7 +111,7 @@ addDefArgs <- function(parms, fxn) { ## add default arguments to parameter list 
 ## }
 
 ## simulate whole trial and return with all parameters used
-simTrial <- function(parms=makeParms(), browse = F) {
+simTrial <- function(parms=makeParms(), browse = F) suppressWarnings({
     if(browse) browser()
     parms$pop <- do.call(makePop, args=subsArgs(parms, makePop))
     parms <- addDefArgs(parms, makePop)
@@ -134,4 +133,4 @@ simTrial <- function(parms=makeParms(), browse = F) {
     parms$st <- do.call(makeSurvDat, args=subsArgs(parms, makeSurvDat))
     parms <- addDefArgs(parms, makeSurvDat)
     return(parms)
-}
+})
