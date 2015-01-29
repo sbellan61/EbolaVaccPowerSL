@@ -52,9 +52,9 @@ summTrial <- function(st) list(summarise(group_by(st, cluster), sum(infected))
                                , summarise(group_by(st, vacc), sum(infected))
                                )
 
-compileStopInfo <- function(minDay, vaccEffEst, temp) {
-    out <- c(stopDay=minDay, vaccEffEst, caseVacc = temp[vacc==1, sum(infected)], caseCont = temp[vacc==0, sum(infected)],
-             ptVacc = temp[vacc==1, sum(perstime)], ptCont = temp[vacc==0, sum(perstime)] )
+compileStopInfo <- function(minDay, vaccEffEst, tmp) {
+    out <- c(stopDay=minDay, vaccEffEst, caseVacc = tmp[vacc==1, sum(infected)], caseCont = tmp[vacc==0, sum(infected)],
+             ptVacc = tmp[vacc==1, sum(perstime)], ptCont = tmp[vacc==0, sum(perstime)] )
     out <- c(out, hazVacc = as.numeric(out['caseVacc']/out['ptVacc']/yearToDays),
              hazCont = as.numeric(out['caseCont']/out['ptCont']/yearToDays))
     return(out)
@@ -66,10 +66,9 @@ firstStop <- function(parms, minDay=min(parms$pop$immuneDay) + 30, maxDay=365, v
     if(verbose>=2) browser()
     midDay <- floor((minDay+maxDay)/2) ## floor to days
     ## doCoxPH(censSurvDat(parms$st, midDay), T)
-    ##     parmsProb <<- parms
-    temp <- censSurvDat(parms, midDay)
-    vaccEffEst <- doCoxPH(temp) ## converting midDay to days from months
-    out <- compileStopInfo(minDay, vaccEffEst, temp)
+    tmp <- censSurvDat(parms, midDay)
+    vaccEffEst <- doCoxPH(tmp) ## converting midDay to days from months
+    out <- compileStopInfo(minDay, vaccEffEst, tmp)
     if (minDay >= maxDay) return(out)
     pVal <- vaccEffEst['p']
     if(verbose>0) print(signif(vaccEffEst,2)) #paste0('lower 95% of vaccine efficacy at ', signif(midDay,2), ' days =', signif(lciMod,2)))
@@ -85,10 +84,10 @@ seqStop <- function(parms, start = parms$immunoDelay + 14, checkIncrement = 7, v
     first <- T
     while(trialOngoing) {
         if(verbose>1) browser()
-        temp <- censSurvDat(parms, checkDay)
-        vaccEffEst <- try(doCoxPH(temp), silent=T) ## converting midDay to days from months
-        if(!inherits(vaccEffEst, 'try-error')) { ## if cox model has enough info to converge check for stopping criteria
-            newout <- compileStopInfo(checkDay, vaccEffEst, temp) 
+        tmp <- censSurvDat(parms, checkDay)
+        vaccEffEst <- try(doCoxPH(tmp), silent=T) ## converting midDay to days from months
+        if(!inherits(vaccEffEst, 'try-error') & !is.nan(vaccEffEst['p'])) { ## if cox model has enough info to converge check for stopping criteria
+            newout <- compileStopInfo(checkDay, vaccEffEst, tmp) 
             if(first) out <- newout else out <- rbind(out, newout)
             first <- F
             if(newout['p'] < .05) trialOngoing <- F
@@ -106,7 +105,7 @@ simNtrials <- function(seed = 1, parms=makeParms(), N = 2, check=F) {
     set.seed(seed)
     for(ii in 1:N) {
         res <- simTrial(parms)
-        stopPoint <- tail(seqStop(res),1)
+        stopPoint <- tail(ssr,1)
         if(ii==1) out <- stopPoint else out <- rbind(out, stopPoint)
         if(check) {
             doCoxPH(censSurvDat(res$st, stopPoint$stopDay))
@@ -114,7 +113,7 @@ simNtrials <- function(seed = 1, parms=makeParms(), N = 2, check=F) {
         }
     }
     rownames(out) <- NULL
-    return(out)
+    return(as.data.table(out))
 }
 
 simNwrp <- function(parms=makeParms(), NperCore = 10, check=F, ncores=12) {
