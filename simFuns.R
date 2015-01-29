@@ -1,10 +1,10 @@
-library(blmer); library(survival); library(data.table); library(dplyr); library(parallel); 
+library(blme); library(survival); library(coxme); library(data.table); library(dplyr); library(parallel); 
 
 yearToDays <- 1/365.25
 monthToDays <- 1/30
 makeParms <- function(trial='RCT', 
                       mu=.1 / 365.25, varClus=mu^2/2, varIndiv = mu^2/8,  ## hazards
-                      vaccEff = .6, maxInfectDay = 12*30,
+                      vaccEff = .6, maxInfectDay = 12*30, immunoDelay = 21,
                       numClus=20, clusSize=300){
     list(mu=mu, varClus=varClus, varIndiv = varIndiv, trial=trial, vaccEff = vaccEff, maxInfectDay=maxInfectDay,
          numClus=numClus, clusSize=clusSize)
