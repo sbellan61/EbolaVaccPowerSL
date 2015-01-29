@@ -101,11 +101,12 @@ seqStop <- function(parms, start = parms$immunoDelay + 14, checkIncrement = 7, v
 
 casesInTrial <- function(parms, maxDayCaseDay = 6*30) sum(with(parms$pop, infectDay < maxDayCaseDay))
 
-simNtrials <- function(seed = 1, parms=makeParms(), N = 2, check=F) {
+simNtrials <- function(seed = 1, parms=makeParms(), N = 2, check=F, verbose=0) {
     set.seed(seed)
     for(ii in 1:N) {
+        if(verbose>1) browser()
         res <- simTrial(parms)
-        stopPoint <- tail(ssr,1)
+        stopPoint <- tail(seqStop(res),1)
         if(ii==1) out <- stopPoint else out <- rbind(out, stopPoint)
         if(check) {
             doCoxPH(censSurvDat(res$st, stopPoint$stopDay))
@@ -113,7 +114,7 @@ simNtrials <- function(seed = 1, parms=makeParms(), N = 2, check=F) {
         }
     }
     rownames(out) <- NULL
-    return(as.data.table(out))
+    return(out)#as.data.table(out))
 }
 
 simNwrp <- function(parms=makeParms(), NperCore = 10, check=F, ncores=12) {
