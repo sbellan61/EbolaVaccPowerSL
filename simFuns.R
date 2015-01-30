@@ -2,28 +2,55 @@ library(blme); library(survival); library(coxme); library(data.table); library(p
 
 yearToDays <- 1/365.25
 monthToDays <- 1/30
-makeParms <- function(trial='RCT',
-                      delayUnit = 7, ## logistically imposed interval in between each new cluster receiving vaccination
-                      ord = F, ## order clusters' receipt of vaccination
-                      mu=.1 * yearToDays, ## mean hazard in all participants
-                      varClus=mu^2, varIndiv = mu^2/8, ## variance in cluster- & indiv-level & hazards
-                      vaccEff = .6,
-                      maxInfectDay = 365, ## end of trial
-                      immunoDelay = 21, ## delay from vaccination to immunity
-                      numClus=20, clusSize=300){
+makeParms <- function(
+    trial='RCT'
+#  , numClus=20, clusSize=300
+  , numClus=4, clusSize=4
+  , delayUnit = 7 ## logistically imposed interval in between each new cluster receiving vaccination
+  , ord = F ## order clusters' receipt of vaccination
+  , mu=.1 * yearToDays ## mean hazard in all participants
+  , varClus=mu^2 ##  variance in cluster-level hazards for gamma distribution 
+  , sdLogIndiv = 1 ## variance of lognormal distribution of individual RR within a hazard (constant over time, i.e. due to job)
+  , vaccEff = .6
+  , maxInfectDay = 365 ## end of trial
+  , immunoDelay = 21 ## delay from vaccination to immunity
+  , weeklyDecay=.9, weeklyDecayVar=.05, hazIntUnit = 7 ## control variation in weekly hazard
+){
     if(trial=='FRCT') delayUnit <- delayUnit/2 ## rolling out vaccines as quickly as you would if you were vaccinating whole clusters
-    	return(as.list(environment()))
+    return(as.list(environment()))
 }
+
+## create a sequence of weekly hazard trajectories to be used as cluster means
+hazTraj <- function(parms=makePop()) within(parms, {
+    baseClusHaz <- reParmRgamma(numClus, mean = mu, var = varClus) ## gamma distributed baseline hazards
+    decs <- rlnorm(numClus, meanlog = log(weeklyDecay^(1/7)), weeklyDecayVar) ## log-normally distributed decay rates (set var = 0 for constant)
+    daySeq <- seq(0,maxInfectDay,by=hazIntUnit)
+    hazT <- data.table(day = rep(daySeq, each = numClus), cluster = rep(1:numClus, length(daySeq)), clusHaz = 0)
+    cHind <- which(names(hazT)=='clusHaz')
+    ## mean cluster hazard trajectory
+    for(ii in 1:numClus) hazT[which(hazT[,cluster]==ii), clusHaz := baseClusHaz[ii]*decs[ii]^day]
+    ## give every individual a lognormally distributed relative risk
+    pop$indivRR <- rlnorm(numClus*clusSize, meanlog = 0, sdlog = sdLogIndiv)
+    ## create popH which has weekly hazards for all individuals
+    popH <- pop[rep(1:nrow(pop), length(daySeq))]
+    popH[, day := rep(daySeq, each=nrow(pop))]
+    for(dd in daySeq) for(ii in 1:numClus) popH[day==dd & cluster==ii, clusHaz := hazT[day==dd & cluster==ii, clusHaz]]
+    popH[, indivHaz := clusHaz*indivRR]
+    rm(ii, cHind, daySeq, decs, baseClusHaz, dd, hazT)
+})
+## hazTraj(makeParms(weeklyDecay=1, weeklyDecayVar=0))[cluster==1,]
+## hazTraj(makeParms(weeklyDecay=.9, weeklyDecayVar=.05))[cluster==1,]
+
+hazTraj()
 
 ## Make a trial population with a given number of clusters of a given size. Put the people in
 ## clusters, give them individual IDs and also id # within cluster
-makePop <- function(numClus=20, clusSize=300){
+makePop <- function(parms=makeParms()) within(parms, {
     pop <- data.table(indiv=as.factor(1:(numClus*clusSize))
                       , cluster=as.numeric(gl(n=numClus, k=clusSize))
                       , idByClus = rep(1:clusSize, numClus)
                       )
-    return(pop)
-}
+})
 
 ## reparameterize a gamma by mean/var to simulate spatial variation in underlying hazards (change
 ## later to something more reasonable or based on real data)
@@ -34,15 +61,18 @@ reParmRgamma <- function(n, mean, var) {
 }
 
 ## Set hazards (monthly units)
-setHazs <- function(pop, mu, varClus, varIndiv) {
+setHazs <- function(parms) within(parms, {
     pop$indivHaz <- pop$clusHaz<- numeric(nrow(pop)) ## set average hazard in cluster
     cHind <- which(names(pop)=='clusHaz')
     iHind <- which(names(pop)=='indivHaz')
-    for(ii in unique(pop$cluster)) set(pop, i=which(pop[,cluster]==ii), cHind, reParmRgamma(1, mean = mu, var = varClus))
+    if(exists('hazT'))
+        for(ii in 1:numClus) set(pop, i=which(pop[,cluster]==ii), cHind, reParmRgamma(1, mean = mu, var = varClus))
+    else
+        for(ii in 1:numClus) set(pop, i=which(pop[,cluster]==ii), cHind, reParmRgamma(1, mean = mu, var = varClus))
     pop[,indivHaz:= reParmRgamma(length(indiv), mean = clusHaz, var = varIndiv)]
     pop[indivHaz<10e-5, indivHaz:=10e-5] ## can't have zero hazard in rexp so make it very small
-    return(pop)
-}
+    rm(cHind, iHind,ii)
+})
 
 ## Set vaccination time for SWCT by cluster
 setSWCTvaccDays <- function(pop, delayUnit = 7, immunoDelay = 21, ord=F) {
