@@ -78,6 +78,7 @@ firstStop <- function(parms, minDay=min(parms$pop$immuneDay) + 30, maxDay=365, v
     return(firstStop(parms, midDay+1, maxDay, verbose)) ## output in months
 }
 
+## Check whether stopping point has been reached at intervals
 seqStop <- function(parms, start = parms$immunoDelay + 14, checkIncrement = 7, verbose = 0, maxDay = 365) {
     trialOngoing <- T
     checkDay <- start

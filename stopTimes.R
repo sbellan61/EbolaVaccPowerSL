@@ -11,6 +11,7 @@ if(length(args)>0)  {## Then cycle through each element of the list and evaluate
         simNum <- 99
         nsims <- 3
         trial <- 'SWCT'
+        batchdirnm <- 'Results'
     }
 
 system.time(
@@ -18,4 +19,4 @@ system.time(
                  simNum=simNum, nsims=nsims, trial=trial)
     )
 
-save(stps, file = paste0('stps',simNum,'.Rdata'))
+save(stps, file = file.path(batchdirnm, paste0('stps',simNum,'.Rdata')))

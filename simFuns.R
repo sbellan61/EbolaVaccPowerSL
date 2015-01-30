@@ -2,9 +2,14 @@ library(blme); library(survival); library(coxme); library(data.table); library(p
 
 yearToDays <- 1/365.25
 monthToDays <- 1/30
-makeParms <- function(trial='RCT', delayUnit = 7,
-                      mu=.1 / 365.25, varClus=mu^2, varIndiv = mu^2/8,  ## hazards
-                      vaccEff = .6, maxInfectDay = 12*30, immunoDelay = 21,
+makeParms <- function(trial='RCT',
+                      delayUnit = 7, ## logistically imposed interval in between each new cluster receiving vaccination
+                      ord = F, ## order clusters' receipt of vaccination
+                      mu=.1 * yearToDays, ## mean hazard in all participants
+                      varClus=mu^2, varIndiv = mu^2/8, ## variance in cluster- & indiv-level & hazards
+                      vaccEff = .6,
+                      maxInfectDay = 365, ## end of trial
+                      immunoDelay = 21, ## delay from vaccination to immunity
                       numClus=20, clusSize=300){
     if(trial=='FRCT') delayUnit <- delayUnit/2 ## rolling out vaccines as quickly as you would if you were vaccinating whole clusters
     	return(as.list(environment()))
@@ -17,29 +22,6 @@ makePop <- function(numClus=20, clusSize=300){
                       , cluster=as.numeric(gl(n=numClus, k=clusSize))
                       , idByClus = rep(1:clusSize, numClus)
                       )
-    return(pop)
-}
-
-## Set vaccination time for SWCT by cluster
-setSWCTvaccDays <- function(pop, delayUnit = 7, immunoDelay = 21) {
-    pop[, vaccDay := delayUnit*(cluster-1)]
-    pop[, immuneDay := vaccDay + immunoDelay]
-    return(pop)
-}
-
-## Set vaccination time for RCT assuming same speed rollout as SWCT
-setRCTvaccDays <- function(pop, delayUnit = 7, immunoDelay = 21, clusSize) {
-    pop[idByClus <= clusSize/2, vaccDay := Inf]
-    pop[idByClus > clusSize/2, vaccDay := delayUnit*(cluster-1)]
-    pop[, immuneDay := vaccDay + immunoDelay]
-    return(pop)
-}
-
-## Set vaccination time for CRCT assuming same speed rollout as SWCT (1 cluster per week)
-setCRCTvaccDays <- function(pop, delayUnit = 7, immunoDelay = 21, numClus) {
-    pop[cluster <= numClus/2 , vaccDay := delayUnit*(cluster-1)]
-    pop[cluster > numClus/2 , vaccDay := Inf]
-    pop[, immuneDay := vaccDay + immunoDelay]
     return(pop)
 }
 
@@ -61,6 +43,52 @@ setHazs <- function(pop, mu, varClus, varIndiv) {
     pop[indivHaz<10e-5, indivHaz:=10e-5] ## can't have zero hazard in rexp so make it very small
     return(pop)
 }
+
+## Set vaccination time for SWCT by cluster
+setSWCTvaccDays <- function(pop, delayUnit = 7, immunoDelay = 21, ord=F) {
+    if(ord) { ## if vaccinating highest incidence clusters first (i.e. *NOT* SW randomization of vaccination sequence)
+        pop[rev(order(clusHaz))] 
+        pp[,indiv:=1:nrow(pp)] ## reset indices so they're ordered again by vaccination sequence
+        pp[,cluster:=as.numeric(gl(n=numClus, k=clusSize))]
+    }
+    pop[, vaccDay := delayUnit*(cluster-1)]
+    pop[, immuneDay := vaccDay + immunoDelay]
+    return(pop)
+}
+
+## Set vaccination time for RCT assuming same speed rollout as SWCT
+setRCTvaccDays <- function(pop, delayUnit = 7, immunoDelay = 21, clusSize) {
+    if(ord) { ## if vaccinating *HALF* of highest incidence clusters first
+        pop[rev(order(clusHaz))] 
+        pp[,indiv:=1:nrow(pp)] ## reset indices so they're ordered again by vaccination sequence
+        pp[,cluster:=as.numeric(gl(n=numClus, k=clusSize))]
+    }
+    pop[idByClus <= clusSize/2, vaccDay := Inf]
+    pop[idByClus > clusSize/2, vaccDay := delayUnit*(cluster-1)]
+    pop[, immuneDay := vaccDay + immunoDelay]
+    return(pop)
+}
+
+## Set vaccination time for CRCT assuming same speed rollout as SWCT (1 cluster per week)
+setCRCTvaccDays <- function(pop, delayUnit = 7, immunoDelay = 21, numClus, clusSize, ord=F) {
+    if(ord) { ## if matching clusters on incidence, then randomizing within pairs, then vaccinating highest incidence first
+        if(numClus %% 2 == 1) stop("need even # of clusters")
+        clusIncRank <- matrix(rev(order(pop[idByClus==1, clusHaz])), nc = 2, byrow=T) ## order clusters by mean hazard, in pairs (each row)
+        whichVacc <- sample(1:2, nrow(clusIncRank), replace=T) ## which of each pair to vaccinate
+        for(ii in 1:nrow(clusIncRank)) if(whichVacc[ii]==2) clusIncRank[ii,1:2] <- clusIncRank[ii,2:1] ## make first column vaccinated group
+        clusIncRank <- c(clusIncRank[,1], clusIncRank[,2]) ## reorder of clusters
+        reord <- order(order(rep(clusIncRank, each = clusSize)))
+        pop <- pop[reord,] ## reorder
+        pop[,indiv:=1:nrow(pop)] ## reset indices so they're ordered again by vaccination sequence
+        pop[,cluster:=as.numeric(gl(n=numClus, k=clusSize))]
+    }
+    pop[cluster <= numClus/2 , vaccDay := delayUnit*(cluster-1)]
+    pop[cluster > numClus/2 , vaccDay := Inf]
+    pop[, immuneDay := vaccDay + immunoDelay]
+    return(pop)
+}
+## To check ordering works
+## simTrial(makeParms('CRCT', numClus=6, clusSize=4, ord=T))$pop[idByClus==1, list(clusHaz*100, rev(order(clusHaz)))]
 
 ## Simulate infections
 simInfection <- function(pop, vaccEff = .8, maxInfectDay = 12*30) {
@@ -110,6 +138,8 @@ simTrial <- function(parms=makeParms(), browse = F) suppressWarnings({
     if(browse) browser()
     parms$pop <- do.call(makePop, args=subsArgs(parms, makePop))
     parms <- addDefArgs(parms, makePop)
+    parms$pop <- do.call(setHazs, args=subsArgs(parms, setHazs))
+    parms <- addDefArgs(parms, setHazs)
     if(parms$trial=='SWCT') {
         parms$pop <- do.call(setSWCTvaccDays, args=subsArgs(parms, setSWCTvaccDays))
         parms <- addDefArgs(parms, setSWCTvaccDays) }
@@ -121,8 +151,6 @@ simTrial <- function(parms=makeParms(), browse = F) suppressWarnings({
         parms$pop <- do.call(setCRCTvaccDays, args=subsArgs(parms, setCRCTvaccDays))
         parms <- addDefArgs(parms, setCRCTvaccDays)
     }
-    parms$pop <- do.call(setHazs, args=subsArgs(parms, setHazs))
-    parms <- addDefArgs(parms, setHazs)
     parms$pop <- do.call(simInfection, args=subsArgs(parms, simInfection))
     parms <- addDefArgs(parms, simInfection)
     parms$st <- do.call(makeSurvDat, args=subsArgs(parms, makeSurvDat))

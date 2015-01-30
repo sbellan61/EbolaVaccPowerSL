@@ -3,7 +3,7 @@ if(grepl('tacc', Sys.info()['nodename'])) setwd('/home1/02413/sbellan/VaccEbola/
 ## Simulate SWCT vs RCT vs CRCT for SL
 sapply(c('simFuns.R','AnalysisFuns.R'), source)
 
-pdf('distribution of mean cluster hazards.pdf')
+pdf(file.path('Figures','distribution of mean cluster hazards.pdf'))
 parms <- makeParms()
 samp <- reParmRgamma(10^5, parms$mu, parms$varClus)
 breaks <- 100
@@ -12,12 +12,12 @@ hist(samp/monthToDays, col = 'black', xlab = 'hazard / month', main = 'distribut
 title(main=paste('average hazard = ', signif(parms$mu/monthToDays,2)), line = -2)
 graphics.off()
 
-pdf('example default cluster hazards.pdf')
+pdf(file.path('Figures','example default cluster hazards.pdf'))
 hist(simTrial(makeParms('SWCT'))$pop[idByClus==1,clusHaz*30], col = 'black', breaks = 20, xlab = 'mean hazard by cluster (per month) ', 
      main ='distribution of mean hazard by cluster for 20 clusters')
 graphics.off()
 
-pdf('example individual hazard distr.pdf')
+pdf(file.path('Figures','example individual hazard distr.pdf'))
 par(mfrow=c(5,4), mar = c(4,1,1,.5), oma = c(0,0,1.5,0))
 tpop <- simTrial(makeParms('SWCT'))$pop
 xlim <- c(0, max(tpop[,indivHaz]*30))
