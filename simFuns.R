@@ -14,7 +14,7 @@ makeParms <- function(
     , maxInfectDay = 7*24 ## end of trial (24 weeks default)
     , immunoDelay = 21 ## delay from vaccination to immunity
     , immunoDelayThink = immunoDelay ## delay from vaccination to immunity used in analysis (realistically would be unknown)
-    , weeklyDecay=.9, weeklyDecayVar=.05 ## log-normally distributed incidence decay rates (set var = 0 for constant)
+    , weeklyDecay=.9, weeklyDecayVar=.005 ## log-normally distributed incidence decay rates (set var = 0 for constant)
     , hazIntUnit = 7 ## interval between discrete changes in hazard
     , reordLag = 0 ## how long ago's hazard to use when deciding this week's time-updated vaccination sequence
     , small=F ## do a small trial for illustration
@@ -41,12 +41,12 @@ makePop <- function(parms=makeParms()) within(parms, {
 ## RR around cluster mean constant
 setHazs <- function(parms=makePop()) within(parms, {
     baseClusHaz <- reParmRgamma(numClus, mean = mu, var = varClus) ## gamma distributed baseline hazards
-    decs <- rlnorm(numClus, meanlog = log(weeklyDecay^(1/7)), weeklyDecayVar) 
+    dailyDecayRates <- rlnorm(numClus, meanlog = log(weeklyDecay^(1/7)), weeklyDecayVar) 
     daySeq <- seq(0,maxInfectDay,by=hazIntUnit)
     hazT <- data.table(day = rep(daySeq, each = numClus), cluster = rep(1:numClus, length(daySeq)), clusHaz = 0)
     cHind <- which(names(hazT)=='clusHaz')
     ## mean cluster hazard trajectory
-    for(ii in 1:numClus) hazT[which(hazT[,cluster]==ii), clusHaz := baseClusHaz[ii]*decs[ii]^day]
+    for(ii in 1:numClus) hazT[which(hazT[,cluster]==ii), clusHaz := baseClusHaz[ii]*dailyDecayRates[ii]^day]
     ## give every individual a lognormally distributed relative risk
     pop$indivRR <- rlnorm(numClus*clusSize, meanlog = 0, sdlog = sdLogIndiv)
     ## create popH which has weekly hazards for all individuals
@@ -54,7 +54,7 @@ setHazs <- function(parms=makePop()) within(parms, {
     popH[, day := rep(daySeq, each=nrow(pop))]
     for(dd in daySeq) for(ii in 1:numClus) popH[day==dd & cluster==ii, clusHaz := hazT[day==dd & cluster==ii, clusHaz]]
     popH[, indivHaz := clusHaz*indivRR]
-    rm(ii, cHind, decs, baseClusHaz, dd, hazT)
+    rm(ii, cHind, baseClusHaz, dd, hazT)
 })
 ## setHazs(makePop(makeParms(weeklyDecay=1, weeklyDecayVar=0)))$popH[cluster==1,]
 ## setHazs(makePop(makeParms(weeklyDecay=.9, weeklyDecayVar=0)))$popH[cluster==1,]
@@ -198,9 +198,8 @@ simInfection <- function(parms) within(parms, {
     indivInfDays <- popH[infectDay!=Inf, list(indiv,infectDay)]
     indivInfDays <- arrange(indivInfDays, indiv)
     pop[indiv %in% indivInfDays[,indiv], infectDay:= indivInfDays[,infectDay]]
-    rm(dd)
+    rm(dd,alreadyInfected,indivInfDays)
 })
-
 
 ## p1 <- setHazs(makePop(makeParms(clusSize=300, numClus=20, weeklyDecay=.9, weeklyDecayVar=0, ord='BL')))
 ## p1 <- reordPop(p1)
@@ -239,9 +238,3 @@ simTrial <- function(parms=makeParms(), browse = F) {
     return(parms)
 }
 simTrial(b=F)
-
-## p1 <- setHazs(makePop(makeParms(clusSize=300, numClus=20, weeklyDecay=.9, weeklyDecayVar=0, ord='BL')))
-## p1 <- reordPop(p1)
-## p1 <- setVaccDays(p1)
-## p1 <- simInfection(p1)
-## head(p1$pop[infectDay!=Inf, list(cluster, immuneDay, infectDay)],100)
