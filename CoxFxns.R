@@ -9,7 +9,6 @@ doCoxPH <- function(csd, pkg='coxme', browse=F) { ## take censored survival obje
         vaccEffEst <- c(vaccEffEst, pval)
     }
     if(pkg=='coxme') {
-        
         mod <- suppressWarnings(coxme(Surv(startDay, endDay, infected) ~ immuneGrp + (1|cluster), data = csd))
         vaccEffEst <- 1-exp(mod$coef + c(0, 1.96, -1.96)*sqrt(vcov(mod)))
         pval <- pnorm(mod$coef/sqrt(vcov(mod)))*2
