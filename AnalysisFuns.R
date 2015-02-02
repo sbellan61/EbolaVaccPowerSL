@@ -33,31 +33,23 @@ censSurvDat <- function(parms, censorDay = 6*30) with(parms, {
 })
 
 ## Select subset of survival table to analyze
-activeFXN <- function(st) within(st, { 
+activeFXN <- function(parms) within(parms, { 
     ## for SWCT or unmatched CRCT always include all clusters in analysis because unvaccinated
     ## clusters are still considered to provide useful information from baseline
-    st$active <- TRUE
-    ## for matched CRCT, only include pairs that have a cluster considered past vaccine refractory period
-    if(trial=='CRCT' & ord!='none') {
-        st[, active := sum(immuneGrp)>0, by = pair] 
-        ## STOPPED HERE ## 
-        ## Only inclue
-        st[, active := sum(startDay > immuneDayThink)>0, by = pair] 
-        ## remove person-time observed prior to post-refractory period from data
-browser()
-        refractoryNotYetStarted <- st[, endDay, by = pair]
-        st <- st[!refractoryNotYetStarted]
-        st
+    st$firstActive <- 0
+    if(!includeAllControlPT) { ## remove person-time observed prior to post-refractory period from data
+        if(trial=='CRCT' & ord!='none') ## active once anyone considered immune in matched cluster pair
+            st[, firstActive := min(immuneDayThink), by = pair]
+        if(trial %in% c('RCT','FRCT')) ## active once anyone considered immune in cluster
+            st[, firstActive := min(immuneDayThink), by = cluster]
     }
-    ## for RCT analysis, includ clusters with anyone considered past vaccination refractory period
-    if(trial %in% c('RCT','FRCT')) 
-        st[,active :=sum(immuneGrp)>0, by = cluster] 
+    st <- st[!endDay <= firstActive] ## remove inactive observation intervals
+    st[startDay < firstActive, startDay := firstActive] ## set accumulation of person time as when the cluster/pair is active
 })
-
-p1 <- simTrial(makeParms('CRCT', ord='BL', small=F))
-s1 <- makeSurvDat(p1)
-
-activeFXN(s1)
+## p1 <- simTrial(makeParms('RCT', ord='BL', small=F), br=F)
+## s1 <- makeSurvDat(p1)
+## s1 <- activeFXN(s1)
+## s1$st[idByClus%in%1:2, list(indiv, cluster, pair, idByClus,immuneDayThink, startDay,endDay)]
 
 summTrial <- function(st) list(summarise(group_by(st[active==T], cluster), sum(infected))
                                , summarise(group_by(st[active==T], cluster, immuneGrp), sum(infected))

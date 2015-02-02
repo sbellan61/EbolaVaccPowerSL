@@ -7,7 +7,7 @@ makeParms <- function(
     , numClus=20, clusSize=300
     , delayUnit = 7 ## logistically imposed interval in between each new cluster receiving vaccination
     , ord = 'none' ## order clusters' receipt of vaccination ('none', by baseline visit 'BL', by time-updated 'TU' last interval incidence)
-    , mu=.1 * yearToDays ## mean hazard in all participants
+    , mu=.02 * yearToDays ## mean hazard in all participants at baseline
     , varClus=mu^2 ##  variance in cluster-level hazards for gamma distribution 
     , sdLogIndiv = 1 ## variance of lognormal distribution of individual RR within a hazard (constant over time, i.e. due to job)
     , vaccEff = .6
@@ -17,6 +17,7 @@ makeParms <- function(
     , weeklyDecay=.9, weeklyDecayVar=.005 ## log-normally distributed incidence decay rates (set var = 0 for constant)
     , hazIntUnit = 7 ## interval between discrete changes in hazard
     , reordLag = 0 ## how long ago's hazard to use when deciding this week's time-updated vaccination sequence
+    , includeAllControlPT = F ## include person-time from controlled trials before end of vaccination refractory period?
     , small=F ## do a small trial for illustration
     ){
     if(small) {
@@ -78,6 +79,11 @@ reordPop <- function(parms) { ## wrapper around other functions below
             popH[,indiv:= rep(1:(numClus*clusSize), length(daySeq))] ## reset indices so they're ordered again by vaccination sequence
             rm(clusIncRank)
         }
+        popH$pair <-  NA ## pairs matched for randomization (if matching)
+        if(trial=='CRCT' & ord!='none') { ## only paired clusters exist in matched CRCT
+            popH$pair <- popH[, cluster %% (numClus/2)]
+            popH[pair==0, pair:=numClus/2]
+        }
     })
 }
 
@@ -97,7 +103,6 @@ reordSWCT <- reordRCT <- function(parms) within(parms, {
         clusIncRank <- order(clusIncRank)
         rm(currentRank,updatingOrder,dd,ii)
     }
-    popH$pair <-  NA ## for symmetry with CRCT structure, but no matching in either of these trials
 })
 
 reordCRCT <- function(parms) within(parms, {
@@ -129,13 +134,11 @@ reordCRCT <- function(parms) within(parms, {
         clusIncRank <- order(clusIncRank) ## get reording for next line
         rm(notRandomized,dd,ii,numPairs,currIncOrd,currentRank)
     }
-    ## pairs matched for randomization (if matching)
-    popH$pair <- popH[, cluster %% (numClus/2)]
-    popH[pair==0, pair:=numClus] 
 })
-## p1 <- setHazs(makePop(makeParms('CRCT', clusSize=2, weeklyDecay=.9, weeklyDecayVar=.3, ord='TU')))
-## p1 <- reordCRCT(p1)
-## p1$pop
+
+## p1 <- setHazs(makePop(makeParms('CRCT', clusSize=2, weeklyDecay=.9, weeklyDecayVar=.3, ord='BL')))
+## p1 <- reordPop(p1)
+## p1$popH
 ## p1$popH[idByClus==1 & day==0 & cluster <=numClus/2, order(clusHaz)]
 
 setVaccDays <- function(parms) { ## wrapper around other functions below
