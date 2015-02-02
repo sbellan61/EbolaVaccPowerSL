@@ -5,7 +5,7 @@ makeSurvDat <- function(parms) within(parms, {
     stPre <- copy(pop) # st = survival table
     stPre$startDay <- 0
     stPre$endDay <- stPre[, pmin(immuneDayThink, infectDay)]
-    stPre$infected <- stPre[ ,as.numeric(infectDay < immuneDayThink)]
+    stPre$infected <- stPre[ ,as.numeric(infectDay <= immuneDayThink)]
     stPre$immuneGrp <-  0     ## immuneGrp is variable used for analysis, not omnietient knowledge of vaccination/immune status
     stPre <- stPre[,list(indiv, cluster, pair, idByClus, vaccDay, immuneDay, immuneDayThink, startDay, endDay, infected, immuneGrp)]
     ## post-immunity table
@@ -17,11 +17,10 @@ makeSurvDat <- function(parms) within(parms, {
     stPost <- stPost[,list(indiv, cluster, pair, idByClus, vaccDay, immuneDay, immuneDayThink, startDay, endDay, infected, immuneGrp)]
     st <- rbind(stPre, stPost) ## combine tables
     rm(stPre, stPost)
-})
+}) ## careful with modifying parms, st depends on analysis a bit too (immunoDelayThink), so we can have different st for same popH
 
 ## Take a survival data from above function and censor it by a specified time in months
 censSurvDat <- function(parms, censorDay = 6*30) with(parms, {
-    browser()
     intervalNotStarted <- st[,startDay] > censorDay
     st <- st[!intervalNotStarted,] 
     noInfectionBeforeCensor <- st[,endDay] > censorDay
@@ -30,35 +29,35 @@ censSurvDat <- function(parms, censorDay = 6*30) with(parms, {
     st[,perstime := (endDay-startDay)]
     if(trial=='SWCT') ## for SWCT always include all clusters in analysis
         st[, active := TRUE] 
-    if(trial %in% c('RCT','FRCT')) ## anyone vaccinated in cluster yet? for RCT analysis
-        st[,active :=sum(vacc)>0, by = cluster] 
-    if(trial=='CRCT') ## for CRCT, only include clusters within a pair that has a cluster that has been vaccinated
-        st[, active := sum(vacc)>0, by = pair] 
+    if(trial %in% c('RCT','FRCT')) ## anyone considered past vaccination refractory in cluster yet? for RCT analysis
+        st[,active :=sum(immuneGrp)>0, by = cluster] 
+    if(trial=='CRCT') ## for CRCT, only include clusters within a pair that has a cluster that is considered past vaccine refractory
+        st[, active := sum(immuneGrp)>0, by = pair] 
     st <- st[perstime > 0,] 
     return(st)
 })
-
-## p1 <- simTrial(makeParms(small=T))
-## censSurvDat(p1, 30)
+## p1 <- simTrial(makeParms(small=F))
+## s1 <- makeSurvDat(p1)
+## censSurvDat(s1, 72)[,sum(active)]
 
 doCoxPH <- function(csd, pkg='coxme', browse=F) { ## take censored survival object and return vacc effectiveness estimates
     if(browse) browser()
     csd <- csd[active==1,]
     if(pkg=='coxph') {
-        mod <- try(coxph(Surv(startDay, endDay, infected) ~ vacc + frailty.gamma(cluster, eps=1e-10, method="em", sparse=0),
+        mod <- try(coxph(Surv(startDay, endDay, infected) ~ immuneGrp + frailty.gamma(cluster, eps=1e-10, method="em", sparse=0),
                          outer.max=1000, iter.max=10000,
                          data=csd), silent=T)
-        vaccEffEst <- 1-summary(mod)$conf.int['vacc',c(1,4:3)] 
-        pval <- summary(mod)$coefficients['vacc','p']
+        vaccEffEst <- 1-summary(mod)$conf.int['immuneGrp',c(1,4:3)] 
+        pval <- summary(mod)$coefficients['immuneGrp','p']
         vaccEffEst <- c(vaccEffEst, pval)
     }
     if(pkg=='coxme') {
-        mod <- suppressWarnings(coxme(Surv(startDay, endDay, infected) ~ vacc + (1|cluster), data = csd))
+        mod <- suppressWarnings(coxme(Surv(startDay, endDay, infected) ~ immuneGrp + (1|cluster), data = csd))
         pval <- pnorm(mod$coef/sqrt(vcov(mod)))*2
         vaccEffEst <- 1-exp(mod$coef + c(0, 1.96, -1.96)*sqrt(vcov(mod)))
         vaccEffEst <- c(vaccEffEst, pval)
     }
-    ##     mod <- coxph(Surv(startDay, endDay, infected) ~ vacc, data=csd) ## without frailty
+    ##     mod <- coxph(Surv(startDay, endDay, infected) ~ immuneGrp, data=csd) ## without frailty
     if(inherits(mod, 'try-error')) {print('blah'); browser()}
     names(vaccEffEst) <- c('mean','lci','uci','p')
     return(signif(vaccEffEst,3))
@@ -67,22 +66,22 @@ doCoxPH <- function(csd, pkg='coxme', browse=F) { ## take censored survival obje
 doGlmer <- function(csd, bayes=F, browse = F) {## take censored survival object and return vacc effectiveness estimates using bayesian glme
     if(browse) browser()
     csd <- csd[active==1,]
-    if(bayes) mod <- bglmer(infected ~ vacc + (1|cluster) + offset(log(perstime)), family=binomial(link='cloglog'),  data = csd)
-    if(!bayes) mod <- glmer(infected ~ vacc + (1|cluster) + offset(log(perstime)), family=binomial(link='cloglog'),  data = csd)
-    vaccRes <- summary(mod)$coefficients['vacc', c('Estimate','Std. Error','Pr(>|z|)')] 
+    if(bayes) mod <- bglmer(infected ~ immuneGrp + (1|cluster) + offset(log(perstime)), family=binomial(link='cloglog'),  data = csd)
+    if(!bayes) mod <- glmer(infected ~ immuneGrp + (1|cluster) + offset(log(perstime)), family=binomial(link='cloglog'),  data = csd)
+    vaccRes <- summary(mod)$coefficients['immuneGrp', c('Estimate','Std. Error','Pr(>|z|)')] 
     vaccEffEst <- c(1 - exp(vaccRes[1] + c(0, 1.96, -1.96) * vaccRes[2]), vaccRes[3])
     names(vaccEffEst) <- c('mean','lci','uci','P')
     return(signif(vaccEffEst,3))
 }
 
 summTrial <- function(st) list(summarise(group_by(st, cluster), sum(infected))
-                               , summarise(group_by(st, cluster, vacc), sum(infected))
-                               , summarise(group_by(st, vacc), sum(infected))
+                               , summarise(group_by(st, cluster, immuneGrp), sum(infected))
+                               , summarise(group_by(st, immuneGrp), sum(infected))
                                )
 
 compileStopInfo <- function(minDay, vaccEffEst, tmp) {
-    out <- c(stopDay=minDay, vaccEffEst, caseVacc = tmp[vacc==1, sum(infected)], caseCont = tmp[vacc==0, sum(infected)],
-             ptVacc = tmp[vacc==1, sum(perstime)], ptCont = tmp[vacc==0, sum(perstime)] )
+    out <- c(stopDay=minDay, vaccEffEst, caseVacc = tmp[immuneGrp==1, sum(infected)], caseCont = tmp[immuneGrp==0, sum(infected)],
+             ptVacc = tmp[immuneGrp==1, sum(perstime)], ptCont = tmp[immuneGrp==0, sum(perstime)] )
     out <- c(out, hazVacc = as.numeric(out['caseVacc']/out['ptVacc']/yearToDays),
              hazCont = as.numeric(out['caseCont']/out['ptCont']/yearToDays))
     return(out)

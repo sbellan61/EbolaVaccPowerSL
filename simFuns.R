@@ -199,4 +199,4 @@ simTrial <- function(parms=makeParms(), browse = F) {
     return(parms)
 }
 ## simTrial(b=F)
-## simTrial(makeParms(small=T))
+## simTrial(makeParms(small=T),F)
