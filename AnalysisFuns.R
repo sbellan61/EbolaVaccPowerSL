@@ -1,17 +1,45 @@
+## Construct survival data from waiting times
+makeSurvDat <- function(parms) within(parms, {
+    pop$immuneDayThink <- pop[,vaccDay] + immunoDelayThink ## vaccine refractory period ASSUMED in analysis
+    ## pre-immunity table
+    stPre <- copy(pop) # st = survival table
+    stPre$startDay <- 0
+    stPre$endDay <- stPre[, pmin(immuneDayThink, infectDay)]
+    stPre$infected <- stPre[ ,as.numeric(infectDay < immuneDayThink)]
+    stPre$immuneGrp <-  0     ## immuneGrp is variable used for analysis, not omnietient knowledge of vaccination/immune status
+    stPre <- stPre[,list(indiv, cluster, pair, idByClus, vaccDay, immuneDay, immuneDayThink, startDay, endDay, infected, immuneGrp)]
+    ## post-immunity table
+    stPost <- copy(pop)[infectDay > immuneDayThink,]
+    stPost$startDay <- stPost[,immuneDayThink]
+    stPost$endDay   <-  stPost[,infectDay]
+    stPost$infected <- 1 ## everyone gets infected eventually, but will truncate this in a separate function
+    stPost$immuneGrp <- 1
+    stPost <- stPost[,list(indiv, cluster, pair, idByClus, vaccDay, immuneDay, immuneDayThink, startDay, endDay, infected, immuneGrp)]
+    st <- rbind(stPre, stPost) ## combine tables
+    rm(stPre, stPost)
+})
 
 ## Take a survival data from above function and censor it by a specified time in months
 censSurvDat <- function(parms, censorDay = 6*30) with(parms, {
+    browser()
     intervalNotStarted <- st[,startDay] > censorDay
     st <- st[!intervalNotStarted,] 
     noInfectionBeforeCensor <- st[,endDay] > censorDay
     st[noInfectionBeforeCensor, infected:=0]
     st[noInfectionBeforeCensor, endDay:=censorDay]
     st[,perstime := (endDay-startDay)]
-    st[, active := TRUE] ## for SWCT
-    if(trial=='RCT') st[,active :=sum(vacc)>0, by = cluster] ## anyone vaccinated in cluster yet? for RCT analysis
+    if(trial=='SWCT') ## for SWCT always include all clusters in analysis
+        st[, active := TRUE] 
+    if(trial %in% c('RCT','FRCT')) ## anyone vaccinated in cluster yet? for RCT analysis
+        st[,active :=sum(vacc)>0, by = cluster] 
+    if(trial=='CRCT') ## for CRCT, only include clusters within a pair that has a cluster that has been vaccinated
+        st[, active := sum(vacc)>0, by = pair] 
     st <- st[perstime > 0,] 
     return(st)
 })
+
+## p1 <- simTrial(makeParms(small=T))
+## censSurvDat(p1, 30)
 
 doCoxPH <- function(csd, pkg='coxme', browse=F) { ## take censored survival object and return vacc effectiveness estimates
     if(browse) browser()
