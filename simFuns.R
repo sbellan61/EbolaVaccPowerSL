@@ -68,7 +68,6 @@ reParmRgamma <- function(n, mean, var) {
     rgamma(n, shape = k, scale = theta)
 }
 
-
 reordPop <- function(parms) { ## wrapper around other functions below
     reordFXN <- get(paste0('reord',parms$trial))
     parms <- reordFXN(parms)
@@ -170,20 +169,24 @@ setCRCTvaccDays <- function(parms) within(parms, {
 ## p1$popH[idByClus==1,list(cluster,clusHaz, day,vacc,immune)]
 
 ## Simulate infections
-simInfection <- function(parms) within(parms, {
-    popH$infectDay <- Inf
+simInfection <- function(parms, whichDo='pop') within(parms, { ## takes popH or EVpopH for end trial vaccination version
+    tmp <- get(whichDo)
+    tmpH <- get(paste0(whichDo,'H'))
+    tmpH$infectDay <- Inf
     for(dd in daySeq) { ## infection day is beginning of each hazard interval + exponential waiting time
-        alreadyInfected <- popH[infectDay!=Inf, indiv] ## don't reinfect those already infected
-        popH[day==dd & !indiv %in% alreadyInfected, 
+        alreadyInfected <- tmpH[infectDay!=Inf, indiv] ## don't reinfect those already infected
+        tmpH[day==dd & !indiv %in% alreadyInfected, 
              infectDay := dd + rexp(length(indiv), rate = indivHaz*ifelse(immune, 1-vaccEff, 1))] 
-        popH[day==dd & !indiv %in% alreadyInfected & infectDay > dd + hazIntUnit, 
+        tmpH[day==dd & !indiv %in% alreadyInfected & infectDay > dd + hazIntUnit, 
              infectDay := Inf] ## reset if it goes into next hazard interval
     }
-    pop$infectDay <- Inf ## copy infection days to pop, to use in analysis
-    indivInfDays <- popH[infectDay!=Inf, list(indiv,infectDay)]
+    tmp$infectDay <- Inf ## copy infection days to pop, to use in analysis
+    indivInfDays <- tmpH[infectDay!=Inf, list(indiv,infectDay)]
     indivInfDays <- arrange(indivInfDays, indiv)
-    pop[indiv %in% indivInfDays[,indiv], infectDay:= indivInfDays[,infectDay]]
-    rm(dd,alreadyInfected,indivInfDays)
+    tmp[indiv %in% indivInfDays[,indiv], infectDay:= indivInfDays[,infectDay]]
+    assign(whichDo, tmp)
+    assign(paste0(whichDo,'H'), tmpH)
+    rm(tmp, tmpH, dd,alreadyInfected,indivInfDays)
 })
 
 ## p1 <- setHazs(makePop(makeParms(clusSize=300, numClus=20, weeklyDecay=.9, weeklyDecayVar=0, ord='BL')))
