@@ -27,78 +27,64 @@ censSurvDat <- function(parms, censorDay = 6*30) with(parms, {
     st[noInfectionBeforeCensor, infected:=0]
     st[noInfectionBeforeCensor, endDay:=censorDay]
     st[,perstime := (endDay-startDay)]
-    if(trial=='SWCT') ## for SWCT always include all clusters in analysis
-        st[, active := TRUE] 
-    if(trial %in% c('RCT','FRCT')) ## anyone considered past vaccination refractory in cluster yet? for RCT analysis
-        st[,active :=sum(immuneGrp)>0, by = cluster] 
-    if(trial=='CRCT') ## for CRCT, only include clusters within a pair that has a cluster that is considered past vaccine refractory
-        st[, active := sum(immuneGrp)>0, by = pair] 
     st <- st[perstime > 0,] 
+    st <- activeFXN(st)
     return(st)
 })
-## p1 <- simTrial(makeParms(small=F))
-## s1 <- makeSurvDat(p1)
-## censSurvDat(s1, 72)[,sum(active)]
 
-doCoxPH <- function(csd, pkg='coxme', browse=F) { ## take censored survival object and return vacc effectiveness estimates
-    if(browse) browser()
-    csd <- csd[active==1,]
-    if(pkg=='coxph') {
-        mod <- try(coxph(Surv(startDay, endDay, infected) ~ immuneGrp + frailty.gamma(cluster, eps=1e-10, method="em", sparse=0),
-                         outer.max=1000, iter.max=10000,
-                         data=csd), silent=T)
-        vaccEffEst <- 1-summary(mod)$conf.int['immuneGrp',c(1,4:3)] 
-        pval <- summary(mod)$coefficients['immuneGrp','p']
-        vaccEffEst <- c(vaccEffEst, pval)
+## Select subset of survival table to analyze
+activeFXN <- function(st) within(st, { 
+    ## for SWCT or unmatched CRCT always include all clusters in analysis because unvaccinated
+    ## clusters are still considered to provide useful information from baseline
+    st$active <- TRUE
+    ## for matched CRCT, only include pairs that have a cluster considered past vaccine refractory period
+    if(trial=='CRCT' & ord!='none') {
+        st[, active := sum(immuneGrp)>0, by = pair] 
+        ## STOPPED HERE ## 
+        ## Only inclue
+        st[, active := sum(startDay > immuneDayThink)>0, by = pair] 
+        ## remove person-time observed prior to post-refractory period from data
+browser()
+        refractoryNotYetStarted <- st[, endDay, by = pair]
+        st <- st[!refractoryNotYetStarted]
+        st
     }
-    if(pkg=='coxme') {
-        mod <- suppressWarnings(coxme(Surv(startDay, endDay, infected) ~ immuneGrp + (1|cluster), data = csd))
-        pval <- pnorm(mod$coef/sqrt(vcov(mod)))*2
-        vaccEffEst <- 1-exp(mod$coef + c(0, 1.96, -1.96)*sqrt(vcov(mod)))
-        vaccEffEst <- c(vaccEffEst, pval)
-    }
-    ##     mod <- coxph(Surv(startDay, endDay, infected) ~ immuneGrp, data=csd) ## without frailty
-    if(inherits(mod, 'try-error')) {print('blah'); browser()}
-    names(vaccEffEst) <- c('mean','lci','uci','p')
-    return(signif(vaccEffEst,3))
-}
+    ## for RCT analysis, includ clusters with anyone considered past vaccination refractory period
+    if(trial %in% c('RCT','FRCT')) 
+        st[,active :=sum(immuneGrp)>0, by = cluster] 
+})
 
-doGlmer <- function(csd, bayes=F, browse = F) {## take censored survival object and return vacc effectiveness estimates using bayesian glme
-    if(browse) browser()
-    csd <- csd[active==1,]
-    if(bayes) mod <- bglmer(infected ~ immuneGrp + (1|cluster) + offset(log(perstime)), family=binomial(link='cloglog'),  data = csd)
-    if(!bayes) mod <- glmer(infected ~ immuneGrp + (1|cluster) + offset(log(perstime)), family=binomial(link='cloglog'),  data = csd)
-    vaccRes <- summary(mod)$coefficients['immuneGrp', c('Estimate','Std. Error','Pr(>|z|)')] 
-    vaccEffEst <- c(1 - exp(vaccRes[1] + c(0, 1.96, -1.96) * vaccRes[2]), vaccRes[3])
-    names(vaccEffEst) <- c('mean','lci','uci','P')
-    return(signif(vaccEffEst,3))
-}
+p1 <- simTrial(makeParms('CRCT', ord='BL', small=F))
+s1 <- makeSurvDat(p1)
 
-summTrial <- function(st) list(summarise(group_by(st, cluster), sum(infected))
-                               , summarise(group_by(st, cluster, immuneGrp), sum(infected))
-                               , summarise(group_by(st, immuneGrp), sum(infected))
+activeFXN(s1)
+
+summTrial <- function(st) list(summarise(group_by(st[active==T], cluster), sum(infected))
+                               , summarise(group_by(st[active==T], cluster, immuneGrp), sum(infected))
+                               , summarise(group_by(st[active==T], immuneGrp), sum(infected))
                                )
 
 compileStopInfo <- function(minDay, vaccEffEst, tmp) {
+    tmp <- tmp[active==T]
     out <- c(stopDay=minDay, vaccEffEst, caseVacc = tmp[immuneGrp==1, sum(infected)], caseCont = tmp[immuneGrp==0, sum(infected)],
              ptVacc = tmp[immuneGrp==1, sum(perstime)], ptCont = tmp[immuneGrp==0, sum(perstime)] )
     out <- c(out, hazVacc = as.numeric(out['caseVacc']/out['ptVacc']/yearToDays),
              hazCont = as.numeric(out['caseCont']/out['ptCont']/yearToDays))
+    out <- c(out, ptRatio = as.numeric(out['ptCont'] / out['ptVacc']))
     return(out)
 }
 
 ## Do a binary search for the number of infections before the stopping point is reached: this is
 ## assumed to be when 95% CI of vaccine efficacy goes above 0
-firstStop <- function(parms, minDay=min(parms$pop$immuneDay) + 30, maxDay=365, verbose = 0) { ## using days to facilitate easier rounding
+firstStop <- function(parms, minDay=min(parms$pop$immuneDayThink) + 30, maxDay=365, verbose = 0) { ## using days to facilitate easier rounding
     if(verbose>=2) browser()
     midDay <- floor((minDay+maxDay)/2) ## floor to days
-    ## doCoxPH(censSurvDat(parms$st, midDay), T)
     tmp <- censSurvDat(parms, midDay)
     vaccEffEst <- doCoxPH(tmp) ## converting midDay to days from months
     out <- compileStopInfo(minDay, vaccEffEst, tmp)
     if (minDay >= maxDay) return(out)
     pVal <- vaccEffEst['p']
-    if(verbose>0) print(signif(vaccEffEst,2)) #paste0('lower 95% of vaccine efficacy at ', signif(midDay,2), ' days =', signif(lciMod,2)))
+    if(verbose>0) print(signif(vaccEffEst,2))
     goSmaller <- !is.na(pVal) & pVal<.05
     if(goSmaller)
         return(firstStop(parms, minDay, midDay, verbose))
@@ -106,7 +92,7 @@ firstStop <- function(parms, minDay=min(parms$pop$immuneDay) + 30, maxDay=365, v
 }
 
 ## Check whether stopping point has been reached at intervals
-seqStop <- function(parms, start = parms$immunoDelay + 14, checkIncrement = 7, verbose = 0, maxDay = 365) {
+seqStop <- function(parms, start = parms$immunoDelayThink + 14, checkIncrement = 7, verbose = 0, maxDay = 365) {
     trialOngoing <- T
     checkDay <- start
     first <- T
@@ -114,7 +100,8 @@ seqStop <- function(parms, start = parms$immunoDelay + 14, checkIncrement = 7, v
         if(verbose>1) browser()
         tmp <- censSurvDat(parms, checkDay)
         vaccEffEst <- try(doCoxPH(tmp), silent=T) ## converting midDay to days from months
-        if(!inherits(vaccEffEst, 'try-error') & !is.nan(vaccEffEst['p'])) { ## if cox model has enough info to converge check for stopping criteria
+        ## if cox model has enough info to converge check for stopping criteria
+        if(!inherits(vaccEffEst, 'try-error') & !is.nan(vaccEffEst['p'])) { 
             newout <- compileStopInfo(checkDay, vaccEffEst, tmp) 
             if(first) out <- newout else out <- rbind(out, newout)
             first <- F

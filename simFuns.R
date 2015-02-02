@@ -1,4 +1,4 @@
-library(blme); library(survival); library(coxme); library(data.table); library(parallel); library(dplyr); 
+library(survBayes); library(blme); library(survival); library(coxme); library(data.table); library(parallel); library(dplyr); 
 
 yearToDays <- 1/365.25
 monthToDays <- 1/30
