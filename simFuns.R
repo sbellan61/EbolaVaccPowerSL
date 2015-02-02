@@ -188,13 +188,19 @@ setCRCTvaccDays <- function(parms) within(parms, {
 simInfection <- function(parms) within(parms, {
     popH$infectDay <- Inf
     for(dd in daySeq) { ## infection day is beginning of each hazard interval + exponential waiting time
-        popH[day==dd, infectDay := dd + rexp(length(indiv), rate = indivHaz*ifelse(immune, 1-vaccEff, 1))] 
-        popH[day==dd & infectDay > dd + hazIntUnit, infectDay := Inf] ## reset if it goes into next haard interval
+        alreadyInfected <- popH[infectDay!=Inf, indiv] ## don't reinfect those already infected
+        popH[day==dd & !indiv %in% alreadyInfected, 
+             infectDay := dd + rexp(length(indiv), rate = indivHaz*ifelse(immune, 1-vaccEff, 1))] 
+        popH[day==dd & !indiv %in% alreadyInfected & infectDay > dd + hazIntUnit, 
+             infectDay := Inf] ## reset if it goes into next hazard interval
     }
     pop$infectDay <- Inf ## copy infection days to pop, to use in analysis
-    pop[indiv == popH[infectDay!=Inf, indiv], infectDay:= popH[infectDay!=Inf, infectDay]]
+    indivInfDays <- popH[infectDay!=Inf, list(indiv,infectDay)]
+    indivInfDays <- arrange(indivInfDays, indiv)
+    pop[indiv %in% indivInfDays[,indiv], infectDay:= indivInfDays[,infectDay]]
     rm(dd)
 })
+
 
 ## p1 <- setHazs(makePop(makeParms(clusSize=300, numClus=20, weeklyDecay=.9, weeklyDecayVar=0, ord='BL')))
 ## p1 <- reordPop(p1)
@@ -232,10 +238,10 @@ simTrial <- function(parms=makeParms(), browse = F) {
     parms <- makeSurvDat(parms) ## convert to survival type object
     return(parms)
 }
-simTrial()
+simTrial(b=F)
 
-p1 <- setHazs(makePop(makeParms(clusSize=300, numClus=20, weeklyDecay=.9, weeklyDecayVar=0, ord='BL')))
-p1 <- reordPop(p1)
-p1 <- setVaccDays(p1)
-p1 <- simInfection(p1)
-head(p1$pop[infectDay!=Inf, list(cluster, immuneDay, infectDay)],100)
+## p1 <- setHazs(makePop(makeParms(clusSize=300, numClus=20, weeklyDecay=.9, weeklyDecayVar=0, ord='BL')))
+## p1 <- reordPop(p1)
+## p1 <- setVaccDays(p1)
+## p1 <- simInfection(p1)
+## head(p1$pop[infectDay!=Inf, list(cluster, immuneDay, infectDay)],100)
