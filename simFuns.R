@@ -19,6 +19,7 @@ makeParms <- function(
     , reordLag = 0 ## how long ago's hazard to use when deciding this week's time-updated vaccination sequence
     , includeAllControlPT = F ## include person-time from controlled trials before end of vaccination refractory period?
     , RCTendOption = 2        ## order to vaccinate unvaccinated invididuals when an RCT ends, see EndTrialFuns.R
+    , instVaccDelay = 7 ## delay til instant vacc of everyone after trial ends in trials where delayUnit=0 otherwise
     , small=F ## do a small trial for illustration
     ){
     if(small) {
