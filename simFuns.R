@@ -18,6 +18,7 @@ makeParms <- function(
     , hazIntUnit = 7 ## interval between discrete changes in hazard
     , reordLag = 0 ## how long ago's hazard to use when deciding this week's time-updated vaccination sequence
     , includeAllControlPT = F ## include person-time from controlled trials before end of vaccination refractory period?
+    , RCTendOption = 2        ## order to vaccinate unvaccinated invididuals when an RCT ends, see EndTrialFuns.R
     , small=F ## do a small trial for illustration
     ){
     if(small) {
