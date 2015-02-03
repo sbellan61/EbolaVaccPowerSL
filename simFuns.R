@@ -154,8 +154,8 @@ setVaccDays <- function(parms) { ## wrapper around other functions below
     })
 }
 setSWCTvaccDays <- function(parms) within(parms, {
-        popH$vaccDay <- delayUnit*(popH[,cluster]-1)
-    })
+    popH$vaccDay <- delayUnit*(popH[,cluster]-1)
+})
 setRCTvaccDays <- function(parms) within(parms, { ## assuming same speed rollout as SWCT (unless FRCT)
     popH$vaccDay <- Inf ## unvaccinated
     popH[idByClus > clusSize/2 , vaccDay := delayUnit*(cluster-1)] ## half get vaccinated in each cluster, 1 per interval
@@ -170,26 +170,30 @@ setCRCTvaccDays <- function(parms) within(parms, {
 ## p1 <- setVaccDays(p1)
 ## p1$popH[idByClus==1,list(cluster,clusHaz, day,vacc,immune)]
 
-## Simulate infections
-simInfection <- function(parms, whichDo='pop') within(parms, { ## takes popH or EVpopH for end trial vaccination version
-    tmp <- get(whichDo)
-    tmpH <- get(paste0(whichDo,'H'))
-    tmpH$infectDay <- Inf
-    for(dd in daySeq) { ## infection day is beginning of each hazard interval + exponential waiting time
-        alreadyInfected <- tmpH[infectDay!=Inf, indiv] ## don't reinfect those already infected
-        tmpH[day==dd & !indiv %in% alreadyInfected, 
-             infectDay := dd + rexp(length(indiv), rate = indivHaz*ifelse(immune, 1-vaccEff, 1))] 
-        tmpH[day==dd & !indiv %in% alreadyInfected & infectDay > dd + hazIntUnit, 
-             infectDay := Inf] ## reset if it goes into next hazard interval
-    }
-    tmp$infectDay <- Inf ## copy infection days to pop, to use in analysis
-    indivInfDays <- tmpH[infectDay!=Inf, list(indiv,infectDay)]
-    indivInfDays <- arrange(indivInfDays, indiv)
-    tmp[indiv %in% indivInfDays[,indiv], infectDay:= indivInfDays[,infectDay]]
-    assign(whichDo, tmp)
-    assign(paste0(whichDo,'H'), tmpH)
-    rm(tmp, tmpH, dd,alreadyInfected,indivInfDays)
-})
+## Simulate infections. Takes popH for initial simulation, or EVpopH for end trial vaccination version (requires startInf)
+simInfection <- function(parms, whichDo='pop', startInfectingDay = 0, ## startInf can be set to endTrialDay
+                         browse = F) 
+    within(parms, { 
+        if(browse) browser()
+        tmp <- get(whichDo)
+        tmpH <- get(paste0(whichDo,'H'))
+        if(startInfectingDay==0) tmpH$infectDay <- Inf ## otherwise it's already got some infection data in it
+        tmpH[infectDay > startInfectingDay, infectDay := Inf] ## redoing post endDay stuff with additional folks vacc
+        for(dd in daySeq[daySeq>=startInfectingDay]) { ## infection day is beginning of each hazard interval + exponential waiting time
+            alreadyInfected <- tmpH[infectDay!=Inf, indiv] ## don't reinfect those already infected
+            tmpH[day==dd & !indiv %in% alreadyInfected, 
+                 infectDay := dd + rexp(length(indiv), rate = indivHaz*ifelse(immune, 1-vaccEff, 1))] 
+            tmpH[day==dd & !indiv %in% alreadyInfected & infectDay > dd + hazIntUnit, 
+                 infectDay := Inf] ## reset if it goes into next hazard interval
+        }
+        tmp$infectDay <- Inf ## copy infection days to pop, to use in analysis
+        indivInfDays <- tmpH[infectDay!=Inf, list(indiv,infectDay)]
+        indivInfDays <- arrange(indivInfDays, indiv)
+        tmp[indiv %in% indivInfDays[,indiv], infectDay:= indivInfDays[,infectDay]]
+        assign(whichDo, tmp)
+        assign(paste0(whichDo,'H'), tmpH)
+        rm(tmp, tmpH, dd,alreadyInfected,indivInfDays)
+    })
 
 ## p1 <- setHazs(makePop(makeParms(clusSize=300, numClus=20, weeklyDecay=.9, weeklyDecayVar=0, ord='BL')))
 ## p1 <- reordPop(p1)

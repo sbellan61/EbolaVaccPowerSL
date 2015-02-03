@@ -1,37 +1,43 @@
 ## Construct survival data from waiting times
-makeSurvDat <- function(parms) within(parms, {
-    pop$immuneDayThink <- pop[,vaccDay] + immunoDelayThink ## vaccine refractory period ASSUMED in analysis
+makeSurvDat <- function(parms,  whichDo='pop') within(parms, {
+    popTmp <- get(whichDo)
+    popTmp$immuneDayThink <- popTmp[,vaccDay] + immunoDelayThink ## vaccine refractory period ASSUMED in analysis
     ## pre-immunity table
-    stPre <- copy(pop) # st = survival table
+    stPre <- copy(popTmp) # st = survival table
     stPre$startDay <- 0
     stPre$endDay <- stPre[, pmin(immuneDayThink, infectDay)]
     stPre$infected <- stPre[ ,as.numeric(infectDay <= immuneDayThink)]
     stPre$immuneGrp <-  0     ## immuneGrp is variable used for analysis, not omnietient knowledge of vaccination/immune status
     stPre <- stPre[,list(indiv, cluster, pair, idByClus, vaccDay, immuneDay, immuneDayThink, startDay, endDay, infected, immuneGrp)]
     ## post-immunity table
-    stPost <- copy(pop)[infectDay > immuneDayThink,]
+    stPost <- copy(popTmp)[infectDay > immuneDayThink,]
     stPost$startDay <- stPost[,immuneDayThink]
     stPost$endDay   <-  stPost[,infectDay]
     stPost$infected <- 1 ## everyone gets infected eventually, but will truncate this in a separate function
     stPost$immuneGrp <- 1
     stPost <- stPost[,list(indiv, cluster, pair, idByClus, vaccDay, immuneDay, immuneDayThink, startDay, endDay, infected, immuneGrp)]
-    st <- rbind(stPre, stPost) ## combine tables
-    rm(stPre, stPost)
+    nmSt <- paste0(sub('pop','',whichDo),'st') ## makes EVpop into EVst for example
+    assign(nmSt, rbind(stPre, stPost)) ## combine tables
+    rm(stPre, stPost, popTmp, nmSt)
 }) ## careful with modifying parms, st depends on analysis a bit too (immunoDelayThink), so we can have different st for same popH
 
 ## Select subset of survival table to analyze
-activeFXN <- function(parms) within(parms, { 
+activeFXN <- function(parms, whichDo='st') within(parms, { 
     ## for SWCT or unmatched CRCT always include all clusters in analysis because unvaccinated
     ## clusters are still considered to provide useful information from baseline
-    st$firstActive <- 0
+    stA <- copy(st)
+    stA$firstActive <- 0
     if(!includeAllControlPT) { ## remove person-time observed prior to post-refractory period from data
         if(trial=='CRCT' & ord!='none') ## active once anyone considered immune in matched cluster pair
-            st[, firstActive := min(immuneDayThink), by = pair]
+            stA[, firstActive := min(immuneDayThink), by = pair]
         if(trial %in% c('RCT','FRCT')) ## active once anyone considered immune in cluster
-            st[, firstActive := min(immuneDayThink), by = cluster]
+            stA[, firstActive := min(immuneDayThink), by = cluster]
     }
-    st <- st[!endDay <= firstActive] ## remove inactive observation intervals
-    st[startDay < firstActive, startDay := firstActive] ## set accumulation of person time as when the cluster/pair is active
+    stA <- stA[!endDay <= firstActive] ## remove inactive observation intervals
+    stA[startDay < firstActive, startDay := firstActive] ## set accumulation of person time as when the cluster/pair is active
+    nmStA <- paste0(sub('st','',whichDo),'stActive') ## makes EVpop into EVst for example
+    assign(nmStA, stA)
+    rm(stA, nmStA)
 })
 ## p1 <- simTrial(makeParms('RCT', ord='BL', small=F), br=F)
 ## s1 <- makeSurvDat(p1)
@@ -39,15 +45,16 @@ activeFXN <- function(parms) within(parms, {
 ## s1$st[idByClus%in%1:2, list(indiv, cluster, pair, idByClus,immuneDayThink, startDay,endDay)]
 
 ## Take a survival data from above function and censor it by a specified time in months
-censSurvDat <- function(parms, censorDay = 6*30) with(parms, {
-    intervalNotStarted <- st[,startDay] > censorDay
-    st <- st[!intervalNotStarted,] 
-    noInfectionBeforeCensor <- st[,endDay] > censorDay
-    st[noInfectionBeforeCensor, infected:=0]
-    st[noInfectionBeforeCensor, endDay:=censorDay]
-    st[,perstime := (endDay-startDay)]
-    st <- st[perstime > 0,] 
-    return(st)
+censSurvDat <- function(parms, censorDay = 6*30, whichDo = 'stActive') with(parms, {
+    stTmp <- get(whichDo)
+    intervalNotStarted <- stTmp[,startDay] > censorDay
+    stTmp <- stTmp[!intervalNotStarted,] 
+    noInfectionBeforeCensor <- stTmp[,endDay] > censorDay
+    stTmp[noInfectionBeforeCensor, infected:=0]
+    stTmp[noInfectionBeforeCensor, endDay:=censorDay]
+    stTmp[,perstime := (endDay-startDay)]
+    stTmp <- stTmp[perstime > 0,] 
+    return(stTmp)
 })
 
 summTrial <- function(st) list(summarise(group_by(st, cluster), sum(infected))
@@ -111,192 +118,6 @@ seqStop <- function(parms, start = parms$immunoDelayThink + 14, checkIncrement =
     return(parms)
 }
 
-endCRCT <- function(parms) within(parms, {
-    EVpopH <- copy(popH)
-    ## remaining clusters get vaccinated starting delayUnit after endTrialDay or when the last cluster 
-    vaccClusters <- EVpopH[vaccDay <= endTrialDay  & vaccDay!=Inf , unique(cluster)]            
-    notYetVaccClusters <- EVpopH[vaccDay > endTrialDay & vaccDay!=Inf , unique(cluster)]
-    contClusters <- EVpopH[vaccDay==Inf , unique(cluster)]
-    unVaccClusters <- c(notYetVaccClusters, contClusters)
-    vaccDaysLeft <- daySeq[daySeq > endTrialDay] ## update this vector
-
-    if(ord == 'none') ## vaccinate clusters
-        ## remaining clusters go numClus/2+1 : numClus in CRCT
-        EVpopH[vaccDay==Inf, vaccDay := startVaccContDay + delayUnit*(cluster - numClus/2)] 
-    if(ord == 'BL') { ## vaccinate remaining clusters in order of highest to lowest based on trial end time
-        EVclusIncRank <- EVpopH[cluster %in% unVaccClusters & idByClus==1 & day == endTrialDay,
-                                rev(order(clusHaz))]
-    }
-    if(ord == 'TU') { ## vaccinate clusters in order of time-updated highest to lowest
-        EVclusIncRank <- NULL
-        for(ii in 1:length(unVaccClusters)) {
-            dd <- vaccDaysLeft[ii]
-            tmpRank <- EVpopH[cluster %in% unVaccClusters & idByClus==1 & day == dd,
-                              rev(order(clusHaz))]
-            tmpRank <- tmpRank[!tmpRank %in% EVclusIncRank]
-            EVclusIncRank <- c(EVclusIncRank, tmpRank[1])
-            rm(tmpRank,dd)
-        }
-        if(ord %in% c('BL','TU'))
-            for(ii in 1:length(EVclusIncRank))
-                EVpopH[cluster==unVaccClusters[EVclusIncRank[ii]],
-                       vaccDay := vaccDaysLeft[ii]]
-        rm(ii, EVclusIncRank)
-    }
-})
-
-## Vaccinate control groups once vaccine efficacy identified
-vaccEndTrial <- function(parms) {
-    parms <- within(parms, {
-        lastPreassignedVaccDay <- popH[vaccDay!=Inf, max(vaccDay)]
-        startVaccContDay <- max(lastPreassignedVaccDay, endTrialDay)
-    })
-    endFXN <- get(paste0('end', parms$trial))
-    parms <- endFXN(parms)
-    return(parms)
-}
-
-    ## SWCT is fastest possible vaccination already, so no change
-
-    if(trial %in% c('RCT','FRCT')) { ## remaining half get vaccinated in each cluster starting delayUnit day decision made to vaccinate controls
-        vaccClusters <- EVpopH[vaccDay <= endTrialDay  & vaccDay!=Inf , unique(cluster)]            
-        notYetVaccClusters <- EVpopH[vaccDay > endTrialDay & vaccDay!=Inf , unique(cluster)]
-        ## ##################################################
-        ## OPTION 1: Continue with cluster sequence, but vaccinate full clusters. Then go back and vacc partially vacc clusters.
-        if(F) {# RCTendOption==1) {
-            ## vaccinate everyone (not just half) in those clusters that haven't yet had anyone vaccinated moving forward
-            vaccDaysLeft <- daySeq[daySeq > lastPreassignedVaccDay] ## remaining vaccination days (delayUnit apart)
-            EVpopH[cluster %in% notYetVaccClusters & vaccDay==Inf,
-                   vaccDay := delayUnit*(cluster-1)] ## same as those pre-assigned to be vaccinated
-            EVpopH[cluster %in% notYetVaccClusters, unique(vaccDay)]
-            ## ##################################################
-            ## Vaccinate the rest of partially vaccinated clusters afterwards. First get order in which to do it, if necessary.
-            if(ord == 'BL') ## reorder vaccination sequence by vaccinating highest hazard clusters as determined when trial ended
-                EVclusIncRank <- EVpopH[cluster %in% vaccClusters & vaccDay == Inf & idByClus==1 & day == endTrialDay,
-                                        rev(order(clusHaz))]
-            if(ord == 'TU') {  ## reorder vaccination sequence by vaccinating highest hazard partially vacc clusters as vaccination happens
-                EVclusIncRank <- NULL
-                for(ii in 1:length(vaccClusters)) {
-                    dd <- vaccDaysLeft[ii]
-                    tmpRank <- EVpopH[cluster %in% vaccClusters & idByClus==1 & day == dd,
-                                      rev(order(clusHaz))]
-                    tmpRank <- tmpRank[!tmpRank %in% EVclusIncRank]
-                    EVclusIncRank <- c(EVclusIncRank, tmpRank[1])
-                }
-            }
-            ## Then update the vaccination days based on the order
-            if(ord == 'none')
-                EVpopH[cluster %in% vaccClusters & vaccDay==Inf, 
-                       vaccDay := vaccDaysLeft[1] + delayUnit*(cluster-1)]
-            if(ord == 'BL') { 
-                for(ii in 1:length(EVclusIncRank))
-                    EVpopH[cluster==EVclusIncRank[ii] & vaccDay==Inf, vaccDay := vaccDaysLeft[ii]]
-                rm(ii) }
-            if(ord == 'TU') {
-                for(ii in 1:length(EVclusIncRank))
-                    EVpopH[cluster==EVclusIncRank[ii] & vaccDay==Inf, vaccDay := vaccDaysLeft[ii]]
-            }
-            rm(ii) }
-        ## EVpopH[idByClus %in% c(1,1+clusSize/2) & day == daySeq[which.min(abs(daySeq - startVaccContDay))],
-        ##        list(cluster, clusHaz, day, vaccDay)] ## check that it works
-    }
-    ## ##################################################
-    ## Option 2. Vacc partially vacc clusters first, then vaccinate entire unvacc clusters.
-    ## vaccinate the rest of partially vaccinated clusters afterwards
-
-    if(T) {# RCTendOption==2) {
-        ## Vaccinate the rest of partially vaccinated clusters first. First get order in which to do it, if necessary.
-        vaccDaysLeft <- daySeq[daySeq > endTrialDay] ## remaining vaccination days (delayUnit apart)
-        if(ord == 'BL') ## reorder vaccination sequence by vaccinating highest hazard clusters as determined when trial ended
-            EVclusIncRank <- EVpopH[cluster %in% vaccClusters & vaccDay == Inf & idByClus==1 & day == endTrialDay,
-                                    rev(order(clusHaz))]
-        if(ord == 'TU') {  ## reorder vaccination sequence by vaccinating highest hazard partially vacc clusters as vaccination happens
-            EVclusIncRank <- NULL
-            for(ii in 1:length(vaccClusters)) {
-                dd <- vaccDaysLeft[ii]
-                tmpRank <- EVpopH[cluster %in% vaccClusters & idByClus==1 & day == dd,
-                                  rev(order(clusHaz))]
-                tmpRank <- tmpRank[!tmpRank %in% EVclusIncRank]
-                EVclusIncRank <- c(EVclusIncRank, tmpRank[1])
-            }
-        }
-        ## Then update the vaccination days for unvaccinated individuals in partially vaccinated clusters based on these orders
-        if(ord == 'none')
-            EVpopH[cluster %in% vaccClusters & vaccDay==Inf, 
-                   vaccDay := vaccDaysLeft[1] + delayUnit*(cluster-1)]
-        if(ord == 'BL') { 
-            for(ii in 1:length(EVclusIncRank))
-                EVpopH[cluster==EVclusIncRank[ii] & vaccDay==Inf, vaccDay := vaccDaysLeft[ii]]
-            rm(ii) }
-        if(ord == 'TU') {
-            for(ii in 1:length(EVclusIncRank))
-                EVpopH[cluster==EVclusIncRank[ii] & vaccDay==Inf, vaccDay := vaccDaysLeft[ii]]
-        }
-        ## EVpopH[cluster %in% vaccClusters & idByClus %in% c(1,clusSize/2+1) & day == 0, ] ## check ordering works
-        ## Then go back and vaccinate unvaccinated clusters
-        vaccDaysLeft <- daySeq[daySeq > EVpopH[cluster %in% vaccClusters, max(vaccDay)]] ## update this vector
-        ## Again get order first, for totally unvaccinated clusters
-        if(ord == 'BL') ## reorder vaccination sequence by vaccinating highest hazard clusters as determined when *trial ended*
-            EVclusIncRank <- EVpopH[cluster %in% notYetVaccClusters & vaccDay == Inf & idByClus==1 & day == endTrialDay,
-                                    rev(order(clusHaz))]
-        if(ord == 'TU') {  ## reorder vaccination sequence by vaccinating highest hazard partially vacc clusters as vaccination happens
-            EVclusIncRank <- NULL
-            for(ii in 1:length(notYetVaccClusters)) {
-                dd <- vaccDaysLeft[ii]
-                tmpRank <- EVpopH[cluster %in% notYetVaccClusters & idByClus==1 & day == dd,
-                                  rev(order(clusHaz))]
-                tmpRank <- tmpRank[!tmpRank %in% EVclusIncRank]
-                EVclusIncRank <- c(EVclusIncRank, tmpRank[1])
-            }
-        }
-        ## Then set vaccination day for ALL within cluster (not those that
-        ## haven't been already assigned, i.e. don't require vaccDay==Inf)
-        if(ord == 'none')
-            EVpopH[cluster %in% notYetVaccClusters,
-                   vaccDay := vaccDaysLeft[1] + delayUnit*(cluster-1)]
-        if(ord %in% c('BL','TU')) { 
-            for(ii in 1:length(EVclusIncRank))
-                EVpopH[cluster==notYetVaccClusters[EVclusIncRank[ii]],
-                       vaccDay := vaccDaysLeft[ii]]
-            rm(ii) }
-        ## for(ii in 1:length(notYetVaccClusters))  ## check it works
-        ##     print(EVpopH[cluster %in% notYetVaccClusters &idByClus==1 &day ==vaccDaysLeft[ii], 
-        ##                  list(cluster, vaccDay, day, clusHaz, order(rev(order(clusHaz))))])
-    }
-
-    ## ##################################################
-    ## Option 3. Continue with cluster sequence, but vaccinate full clusters. *Simultaneously* begin going
-    ## back and vacc partially vacc clusters.
-    if(F) {# RCTendOption==3) {
-
-    }
-
-
-        }
-        ## for(ii in 1:length(unVaccClusters))  ## check ordering
-        ##     print(EVpopH[cluster %in% unVaccClusters & idByClus==1 & day==vaccDaysLeft[ii], 
-        ##                  list(cluster, clusHaz, order(rev(order(clusHaz))), vaccDay)])
-
-    toChange <- EVpopH[, vaccDay==Inf]
-    ## ## Reset immune indices for these individuals
-    ## EVpopH[toChange, immuneDay := vaccDay + immunoDelay] 
-    ## EVpopH[toChange, vacc := day >= vaccDay]
-    ## EVpopH[toChange, immune := day >= immuneDay]
-
-    ## ## Resample infection times for vacc
-    ## EVpopH[toChange & vacc==TRUE,]
-    
-})
-
-vaccEndTrial(t1)
-
-## * Finish the trial (but vaccinating whole clusters), then go back and
-## clean up the half-vaccinated clusters
-
-## * Clean up the half-vaccinated clusters, and then finish with the
-## unvaccinated clusters
-
-## * Assume some sort of logistical miracle that allows you to do both.
 
 
 casesInTrial <- function(parms, maxDayCaseDay = 6*30) sum(with(parms$pop, infectDay < maxDayCaseDay))
