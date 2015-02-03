@@ -49,7 +49,7 @@ activeFXN <- function(parms, whichDo='st', browse=F) within(parms, {
 ## s1$st[idByClus%in%1:2, list(indiv, cluster, pair, idByClus,immuneDayThink, startDay,endDay)]
 
 ## Take a survival data from above function and censor it by a specified time in months
-censSurvDat <- function(parms, censorDay = 6*30, whichDo = 'stActive') with(parms, {
+censSurvDat <- function(parms, censorDay = parms$maxInfectDay+hazIntUnit, whichDo = 'stActive') with(parms, {
     stTmp <- copy(get(whichDo))
     intervalNotStarted <- stTmp[,startDay] > censorDay
     stTmp <- stTmp[!intervalNotStarted,] 
