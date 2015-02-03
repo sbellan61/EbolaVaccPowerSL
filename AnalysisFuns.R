@@ -1,5 +1,6 @@
 ## Construct survival data from waiting times
-makeSurvDat <- function(parms,  whichDo='pop') within(parms, {
+makeSurvDat <- function(parms,  whichDo='pop', browse=F) within(parms, {
+    if(browse) browser()
     popTmp <- get(whichDo)
     popTmp$immuneDayThink <- popTmp[,vaccDay] + immunoDelayThink ## vaccine refractory period ASSUMED in analysis
     ## pre-immunity table
@@ -8,24 +9,27 @@ makeSurvDat <- function(parms,  whichDo='pop') within(parms, {
     stPre$endDay <- stPre[, pmin(immuneDayThink, infectDay)]
     stPre$infected <- stPre[ ,as.numeric(infectDay <= immuneDayThink)]
     stPre$immuneGrp <-  0     ## immuneGrp is variable used for analysis, not omnietient knowledge of vaccination/immune status
-    stPre <- stPre[,list(indiv, cluster, pair, idByClus, vaccDay, immuneDay, immuneDayThink, startDay, endDay, infected, immuneGrp)]
+    stPre <- stPre[,list(indiv, cluster, pair, idByClus, vaccDay, immuneDay, 
+                         immuneDayThink, startDay, endDay, infectDay, infected, immuneGrp)]
     ## post-immunity table
     stPost <- copy(popTmp)[infectDay > immuneDayThink,]
     stPost$startDay <- stPost[,immuneDayThink]
     stPost$endDay   <-  stPost[,infectDay]
     stPost$infected <- 1 ## everyone gets infected eventually, but will truncate this in a separate function
     stPost$immuneGrp <- 1
-    stPost <- stPost[,list(indiv, cluster, pair, idByClus, vaccDay, immuneDay, immuneDayThink, startDay, endDay, infected, immuneGrp)]
+    stPost <- stPost[,list(indiv, cluster, pair, idByClus, vaccDay, immuneDay, 
+                           immuneDayThink, startDay, endDay, infectDay,  infected, immuneGrp)]
     nmSt <- paste0(sub('pop','',whichDo),'st') ## makes EVpop into EVst for example
     assign(nmSt, rbind(stPre, stPost)) ## combine tables
     rm(stPre, stPost, popTmp, nmSt)
 }) ## careful with modifying parms, st depends on analysis a bit too (immunoDelayThink), so we can have different st for same popH
 
 ## Select subset of survival table to analyze
-activeFXN <- function(parms, whichDo='st') within(parms, { 
+activeFXN <- function(parms, whichDo='st', browse=F) within(parms, { 
+    if(browse) browser()
     ## for SWCT or unmatched CRCT always include all clusters in analysis because unvaccinated
     ## clusters are still considered to provide useful information from baseline
-    stA <- copy(st)
+    stA <- copy(get(whichDo))
     stA$firstActive <- 0
     if(!includeAllControlPT) { ## remove person-time observed prior to post-refractory period from data
         if(trial=='CRCT' & ord!='none') ## active once anyone considered immune in matched cluster pair
@@ -46,7 +50,7 @@ activeFXN <- function(parms, whichDo='st') within(parms, {
 
 ## Take a survival data from above function and censor it by a specified time in months
 censSurvDat <- function(parms, censorDay = 6*30, whichDo = 'stActive') with(parms, {
-    stTmp <- get(whichDo)
+    stTmp <- copy(get(whichDo))
     intervalNotStarted <- stTmp[,startDay] > censorDay
     stTmp <- stTmp[!intervalNotStarted,] 
     noInfectionBeforeCensor <- stTmp[,endDay] > censorDay
