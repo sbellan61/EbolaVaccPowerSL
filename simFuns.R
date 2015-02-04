@@ -1,4 +1,4 @@
-library(survBayes); library(blme); library(survival); library(coxme); library(data.table); library(parallel); library(dplyr); 
+library(blme); library(survival); library(coxme); library(data.table); library(parallel); library(dplyr); 
 
 yearToDays <- 1/365.25
 monthToDays <- 1/30
@@ -150,7 +150,7 @@ setVaccDays <- function(parms) { ## wrapper around other functions below
         popH$vacc <- popH[, day>=vaccDay]
         popH$immune <- popH[, day>=immuneDay]
         ## reset pop to refrence data table after reordering and then assignment of vaccday stuff
-        pop <- select(popH[day==0,], indiv, cluster, pair, idByClus, indivRR, vaccDay, immuneDay) 
+        pop <- select(popH[day==0], indiv, cluster, pair, idByClus, indivRR, vaccDay, immuneDay) 
     })
 }
 setSWCTvaccDays <- function(parms) within(parms, {
@@ -186,8 +186,9 @@ simInfection <- function(parms, whichDo='pop', startInfectingDay = 0, ## startIn
             tmpH[day==dd & !indiv %in% alreadyInfected & infectDay > dd + hazIntUnit, 
                  infectDay := Inf] ## reset if it goes into next hazard interval
         }
-        tmp$infectDay <- Inf ## copy infection days to pop, to use in analysis
-        indivInfDays <- tmpH[infectDay!=Inf, list(indiv,infectDay)]
+        if(startInfectingDay==0) tmp$infectDay <- Inf ## initialize in pop if this is start trial simulation
+        ## copy infection days to pop, to use in analysis
+        indivInfDays <- tmpH[infectDay!=Inf & infectDay > startInfectingDay, list(indiv,infectDay)]
         indivInfDays <- arrange(indivInfDays, indiv)
         tmp[indiv %in% indivInfDays[,indiv], infectDay:= indivInfDays[,infectDay]]
         assign(whichDo, tmp)

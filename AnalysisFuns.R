@@ -69,21 +69,21 @@ summTrial <- function(st) list(summarise(group_by(st, cluster), sum(infected))
 compileStopInfo <- function(minDay, vaccEffEst, tmp) {
     out <- data.table(stopDay=minDay
                       , mean = vaccEffEst['mean'], lci = vaccEffEst['lci'], uci = vaccEffEst['uci'], p = vaccEffEst['p']
-                      , caseVaccEndTXImmuneGrp = tmp[immuneGrp==1, sum(infected)]
-                      , caseContEndTXImmuneGrp = tmp[immuneGrp==0, sum(infected)]
-                      ## , ptVaccEndTXImmuneGrp = tmp[immuneGrp==1, sum(perstime)]
-                      ## , ptContEndTXImmuneGrp = tmp[immuneGrp==0, sum(perstime)]
+                      , caseVaccEndXimmuneGrp = tmp[immuneGrp==1, sum(infected)]
+                      , caseContEndXimmuneGrp = tmp[immuneGrp==0, sum(infected)]
+                      ## , ptVaccEndXimmuneGrp = tmp[immuneGrp==1, sum(perstime)]
+                      ## , ptContEndXimmuneGrp = tmp[immuneGrp==0, sum(perstime)]
                       )
-    ## out$hazVaccEndTXImmuneGrp <- out[, caseVaccEndTXImmuneGrp / ptVaccEndTXImmuneGrp / yearToDays]
-    ## out$hazContEndTXImmuneGrp <- out[, caseContEndTXImmuneGrp / ptContEndTXImmuneGrp / yearToDays]
-    ## out$ptRatioEndTXImmuneGrp <- out[, ptContEndTXImmuneGrp / ptVaccEndTXImmuneGrp]
+    ## out$hazVaccEndXimmuneGrp <- out[, caseVaccEndXimmuneGrp / ptVaccEndXimmuneGrp / yearToDays]
+    ## out$hazContEndXimmuneGrp <- out[, caseContEndXimmuneGrp / ptContEndXimmuneGrp / yearToDays]
+    ## out$ptRatioEndXimmuneGrp <- out[, ptContEndXimmuneGrp / ptVaccEndXimmuneGrp]
     out$stopped <- out[, p<.05 & !is.na(p)]
     out$vaccGood <- NA
     out[stopped==T, vaccGood:= lci > 0]
     out <- setcolorder(out, c("stopped", "vaccGood", "stopDay", "mean", "lci", "uci", "p"
-                              , "caseVaccEndTXImmuneGrp", "caseContEndTXImmuneGrp"
-                              ## , "ptVaccEndTXImmuneGrp", "ptContEndTXImmuneGrp"
-                              ## , "hazVaccEndTXImmuneGrp", "hazContEndTXImmuneGrp",  "ptRatioEndTXImmuneGrp"
+                              , "caseVaccEndXimmuneGrp", "caseContEndXimmuneGrp"
+                              ## , "ptVaccEndXimmuneGrp", "ptContEndXimmuneGrp"
+                              ## , "hazVaccEndXimmuneGrp", "hazContEndXimmuneGrp",  "ptRatioEndXimmuneGrp"
                               ))
     out <- as.data.frame(out)
     return(out)
@@ -130,19 +130,17 @@ simNtrials <- function(seed = 1, parms=makeParms(), N = 2, check=F, returnAll = 
         res <- makeSurvDat(res)
         res <- activeFXN(res)
         res <- seqStop(res)
-        browser()
-        res <- endT(res,T)
+        res <- endT(res)
         res <- makeCaseSummary(res)
-
         ## active cases at end of trial
         ## total cases at final
         ## active cases at final
         stopPt <- as.data.frame(tail(res$weeklyAns,1))
         stopPt <- c(stopPt
-                    , contCasesFinalActive = res$casesXVaccRandGrp[type=='EVstActive', contCases] 
-                    , vaccCasesFinalActive = res$casesXVaccRandGrp[type=='EVstActive', vaccCases]
-                    , contCasesFinal = res$casesXVaccRandGrp[type=='EVst', contCases] 
-                    , vaccCasesFinal = res$casesXVaccRandGrp[type=='EVst', vaccCases]
+                    , casesXrandContFinalActive = res$casesXVaccRandGrp[type=='EVstActive', contCases] 
+                    , casesXrandVaccFinalActive = res$casesXVaccRandGrp[type=='EVstActive', vaccCases]
+                    , casesXrandContFinal = res$casesXVaccRandGrp[type=='EVst', contCases] 
+                    , casesXrandVaccFinal = res$casesXVaccRandGrp[type=='EVst', vaccCases]
                     )
         stopPoints <- rbind(stopPoints, stopPt)
         if(returnAll) {
