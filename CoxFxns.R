@@ -11,7 +11,7 @@ doCoxPH <- function(csd, pkg='coxme', browse=F) { ## take censored survival obje
     if(pkg=='coxme') {
         mod <- suppressWarnings(coxme(Surv(startDay, endDay, infected) ~ immuneGrp + (1|cluster), data = csd))
         vaccEffEst <- 1-exp(mod$coef + c(0, 1.96, -1.96)*sqrt(vcov(mod)))
-        pval <- pnorm(mod$coef/sqrt(vcov(mod)))*2
+        pval <- pnorm(mod$coef/sqrt(vcov(mod)), lower.tail = vaccEffEst[1]>0)*2
         vaccEffEst <- c(vaccEffEst, pval)
         if(vcov(mod)==0) vaccEffEst[2:4] <- NA ## if failing to converge on effect estimate (i.e. 0 variance in beta coefficient)
     }
