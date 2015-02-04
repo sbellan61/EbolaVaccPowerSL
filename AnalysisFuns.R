@@ -49,7 +49,7 @@ activeFXN <- function(parms, whichDo='st', browse=F) within(parms, {
 ## s1$st[idByClus%in%1:2, list(indiv, cluster, pair, idByClus,immuneDayThink, startDay,endDay)]
 
 ## Take a survival data from above function and censor it by a specified time in months
-censSurvDat <- function(parms, censorDay = parms$maxInfectDay+hazIntUnit, whichDo = 'stActive') with(parms, {
+censSurvDat <- function(parms, censorDay = parms$maxInfectDay+parms$hazIntUnit, whichDo = 'stActive') with(parms, {
     stTmp <- copy(get(whichDo))
     intervalNotStarted <- stTmp[,startDay] > censorDay
     stTmp <- stTmp[!intervalNotStarted,] 
@@ -67,30 +67,27 @@ summTrial <- function(st) list(summarise(group_by(st, cluster), sum(infected))
                                )
 
 compileStopInfo <- function(minDay, vaccEffEst, tmp) {
-    out <- c(stopDay=minDay, vaccEffEst, caseVacc = tmp[immuneGrp==1, sum(infected)], caseCont = tmp[immuneGrp==0, sum(infected)],
-             ptVacc = tmp[immuneGrp==1, sum(perstime)], ptCont = tmp[immuneGrp==0, sum(perstime)] )
-    out <- c(out, hazVacc = as.numeric(out['caseVacc']/out['ptVacc']/yearToDays),
-             hazCont = as.numeric(out['caseCont']/out['ptCont']/yearToDays))
-    out <- c(out, ptRatio = as.numeric(out['ptCont'] / out['ptVacc']))
+    out <- data.table(stopDay=minDay
+                      , mean = vaccEffEst['mean'], lci = vaccEffEst['lci'], uci = vaccEffEst['uci'], p = vaccEffEst['p']
+                      , caseVaccEndTXImmuneGrp = tmp[immuneGrp==1, sum(infected)]
+                      , caseContEndTXImmuneGrp = tmp[immuneGrp==0, sum(infected)]
+                      ## , ptVaccEndTXImmuneGrp = tmp[immuneGrp==1, sum(perstime)]
+                      ## , ptContEndTXImmuneGrp = tmp[immuneGrp==0, sum(perstime)]
+                      )
+    ## out$hazVaccEndTXImmuneGrp <- out[, caseVaccEndTXImmuneGrp / ptVaccEndTXImmuneGrp / yearToDays]
+    ## out$hazContEndTXImmuneGrp <- out[, caseContEndTXImmuneGrp / ptContEndTXImmuneGrp / yearToDays]
+    ## out$ptRatioEndTXImmuneGrp <- out[, ptContEndTXImmuneGrp / ptVaccEndTXImmuneGrp]
+    out$stopped <- out[, p<.05 & !is.na(p)]
+    out$vaccGood <- NA
+    out[stopped==T, vaccGood:= lci > 0]
+    out <- setcolorder(out, c("stopped", "vaccGood", "stopDay", "mean", "lci", "uci", "p"
+                              , "caseVaccEndTXImmuneGrp", "caseContEndTXImmuneGrp"
+                              ## , "ptVaccEndTXImmuneGrp", "ptContEndTXImmuneGrp"
+                              ## , "hazVaccEndTXImmuneGrp", "hazContEndTXImmuneGrp",  "ptRatioEndTXImmuneGrp"
+                              ))
+    out <- as.data.frame(out)
     return(out)
 }
-
-## ## Do a binary search for the number of infections before the stopping point is reached: this is
-## ## assumed to be when 95% CI of vaccine efficacy goes above 0
-## firstStop <- function(parms, minDay=min(parms$pop$immuneDayThink) + 30, maxDay=365, verbose = 0) { ## using days to facilitate easier rounding
-##     if(verbose>=2) browser()
-##     midDay <- floor((minDay+maxDay)/2) ## floor to days
-##     tmp <- censSurvDat(parms, midDay)
-##     vaccEffEst <- doCoxPH(tmp) ## converting midDay to days from months
-##     out <- compileStopInfo(minDay, vaccEffEst, tmp)
-##     if (minDay >= maxDay) return(out)
-##     pVal <- vaccEffEst['p']
-##     if(verbose>0) print(signif(vaccEffEst,2))
-##     goSmaller <- !is.na(pVal) & pVal<.05
-##     if(goSmaller)
-##         return(firstStop(parms, minDay, midDay, verbose))
-##     return(firstStop(parms, midDay+1, maxDay, verbose)) ## output in months
-## }
 
 ## Check whether stopping point has been reached at intervals
 seqStop <- function(parms, start = parms$immunoDelayThink + 14, checkIncrement = 7, verbose = 0, maxDay = parms$maxInfectDay) {
@@ -101,7 +98,7 @@ seqStop <- function(parms, start = parms$immunoDelayThink + 14, checkIncrement =
         if(verbose>1) browser()
         if(verbose>0) print(checkDay)
         tmp <- censSurvDat(parms, checkDay)
-        vaccEffEst <- try(doCoxPH(tmp), silent=F) ## converting midDay to days from months
+        vaccEffEst <- try(doCoxPH(tmp), silent=T) ## converting midDay to days from months
         ## if cox model has enough info to converge check for stopping criteria
         if(!inherits(vaccEffEst, 'try-error') & !is.nan(vaccEffEst['p'])) { 
             newout <- compileStopInfo(checkDay, vaccEffEst, tmp) 
@@ -122,27 +119,42 @@ seqStop <- function(parms, start = parms$immunoDelayThink + 14, checkIncrement =
     return(parms)
 }
 
-
-
-casesInTrial <- function(parms, maxDayCaseDay = 6*30) sum(with(parms$pop, infectDay < maxDayCaseDay))
-
-simNtrials <- function(seed = 1, parms=makeParms(), N = 2, check=F, verbose=0) {
+simNtrials <- function(seed = 1, parms=makeParms(), N = 2, check=F, returnAll = F, verbose=0) {
     set.seed(seed)
+    casesXVaccRandGrpList <- casesXPT_ImmuneList <- weeklyAnsList <- list()
+    length(casesXVaccRandGrpList) <- length(casesXPT_ImmuneList) <- length(weeklyAnsList) <- N
+    stopPoints <- data.frame(NULL)
     for(ii in 1:N) {
         if(verbose>1) browser()
         res <- simTrial(parms)
-        stopPoint <- tail(seqStop(res),1)
-        if(ii==1) out <- stopPoint else out <- rbind(out, stopPoint)
-        if(check) {
-            doCoxPH(censSurvDat(res$st, stopPoint$stopDay))
-            doCoxPH(censSurvDat(res$st, stopPoint$stopDay+1))
+        res <- makeSurvDat(res)
+        res <- activeFXN(res)
+        res <- seqStop(res)
+        res <- endT(res)
+        res <- makeCaseSummary(res,T)
+        browser()
+        ## active cases at end of trial
+        ## total cases at final
+        ## active cases at final
+        stopPt <- as.data.frame(tail(res$weeklyAns,1))
+        res$casesXVaccRandGrp
+
+        stopPt <- c(stopPt
+                    , contCasesFinalActive = res$casesXVaccRandGrp[type=='EVstActive', contCases] 
+                    , vaccCasesFinalActive = res$casesXVaccRandGrp[type=='EVstActive', vaccCases]
+                    , contCasesFinal = res$casesXVaccRandGrp[type=='EVst', contCases] 
+                    , vaccCasesFinal = res$casesXVaccRandGrp[type=='EVst', vaccCases]
+                    )
+        stopPoints <- rbind(stopPoints, stopPt)
+        if(returnAll) {
+            weeklyAnsList[[ii]] <- as.data.frame(res$weeklyAns)
+            casesXVaccRandGrpList[[ii]] <- as.data.frame(res$casesXVaccRandGrp)
+            casesXPT_ImmuneList[[ii]] <- as.data.frame(res$casesXPT_Immune)
         }
     }
-    rownames(out) <- NULL
-    return(out)#as.data.table(out))
-}
-
-simNwrp <- function(parms=makeParms(), NperCore = 10, check=F, ncores=12) {
-    out <- mclapply(1:ncores, simNtrials, N = NperCore, mc.cores = ncores)
-    out <- do.call(rbind.data.frame, out)
+    rownames(stopPoints) <- NULL
+    if(returnAll)
+        return(list(stopPoints, weeklyAnsList, casesXVaccRandGrpList, casesXPT_ImmuneList))
+    if(!returnAll)
+        return(stopPoints)
 }

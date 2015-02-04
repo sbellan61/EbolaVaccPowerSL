@@ -7,10 +7,10 @@ makeParms <- function(
     , numClus=20, clusSize=300
     , delayUnit = 7 ## logistically imposed interval in between each new cluster receiving vaccination
     , ord = 'none' ## order clusters' receipt of vaccination ('none', by baseline visit 'BL', by time-updated 'TU' last interval incidence)
-    , mu=.02 * yearToDays ## mean hazard in all participants at baseline
+    , mu=.03 * yearToDays ## mean hazard in all participants at baseline
     , varClus=mu^2/2 ##  variance in cluster-level hazards for gamma distribution 
     , sdLogIndiv = 1 ## variance of lognormal distribution of individual RR within a hazard (constant over time, i.e. due to job)
-    , vaccEff = .6
+    , vaccEff = .8
     , maxInfectDay = 7*36 ## end of trial (36 weeks default; 9 months)
     , immunoDelay = 21 ## delay from vaccination to immunity
     , immunoDelayThink = immunoDelay ## delay from vaccination to immunity used in analysis (realistically would be unknown)
