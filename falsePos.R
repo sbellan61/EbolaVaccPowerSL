@@ -4,7 +4,7 @@ if(grepl('tacc', Sys.info()['nodename'])) setwd('/home1/02413/sbellan/VaccEbola/
 ## Simulate SWCT vs RCT vs CRCT for SL
 sapply(c('simFuns.R','AnalysisFuns.R','CoxFxns.R','EndTrialFuns.R'), source)
 
-nullParms <- makeParms(vaccEff = 0, weeklyDecay = 1, weeklyDecayVar = 0)
+nullParms <- makeParms(vaccEff = 0, weeklyDecay = 1, weeklyDecayVar = 0, varClus = 0)
 trialTypes <- c('RCT','FRCT','SWCT','CRCT')
 nsims <- 2
 seed <- 1
