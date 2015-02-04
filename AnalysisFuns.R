@@ -130,15 +130,14 @@ simNtrials <- function(seed = 1, parms=makeParms(), N = 2, check=F, returnAll = 
         res <- makeSurvDat(res)
         res <- activeFXN(res)
         res <- seqStop(res)
-        res <- endT(res)
-        res <- makeCaseSummary(res,T)
         browser()
+        res <- endT(res,T)
+        res <- makeCaseSummary(res)
+
         ## active cases at end of trial
         ## total cases at final
         ## active cases at final
         stopPt <- as.data.frame(tail(res$weeklyAns,1))
-        res$casesXVaccRandGrp
-
         stopPt <- c(stopPt
                     , contCasesFinalActive = res$casesXVaccRandGrp[type=='EVstActive', contCases] 
                     , vaccCasesFinalActive = res$casesXVaccRandGrp[type=='EVstActive', vaccCases]
