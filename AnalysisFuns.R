@@ -134,8 +134,8 @@ simNtrials <- function(seed = 1, parms=makeParms(), N = 2, returnAll = F,
     length(caseXVaccRandGrpList) <- length(caseXPT_ImmuneList) <- length(weeklyAnsList) <- N
     endFinRes <- stopPoints <- data.frame(NULL)
     if(showSeqStops) pdf(paste0(flnm, '.pdf'), w = 8, h = 6)
-    for(ii in 1:N) {
-        if(verbose>0 & (ii %% 10 == 0)) print(paste('on',ii,'of',N))
+    for(ss in 1:N) {
+        if(verbose>0 & (ss %% 10 == 0)) print(paste('on',ss,'of',N))
         if(verbose>1) browser()
         res <- simTrial(parms)
         res <- makeSurvDat(res)
@@ -164,9 +164,9 @@ simNtrials <- function(seed = 1, parms=makeParms(), N = 2, returnAll = F,
         stopPoints <- rbind(stopPoints, stopPt)
         endFinRes <- rbind(endFinRes, res$stopFin)
         if(returnAll) {
-            weeklyAnsList[[ii]] <- as.data.frame(res$weeklyAns)
-            caseXVaccRandGrpList[[ii]] <- as.data.frame(res$casesXVaccRandGrp)
-            caseXPT_ImmuneList[[ii]] <- as.data.frame(res$casesXPT_Immune)
+            weeklyAnsList[[ss]] <- as.data.frame(res$weeklyAns)
+            caseXVaccRandGrpList[[ss]] <- as.data.frame(res$casesXVaccRandGrp)
+            caseXPT_ImmuneList[[ss]] <- as.data.frame(res$casesXPT_Immune)
         }
         rm(res)
     }

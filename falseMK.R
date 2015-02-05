@@ -13,6 +13,7 @@ numEach <- 12
 parmsMat <- as.data.table(expand.grid(
     seed =  1:numEach
     , trial = tnms
+    , sdLogIndiv = c(0,makeParms()$sdLogIndiv)
     , varClus = c(0, makeParms()$varClus) 
     , weeklyDecay = c(1, makeParms()$weeklyDecay)
     , weeklyDecayVar = c(0, makeParms()$weeklyDecayVar)
@@ -21,13 +22,17 @@ parmsMat <- as.data.table(expand.grid(
 parmsMat <- parmsMat[! ( weeklyDecay==1 & weeklyDecayVar!=0 )] ## not interested in variance around stability
 parmsMat$simNum <- 1:nrow(parmsMat)
 parmsMat$batchdirnm <- batchdirnm
-parmsMat$nsims <- 1000
+parmsMat$saveNm <- 'simFP2-'
+parmsMat$nsims <- 100
+
+parmsMatDo <- parmsMat[sdLogIndiv==1 & varClus!=0 & weeklyDecay!=1 & weeklyDecayVar!=0]
+nrow(parmsMatDo)
 
 addParm <- function(x, parmsMat,ii) {
     for(pp in 1:length(parmsMat)) {
         tempP <- as.data.frame(parmsMat)[,pp]
         isch <- !is.numeric(tempP[1])
-        parmAdd <- tempP[ii]
+        parmAdd <- tempP[parmsMat$simNum==ii]
         addStrg <- paste0(" ", names(parmsMat)[pp], "=", "\""[isch], parmAdd, "\""[isch])
         x <- paste0(x, addStrg)
     }
@@ -35,9 +40,9 @@ addParm <- function(x, parmsMat,ii) {
 }
 
 sink('falsePosSims.txt')
-for(ii in parmsMat$simNum) {
+for(ii in parmsMatDo$simNum) {
     cmd <- "R CMD BATCH '--no-restore --no-save --args"
-    cmd <- addParm(cmd, parmsMat, ii)
+    cmd <- addParm(cmd, parmsMatDo, ii)
     cmd <- paste0(cmd, " ' falsePos.R ", file.path(batchdirnm,'Routs', paste0('falsePosSim', ii,'.Rout')), sep='')
     cat(cmd)               # add command
     cat('\n')              # add new line
