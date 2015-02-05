@@ -71,26 +71,26 @@ compileStopInfo <- function(minDay, vaccEffEst, tmp) {
                       , mean = vaccEffEst['mean'], lci = vaccEffEst['lci'], uci = vaccEffEst['uci'], p = vaccEffEst['p']
                       , caseCXimmGrpEnd = tmp[immuneGrp==0, sum(infected)]
                       , caseVXimmGrpEnd = tmp[immuneGrp==1, sum(infected)]
-                      ## , ptVXimmGrpEnd = tmp[immuneGrp==1, sum(perstime)]
-                      ## , ptCXimmGrpEnd = tmp[immuneGrp==0, sum(perstime)]
+                      , hazCXimmGrpEnd = tmp[immuneGrp==0, sum(infected)/sum(perstime)]
+                      , hazVXimmGrpEnd = tmp[immuneGrp==1, sum(infected)/sum(perstime)]
+                      , ptRatioCVXimmGrpEnd = tmp[immuneGrp==0, sum(perstime)] / tmp[immuneGrp==1, sum(perstime)]
                       )
-    ## out$hazVXimmGrpEnd <- out[, caseVXimmGrpEnd / ptVXimmGrpEnd / yearToDays]
-    ## out$hazCXimmGrpEnd <- out[, caseCXimmGrpEnd / ptCXimmGrpEnd / yearToDays]
-    ## out$ptRatioXimmGrpEnd <- out[, ptCXimmGrpEnd / ptVXimmGrpEnd]
     out$stopped <- out[, p<.05 & !is.na(p)]
     out$vaccGood <- NA
     out[stopped==T, vaccGood:= lci > 0]
     out <- setcolorder(out, c("stopped", "vaccGood", "stopDay", "mean", "lci", "uci", "p"
                               , "caseCXimmGrpEnd", "caseVXimmGrpEnd"
-                              ## , "ptVXimmGrpEnd", "ptCXimmGrpEnd"
-                              ## , "hazVXimmGrpEnd", "hazCXimmGrpEnd",  "ptRatioXimmGrpEnd"
+                              , "hazCXimmGrpEnd", "hazVXimmGrpEnd"
+                              , "ptRatioCVXimmGrpEnd"
                               ))
     out <- as.data.frame(out)
     return(out)
 }
 
+
 ## Check whether stopping point has been reached at intervals
-seqStop <- function(parms, start = parms$immunoDelayThink + 14, checkIncrement = 7, verbose = 0, maxDay = parms$maxInfectDay) {
+seqStop <- function(parms, start = parms$immunoDelayThink + 14, checkIncrement = 7, minCases = 10,
+                    verbose = 0, fullSeq = F, maxDay = parms$maxInfectDay) {
     trialOngoing <- T
     checkDay <- start
     first <- T
@@ -104,7 +104,8 @@ seqStop <- function(parms, start = parms$immunoDelayThink + 14, checkIncrement =
             newout <- compileStopInfo(checkDay, vaccEffEst, tmp) 
             if(first) out <- newout else out <- rbind(out, newout)
             first <- F
-            if(!is.na(newout['p']))
+            numCases <- newout['caseCXimmGrpEnd'] + newout['caseVXimmGrpEnd']
+            if(!fullSeq & !is.na(newout['p']) & numCases > minCases)
                 if(newout['p'] < .05)
                     trialOngoing <- F
             if(checkDay > maxDay) trialOngoing <- F
@@ -119,40 +120,99 @@ seqStop <- function(parms, start = parms$immunoDelayThink + 14, checkIncrement =
     return(parms)
 }
 
-simNtrials <- function(seed = 1, parms=makeParms(), N = 2, check=F, returnAll = F, verbose=0) {
+simNtrials <- function(seed = 1, parms=makeParms(), N = 2, returnAll = F,
+                       showSeqStops = F, flnm='test', verbose=1) {
     set.seed(seed)
-    casesXVaccRandGrpList <- casesXPT_ImmuneList <- weeklyAnsList <- list()
-    length(casesXVaccRandGrpList) <- length(casesXPT_ImmuneList) <- length(weeklyAnsList) <- N
+    caseXVaccRandGrpList <- caseXPT_ImmuneList <- weeklyAnsList <- list()
+    length(caseXVaccRandGrpList) <- length(caseXPT_ImmuneList) <- length(weeklyAnsList) <- N
     stopPoints <- data.frame(NULL)
+    if(showSeqStops) pdf(paste0(flnm, '.pdf'), w = 8, h = 6)
     for(ii in 1:N) {
+        if(verbose>0 & ii %% 10 == 0) print(paste('on',ii,'of',N))
         if(verbose>1) browser()
         res <- simTrial(parms)
         res <- makeSurvDat(res)
         res <- activeFXN(res)
         res <- seqStop(res)
+        if(showSeqStops) {
+            resfull <- seqStop(res, fullSeq = T)
+            showSeqStop(resfull)
+        }
         res <- endT(res)
         res <- makeCaseSummary(res)
-        ## active cases at end of trial
-        ## total cases at final
-        ## active cases at final
-        stopPt <- as.data.frame(tail(res$weeklyAns,1))
-        stopPt <- c(stopPt
-                    , caseCXrandFinA = res$casesXVaccRandGrp[type=='EVstActive', contCases] 
-                    , caseVXrandFinA = res$casesXVaccRandGrp[type=='EVstActive', vaccCases]
-                    , caseCXrandFin = res$casesXVaccRandGrp[type=='EVst', contCases] 
-                    , caseVXrandFin = res$casesXVaccRandGrp[type=='EVst', vaccCases]
-                    )
+        stopPt <- as.data.frame(tail(res$weeklyAns,1)) ## active cases by immmune grouping at time of case at end of trial
+        stopPt <- with(res, {
+            cbind(stopPt
+                , caseCXrandFinA = casesXVaccRandGrp[type=='EVstActive', contCases] ## active cases by vaccination randomization group at final
+                , caseVXrandFinA = casesXVaccRandGrp[type=='EVstActive', vaccCases]
+                , hazCXrandFinA = casesXVaccRandGrp[type=='EVstActive', contCases/contPT]/yearToDays
+                , hazVXrandFinA = casesXVaccRandGrp[type=='EVstActive', vaccCases/vaccPT]/yearToDays
+                , caseCXrandFin = casesXVaccRandGrp[type=='EVst', contCases]         ## total cases by vaccination randomization group at final
+                , caseVXrandFin = casesXVaccRandGrp[type=='EVst', vaccCases]
+                , hazCXrandFin = casesXVaccRandGrp[type=='EVst', contCases/contPT]/yearToDays
+                , hazVXrandFin = casesXVaccRandGrp[type=='EVst', vaccCases/vaccPT]/yearToDays
+                  )
+        })
         stopPoints <- rbind(stopPoints, stopPt)
         if(returnAll) {
             weeklyAnsList[[ii]] <- as.data.frame(res$weeklyAns)
             caseXVaccRandGrpList[[ii]] <- as.data.frame(res$casesXVaccRandGrp)
             caseXPT_ImmuneList[[ii]] <- as.data.frame(res$casesXPT_Immune)
         }
+        rm(res)
     }
+    if(showSeqStops) graphics.off()
     rownames(stopPoints) <- NULL
     stop
     if(returnAll)
-        return(list(stopPoints, weeklyAnsList, caseXVaccRandGrpList, caseXPT_ImmuneList))
+        return(list(
+            stopPoints = stopPoints
+          , weeklyAnsList = weeklyAnsList
+          , caseXVaccRandGrpList = caseXVaccRandGrpList
+          , caseXPT_ImmuneList = caseXPT_ImmuneList
+        ))
     if(!returnAll)
         return(stopPoints)
 }
+
+showSeqStop <- function(resfull, flnm= NULL, ...) {
+    with(resfull, {
+        if(!is.null(flnm)) pdf(file.path('Figures', paste0(flnm,'.pdf')), ...)
+        par(lwd=1.5, mar = c(3,6,1,5), mgp = c(4,1,0), mfrow = c(2,2), oma = c(2,0,0,0))
+        plot(0,0, type = 'n', xlim = range(popH$day)/7, ylim = c(0, mu*7), las= 1, bty = 'n',
+             ylab = 'weekly hazard', xlab = 'day')
+        lines(weeklyAns[,list(stopDay/7, hazCXimmGrpEnd)], col = 'red')
+        lines(weeklyAns[,list(stopDay/7, hazVXimmGrpEnd)], col = 'black')
+        legend('topleft', c('vacc','cont','total','P value'), col = c('black', 'red','dark green','purple'),  bty = 'n', lwd=2,bg='white')
+        ## person-year of observation
+        plot(0,0, type = 'n', xlim = range(popH$day)/7, ylim = c(0, yearToDays*max(weeklyAns[, caseCXimmGrpEnd/hazCXimmGrpEnd],na.rm=T)), las= 1, bty = 'n',
+             ylab = 'person-years', xlab = 'day')
+        lines(weeklyAns[,list(stopDay/7, yearToDays*caseCXimmGrpEnd/hazCXimmGrpEnd)], col = 'red')
+        lines(weeklyAns[,list(stopDay/7, yearToDays*caseVXimmGrpEnd/hazVXimmGrpEnd)], col = 'black', lty = 2)
+        legend('topleft', c('vacc','cont','P value'), col = c('black', 'red','purple'),  bty = 'n', lwd=2,bg='white')
+        ## number of cases
+        plot(0,0, type = 'n', xlim = range(popH$day)/7, ylim = c(0, max(weeklyAns[, list(caseVXimmGrpEnd,caseCXimmGrpEnd)])), las= 1, bty = 'n',
+             ylab = 'cases', xlab = 'day')
+        lines(weeklyAns[,list(stopDay/7, caseCXimmGrpEnd)], col = 'red')
+        lines(weeklyAns[,list(stopDay/7, caseVXimmGrpEnd)], col = 'black')
+        lines(weeklyAns[,list(stopDay/7, caseVXimmGrpEnd+caseCXimmGrpEnd)], col = 'dark green')
+        par(new=T)
+        plot(weeklyAns[,list(stopDay, p)], col = 'purple', lty = 1, axes = F, ylab='', xlab='', type='l', ylim = c(0,1))
+        axis(4, at = seq(0, 1, by = .05), lab = NA)
+        axis(4, at = seq(0, 1, by = .1), las = 1)
+        abline(h=.05, lty = 2)
+        mtext('p value', 4, 3)
+        ## vaccine efficacy estimate
+        plot(0,0, type = 'n', xlim = range(popH$day)/7,
+             ylim = c(-1, 1), las= 1, bty = 'n', ylab = 'vaccine efficacy', xlab = 'day')
+        nmisg <- !weeklyAns[, is.na(lci) | is.na(uci)]
+        polygon(c(weeklyAns$stopDay[nmisg], rev(weeklyAns$stopDay[nmisg]))/7,
+                c(weeklyAns$lci[nmisg], rev(weeklyAns$uci[nmisg])), col = 'gray', border = NA)
+        lines(weeklyAns[,list(stopDay/7, mean)], col = 'black')
+        abline(h=0, lty = 2)
+        mtext('week of trial', 1, 1, T)
+        if(!is.null(flnm)) graphics.off()
+    })
+}
+
+

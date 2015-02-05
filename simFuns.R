@@ -2,6 +2,7 @@ library(blme); library(survival); library(coxme); library(data.table); library(p
 
 yearToDays <- 1/365.25
 monthToDays <- 1/30
+trialTypes <- c('RCT','FRCT','SWCT','CRCT')
 makeParms <- function(
     trial='RCT'
     , numClus=20, clusSize=300
@@ -65,9 +66,13 @@ setHazs <- function(parms=makePop()) within(parms, {
 ## reparameterize a gamma by mean/var to simulate spatial variation in underlying hazards (change
 ## later to something more reasonable or based on real data)
 reParmRgamma <- function(n, mean, var) {
-    theta <- var/mean
-    k <- mean/theta
-    rgamma(n, shape = k, scale = theta)
+    if(var > 0) {
+        theta <- var/mean
+        k <- mean/theta
+        rgamma(n, shape = k, scale = theta)
+    }else{ ## no variance
+        rep(mean, n)
+    }
 }
 
 reordPop <- function(parms) { ## wrapper around other functions below
@@ -213,3 +218,5 @@ simTrial <- function(parms=makeParms(), browse = F) {
 }
 ## simTrial(b=F)
 ## simTrial(makeParms(small=T),F)
+
+subsArgs <- function(parms, fxn) parms[names(parms) %in% names(formals(fxn))] ## get parameters necessary for a fxn
