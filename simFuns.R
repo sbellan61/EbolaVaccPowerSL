@@ -186,7 +186,8 @@ simInfection <- function(parms, whichDo='pop', startInfectingDay = 0, ## startIn
         tmpH <- get(paste0(whichDo,'H'))
         if(startInfectingDay==0) tmp$infectDay <- tmpH$infectDay <- Inf ## otherwise it's already got some infection data in it
         tmpH[infectDay > startInfectingDay, infectDay := Inf] ## redoing post endDay stuff with additional folks vacc
-        tmp[infectDay > startInfectingDay, infectDay := Inf] ## redoing post endDay stuff with additional folks vacc        
+        tmp[infectDay > startInfectingDay, infectDay := Inf] ## redoing post endDay stuff with additional folks vacc
+        alreadyInfected <- NULL
         for(dd in daySeq[daySeq>=startInfectingDay]) { ## infection day is beginning of each hazard interval + exponential waiting time
             alreadyInfected <- tmpH[infectDay!=Inf, indiv] ## don't reinfect those already infected
             tmpH[day==dd & !indiv %in% alreadyInfected, 

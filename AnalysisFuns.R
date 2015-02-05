@@ -135,7 +135,7 @@ simNtrials <- function(seed = 1, parms=makeParms(), N = 2, returnAll = F,
     endFinRes <- stopPoints <- data.frame(NULL)
     if(showSeqStops) pdf(paste0(flnm, '.pdf'), w = 8, h = 6)
     for(ii in 1:N) {
-        if(verbose>0 & ii %% 10 == 0) print(paste('on',ii,'of',N))
+        if(verbose>0 & (ii %% 10 == 0)) print(paste('on',ii,'of',N))
         if(verbose>1) browser()
         res <- simTrial(parms)
         res <- makeSurvDat(res)

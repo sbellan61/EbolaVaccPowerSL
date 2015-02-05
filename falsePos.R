@@ -19,10 +19,13 @@ if(length(args)>0)  {## Then cycle through each element of the list and evaluate
     simNum <- 99999
 }
 
+## seed=1; trial="RCT"; varClus=3.37312211966994e-09; weeklyDecay=0.9; weeklyDecayVar=0; vaccEff=0.8; simNum=1021; batchdirnm="Results/FalsePosSims"; nsims=5
+## parmArgs <- subsArgs(as.list(environment()), makeParms)
+
 print(parmArgs)
 parms <- do.call(makeParms, parmArgs)
 
-system.time(sim <- simNtrials(seed=seed, parms=parms, N=nsims, verbose = 0))
+system.time(sim <- simNtrials(seed=seed, parms=parms, N=nsims, verbose = 1))
 sim <- list(sim=sim, parms=parms)
 save(sim, file = file.path(batchdirnm, paste0('simFP',formatC(simNum, width=4, flag="0"),'.Rdata')))
 
