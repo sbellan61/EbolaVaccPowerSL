@@ -17,7 +17,7 @@ makeParms <- function(
     , immunoDelayThink = immunoDelay ## delay from vaccination to immunity used in analysis (realistically would be unknown)
     , weeklyDecay=.9, weeklyDecayVar=.007 ## log-normally distributed incidence decay rates (set var = 0 for constant)
     , hazIntUnit = 7 ## interval between discrete changes in hazard
-    , reordLag = 0 ## how long ago's hazard to use when deciding this week's time-updated vaccination sequence
+    , reordLag = 14 ## how long ago's hazard to use when deciding this week's time-updated vaccination sequence
     , includeAllControlPT = F ## include person-time from controlled trials before end of vaccination refractory period?
     , RCTendOption = 2        ## order to vaccinate unvaccinated invididuals when an RCT ends, see EndTrialFuns.R
     , instVaccDelay = 7 ## delay til instant vacc of everyone after trial ends in trials where delayUnit=0 otherwise
@@ -43,10 +43,11 @@ makePop <- function(parms=makeParms()) within(parms, {
 
 ## Set cluster- and individual-level hazards, with cluster means changing over time and individual
 ## RR around cluster mean constant
-setHazs <- function(parms=makePop()) within(parms, {
+setHazs <- function(parms=makePop(), browse=F) within(parms, {
+    if(browse) browser()
     baseClusHaz <- reParmRgamma(numClus, mean = mu, var = varClus) ## gamma distributed baseline hazards
     dailyDecayRates <- rlnorm(numClus, meanlog = log(weeklyDecay^(1/7)), weeklyDecayVar) 
-    daySeq <- seq(0,maxInfectDay,by=hazIntUnit)
+    daySeq <- seq(-hazIntUnit*ceiling(reordLag/hazIntUnit),maxInfectDay,by=hazIntUnit)
     hazT <- data.table(day = rep(daySeq, each = numClus), cluster = rep(1:numClus, length(daySeq)), clusHaz = 0)
     cHind <- which(names(hazT)=='clusHaz')
     ## mean cluster hazard trajectory
@@ -58,6 +59,9 @@ setHazs <- function(parms=makePop()) within(parms, {
     popH[, day := rep(daySeq, each=nrow(pop))]
     for(dd in daySeq) for(ii in 1:numClus) popH[day==dd & cluster==ii, clusHaz := hazT[day==dd & cluster==ii, clusHaz]]
     popH[, indivHaz := clusHaz*indivRR]
+    daySeqLong <- seq(0,maxInfectDay+1000,by=hazIntUnit) ## to avoid problems later
+    popHearly <- copy(popH)
+    popH <- popH[day >= 0]
     rm(ii, cHind, baseClusHaz, dd, hazT)
 })
 ## setHazs(makePop(makeParms(weeklyDecay=1, weeklyDecayVar=0)))$popH[cluster==1,]
@@ -102,7 +106,7 @@ reordSWCT <- reordFRCT <- reordRCT <- function(parms) within(parms, {
         for(ii in 1:numClus) { ## for each vaccination day
             dd <- daySeq[ii]
             updatingOrder <- 1:numClus > ii-1 ## i.e. on 3rd day of vaccination, only updating the 3rd vaccination sequence
-            currentRank <- popH[idByClus==1 & day == dd - reordLag, rev(order(clusHaz))] ## current cluster hazard ordering
+            currentRank <- popHearly[idByClus==1 & day == dd - reordLag, rev(order(clusHaz))] ## current cluster hazard ordering
             currentRank <- currentRank[!currentRank %in% clusIncRank] ## remove clusters already vaccinated
             clusIncRank <- c(clusIncRank, currentRank[1])
         }
@@ -131,7 +135,7 @@ reordCRCT <- function(parms) within(parms, {
         for(ii in 1:min(numPairs,length(daySeq))) { ## for each vaccination day
             dd <- daySeq[ii]
             notRandomized <- (1:numClus)[! 1:numClus %in% as.vector(clusIncRank)] ## haven't already been randomized
-            currIncOrd <- notRandomized[rev(order(popH[day==dd - reordLag & idByClus==1 & cluster %in% notRandomized, clusHaz]))]
+            currIncOrd <- notRandomized[rev(order(popHearly[day==dd - reordLag & idByClus==1 & cluster %in% notRandomized, clusHaz]))]
             currentRank <- matrix(currIncOrd, nc = 2, byrow=T)[1,] ## pick top row of paired matrix
             if(rbinom(1,1,.5)) currentRank <- rev(currentRank) ## deterine which of each pair to vaccinate (1st column)
             clusIncRank <- rbind(clusIncRank, currentRank) ## add pair

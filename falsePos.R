@@ -16,12 +16,15 @@ if(length(args)>0)  {## Then cycle through each element of the list and evaluate
     parmArgs <- list(trial='RCT', vaccEff = 0, weeklyDecay = 1, weeklyDecayVar = 0, varClus = 0, sdLogIndiv=0, small=F)
     nsims <- 1
     seed <- 1
+    simNum <- 99999
 }
+
 print(parmArgs)
 parms <- do.call(makeParms, parmArgs)
 
 system.time(sim <- simNtrials(seed=seed, parms=parms, N=nsims, verbose = 0))
-save(sim, file = file.path(batchdirnm, paste0('simFP',simNum,'.Rdata')))
+sim <- list(sim=sim, parms=parms)
+save(sim, file = file.path(batchdirnm, paste0('simFP',formatC(simNum, width=4, flag="0"),'.Rdata')))
 
 ## for(tri in trialTypes)
 ##     assign(paste0('sim',tri), simNtrials(seed = seed, parms = within(nullParms, {trial=tri}),
