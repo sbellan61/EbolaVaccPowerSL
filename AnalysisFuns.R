@@ -162,7 +162,7 @@ simNtrials <- function(seed = 1, parms=makeParms(), N = 2, returnAll = F,
                   )
         })
         stopPoints <- rbind(stopPoints, stopPt)
-        endFinRes <- rind(endFinRes, res$stopFin)
+        endFinRes <- rbind(endFinRes, res$stopFin)
         if(returnAll) {
             weeklyAnsList[[ii]] <- as.data.frame(res$weeklyAns)
             caseXVaccRandGrpList[[ii]] <- as.data.frame(res$casesXVaccRandGrp)

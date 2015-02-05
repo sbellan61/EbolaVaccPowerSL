@@ -1,6 +1,8 @@
 if(grepl('stevebe', Sys.info()['nodename'])) setwd('~/Documents/R Repos/EbolaVaccSim/')
 if(grepl('stevebellan', Sys.info()['login'])) setwd('~/Documents/R Repos/EbolaVaccSim/')
 if(grepl('tacc', Sys.info()['nodename'])) setwd('/home1/02413/sbellan/VaccEbola/')
+sapply(c('simFuns.R','AnalysisFuns.R','CoxFxns.R','EndTrialFuns.R'), source)
+
 batchdirnm <- file.path('Results','FalsePosSims')
 routdirnm <- file.path('Results','FalsePosSims','Routs')
 if(!file.exists(batchdirnm)) dir.create(batchdirnm)
@@ -8,21 +10,22 @@ if(!file.exists(routdirnm)) dir.create(routdirnm)
 tnms <- c('SWCT','RCT','FRCT','CRCT')
 numEach <- 12
 
-parmsMat <- data.frame(
-    nsims = 200
-  , seed =  rep(1:numEach, length(tnms))
-  , trial = rep(tnms, each = numEach)
-  , batchdirnm = batchdirnm
-  , varClus = 0
-  , weeklyDecay = 1
-  , weeklyDecayVar = 0
-  , vaccEff = 0
-)
+parmsMat <- as.data.table(expand.grid(
+    seed =  1:numEach
+    , trial = tnms
+    , varClus = c(0, makeParms()$varClus) 
+    , weeklyDecay = c(1, makeParms()$weeklyDecay)
+    , weeklyDecayVar = c(0, makeParms()$weeklyDecayVar)
+    , vaccEff = c(0, .6, .7, .8)
+    ))
+parmsMat <- parmsMat[! ( weeklyDecay==1 & weeklyDecayVar!=0 )] ## not interested in variance around stability
 parmsMat$simNum <- 1:nrow(parmsMat)
+parmsMat$batchdirnm <- batchdirnm
+parmsMat$nsims <- 1000
 
 addParm <- function(x, parmsMat,ii) {
     for(pp in 1:length(parmsMat)) {
-        tempP <- parmsMat[,pp]
+        tempP <- as.data.frame(parmsMat)[,pp]
         isch <- !is.numeric(tempP[1])
         parmAdd <- tempP[ii]
         addStrg <- paste0(" ", names(parmsMat)[pp], "=", "\""[isch], parmAdd, "\""[isch])

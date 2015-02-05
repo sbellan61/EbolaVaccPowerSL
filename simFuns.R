@@ -55,14 +55,12 @@ setHazs <- function(parms=makePop(), browse=F) within(parms, {
     ## give every individual a lognormally distributed relative risk
     pop$indivRR <- rlnorm(numClus*clusSize, meanlog = 0, sdlog = sdLogIndiv)
     ## create popH which has weekly hazards for all individuals
-    popH <- pop[rep(1:nrow(pop), length(daySeq))]
-    popH[, day := rep(daySeq, each=nrow(pop))]
-    for(dd in daySeq) for(ii in 1:numClus) popH[day==dd & cluster==ii, clusHaz := hazT[day==dd & cluster==ii, clusHaz]]
+    popH <- arrange(merge(pop, hazT, by='cluster', allow.cartesian=T),day)
     popH[, indivHaz := clusHaz*indivRR]
     daySeqLong <- seq(0,maxInfectDay+1000,by=hazIntUnit) ## to avoid problems later
     popHearly <- copy(popH)
     popH <- popH[day >= 0]
-    rm(ii, cHind, baseClusHaz, dd, hazT)
+    rm(ii, cHind, baseClusHaz, hazT)
 })
 ## setHazs(makePop(makeParms(weeklyDecay=1, weeklyDecayVar=0)))$popH[cluster==1,]
 ## setHazs(makePop(makeParms(weeklyDecay=.9, weeklyDecayVar=0)))$popH[cluster==1,]
