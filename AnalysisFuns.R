@@ -89,7 +89,7 @@ compileStopInfo <- function(minDay, vaccEffEst, tmp) {
 
 
 ## Check whether stopping point has been reached at intervals
-seqStop <- function(parms, start = parms$immunoDelayThink + 14, checkIncrement = 7, minCases = 10,
+seqStop <- function(parms, start = parms$immunoDelayThink + 14, checkIncrement = 7, minCases = 15,
                     verbose = 0, fullSeq = F, maxDay = parms$maxInfectDay) {
     trialOngoing <- T
     checkDay <- start
@@ -120,12 +120,19 @@ seqStop <- function(parms, start = parms$immunoDelayThink + 14, checkIncrement =
     return(parms)
 }
 
+getEndResults <- function(parms) within(parms, {
+    tmp <- censSurvDat(parms, maxInfectDay)
+    vaccEE <- doCoxPH(tmp)
+    stopFin <- compileStopInfo(maxInfectDay, vaccEE, tmp) 
+    rm(vaccEE,tmp)
+})
+
 simNtrials <- function(seed = 1, parms=makeParms(), N = 2, returnAll = F,
                        showSeqStops = F, flnm='test', verbose=1) {
     set.seed(seed)
     caseXVaccRandGrpList <- caseXPT_ImmuneList <- weeklyAnsList <- list()
     length(caseXVaccRandGrpList) <- length(caseXPT_ImmuneList) <- length(weeklyAnsList) <- N
-    stopPoints <- data.frame(NULL)
+    endFinRes <- stopPoints <- data.frame(NULL)
     if(showSeqStops) pdf(paste0(flnm, '.pdf'), w = 8, h = 6)
     for(ii in 1:N) {
         if(verbose>0 & ii %% 10 == 0) print(paste('on',ii,'of',N))
@@ -134,6 +141,7 @@ simNtrials <- function(seed = 1, parms=makeParms(), N = 2, returnAll = F,
         res <- makeSurvDat(res)
         res <- activeFXN(res)
         res <- seqStop(res)
+        res <- getEndResults(res)
         if(showSeqStops) {
             resfull <- seqStop(res, fullSeq = T)
             showSeqStop(resfull)
@@ -154,6 +162,7 @@ simNtrials <- function(seed = 1, parms=makeParms(), N = 2, returnAll = F,
                   )
         })
         stopPoints <- rbind(stopPoints, stopPt)
+        endFinRes <- rind(endFinRes, res$stopFin)
         if(returnAll) {
             weeklyAnsList[[ii]] <- as.data.frame(res$weeklyAns)
             caseXVaccRandGrpList[[ii]] <- as.data.frame(res$casesXVaccRandGrp)
@@ -170,9 +179,10 @@ simNtrials <- function(seed = 1, parms=makeParms(), N = 2, returnAll = F,
           , weeklyAnsList = weeklyAnsList
           , caseXVaccRandGrpList = caseXVaccRandGrpList
           , caseXPT_ImmuneList = caseXPT_ImmuneList
+            , endFinRes=endFinRes
         ))
     if(!returnAll)
-        return(stopPoints)
+        return(list(stopPoints=stopPoints, endFinRes=endFinRes))
 }
 
 showSeqStop <- function(resfull, flnm= NULL, ...) {
