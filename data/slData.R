@@ -86,7 +86,7 @@ graphics.off()
 sl[,reg2:=reg]
 cols <- rep(rainbow(7),2) ##rep(brewer.pal(11, 'RdBu'),2)
 ltys <- rep(1:2, each =7)
-pdf('../Figures/Paneled SL cleaned subnational data.pdf',  w = 10, h = 10)
+pdf('../Figures/Paneled SL cleaned subnational data.pdf',  w = 10, h = 8)
 xRange <- c(as.Date('2014-07-01'), as.Date('2015-02-01'))
 par(lwd=1, 'ps' = 12, mar = c(5,3,1.5,.5),mfrow = c(4,4))
 ymax <- sl[,max(inc,na.rm=T)]
