@@ -3,7 +3,7 @@ if(grepl('stevebellan', Sys.info()['login'])) setwd('~/Documents/R Repos/EbolaVa
 if(grepl('tacc', Sys.info()['nodename'])) setwd('/home1/02413/sbellan/VaccEbola/')
 # slData.R
 setwd('data')
-require(gdata); require(data.table); library(RColorBrewer)
+require(gdata); require(data.table); library(RColorBrewer); library(mgcv)
 
 # Data from: https://data.hdx.rwlabs.org/dataset/rowca-ebola-cases
 
@@ -105,3 +105,12 @@ graphics.off()
 
 save(sl, file='cleanSLData.Rdata')
 
+####################################################################################################
+## Nbinom GAM to each subnational to forecast
+m1 <- gam(inc ~ s(Date), family=negbin(c(1,10), 'log'), data= sl[reg=='Bombali'])
+m1 <- gam(inc ~ s(as.numeric(Date)), family=poisson(link='log'), data= sl[reg=='Bombali'])
+warnings()
+summary(m1)
+plot(m1)
+sl[,Date]
+negbin(c(1,10), link = log)
