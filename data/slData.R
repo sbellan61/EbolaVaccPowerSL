@@ -3,7 +3,7 @@ if(grepl('stevebellan', Sys.info()['login'])) setwd('~/Documents/R Repos/EbolaVa
 if(grepl('tacc', Sys.info()['nodename'])) setwd('/home1/02413/sbellan/VaccEbola/')
 # slData.R
 setwd('data')
-require(gdata); require(data.table)
+require(gdata); require(data.table); library(RColorBrewer)
 
 # Data from: https://data.hdx.rwlabs.org/dataset/rowca-ebola-cases
 
@@ -69,7 +69,8 @@ sl[Date==sl[int==0,unique(Date)], dupl:=duplicated(Date), reg]
 sl[,sum(dupl)]
 sl <- sl[dupl==F]
 
-
+cols <- rep(rainbow(7),2) ##rep(brewer.pal(11, 'RdBu'),2)
+ltys <- rep(1:2, each =7)
 pdf('../Figures/SL cleaned subnational data.pdf',  w = 6, h = 5)
 xRange <- c(as.Date('2014-07-01'), as.Date('2015-02-01'))
 par(lwd=1, 'ps' = 12)
@@ -77,8 +78,29 @@ ymax <- sl[,max(inc,na.rm=T)]*1.4
 plot(0,0, type = 'n', xlim = xRange, ylim = c(0, ymax), xaxt='n', xlab = '', bty = 'n', las = 1, ylab = '', 
      main= 'Sierra Leone Incident Cases')
 axis.Date(1, at=seq.Date(xRange[1], xRange[2], by = 'month'), las = 2, format = '%b-%d')
-sl[, lines(Date, inc, col = as.numeric(reg)), reg]
-legend('top', leg = sl[,unique(reg)], col = as.numeric(sl[,unique(reg)]), lty = 1, bty = 'n', ncol=3, cex = .75)
+sl[, lines(Date, inc, col = cols[as.numeric(reg)], lty = ltys[as.numeric(reg)]), reg]
+legend('top', leg = sl[,unique(reg)], col = cols[as.numeric(sl[,unique(reg)])], lty = ltys[as.numeric(sl[,unique(reg)])],
+       bty = 'n', ncol=3, cex = .75)
+graphics.off()
+
+sl[,reg2:=reg]
+cols <- rep(rainbow(7),2) ##rep(brewer.pal(11, 'RdBu'),2)
+ltys <- rep(1:2, each =7)
+pdf('../Figures/Paneled SL cleaned subnational data.pdf',  w = 10, h = 10)
+xRange <- c(as.Date('2014-07-01'), as.Date('2015-02-01'))
+par(lwd=1, 'ps' = 12, mar = c(5,3,1.5,.5),mfrow = c(4,4))
+ymax <- sl[,max(inc,na.rm=T)]
+sl[, {plot(Date,inc, xlim = xRange, ylim = c(0, ymax), xaxt='n', xlab = '', bty = 'n', las = 1, ylab = '', type = 'l',
+     main= '')
+      title(reg2[1])
+    axis.Date(1, at=seq.Date(xRange[1], xRange[2], by = 'month'), las = 2, format = '%b-%d')
+    }, reg]
+dev.off()
+
+
+sl[, lines(Date, inc, col = cols[as.numeric(reg)], lty = ltys[as.numeric(reg)]), reg]
+legend('top', leg = sl[,unique(reg)], col = cols[as.numeric(sl[,unique(reg)])], lty = ltys[as.numeric(sl[,unique(reg)])],
+       bty = 'n', ncol=3, cex = .75)
 graphics.off()
 
 save(sl, file='cleanSLData.Rdata')
