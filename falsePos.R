@@ -28,7 +28,7 @@ parms <- do.call(makeParms, parmArgs)
 
 system.time(sim <- simNtrials(seed=seed, parms=parms, N=nsims, verbose = 1))
 sim <- list(sim=sim, parms=parms, seed=seed)
-save(sim, file = file.path(batchdirnm, paste0(saveNm,formatC(simNum, width=4, flag="0"),'.Rdata')))
+save(sim, file = file.path(batchdirnm, paste0(saveNm,formatC(simNum, width=6, flag="0"),'.Rdata')))
 
 ## for(tri in trialTypes)
 ##     assign(paste0('sim',tri), simNtrials(seed = seed, parms = within(nullParms, {trial=tri}),

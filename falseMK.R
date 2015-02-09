@@ -3,8 +3,8 @@ if(grepl('stevebellan', Sys.info()['login'])) setwd('~/Documents/R Repos/EbolaVa
 if(grepl('tacc', Sys.info()['nodename'])) setwd('/home1/02413/sbellan/VaccEbola/')
 sapply(c('simFuns.R','AnalysisFuns.R','CoxFxns.R','EndTrialFuns.R'), source)
 
-batchdirnm <- file.path('Results','FalsePosSims')
-routdirnm <- file.path('Results','FalsePosSims','Routs')
+batchdirnm <- file.path('BigResults','FalsePosSims')
+routdirnm <- file.path('BigResults','FalsePosSims','Routs')
 if(!file.exists(batchdirnm)) dir.create(batchdirnm)
 if(!file.exists(routdirnm)) dir.create(routdirnm)
 tnms <- c('SWCT','RCT','FRCT','CRCT')
@@ -13,19 +13,26 @@ numEach <- 12
 parmsMat <- as.data.table(expand.grid(
     seed =  1:numEach
     , trial = tnms
-    , sdLogIndiv = c(0,makeParms()$sdLogIndiv)
-    , varClus = c(0, makeParms()$varClus) 
-    , weeklyDecay = c(1, makeParms()$weeklyDecay)
-    , weeklyDecayVar = c(0, makeParms()$weeklyDecayVar)
-    , vaccEff = c(0, .6, .7, .8)
+    , sdLogIndiv = makeParms()$sdLogIndiv
+    , varClus = c(0, makeParms()$varClus*c(1,2,3)) 
+    , weeklyDecay = c(1, .98,.95,.9)
+    , weeklyDecayVar = c(0, makeParms()$weeklyDecayVar*c(1,2,3))
+    , vaccEff = c(0, .5, .6, .7, .8, .9)
     ))
 parmsMat <- parmsMat[! ( weeklyDecay==1 & weeklyDecayVar!=0 )] ## not interested in variance around stability
 parmsMat$simNum <- 1:nrow(parmsMat)
 parmsMat$batchdirnm <- batchdirnm
-parmsMat$saveNm <- 'simFP2-'
+nmtmp <- 'simFP-big'
+parmsMat$saveNm <- nmtmp
 parmsMat$nsims <- 100
+nrow(parmsMat)
 
-parmsMatDo <- parmsMat[sdLogIndiv==1 & varClus!=0 & weeklyDecay!=1 & weeklyDecayVar!=0]
+fls <- list.files(batchdirnm, pattern=nmtmp)
+done <- gsub(nmtmp, '', fls)
+done <- as.numeric(gsub('.Rdata', '', done))
+length(done)
+
+parmsMatDo <- parmsMat[!simNum %in% done]
 nrow(parmsMatDo)
 
 addParm <- function(x, parmsMat,ii) {
