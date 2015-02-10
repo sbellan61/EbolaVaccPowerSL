@@ -169,6 +169,7 @@ simNtrials <- function(seed = 1, parms=makeParms(), N = 2, returnAll = F,
             caseXPT_ImmuneList[[ss]] <- as.data.frame(res$casesXPT_Immune)
         }
         rm(res)
+        gc()
     }
     if(showSeqStops) graphics.off()
     rownames(stopPoints) <- NULL
@@ -176,11 +177,11 @@ simNtrials <- function(seed = 1, parms=makeParms(), N = 2, returnAll = F,
     if(returnAll)
         return(list(
             stopPoints = stopPoints
-          , weeklyAnsList = weeklyAnsList
-          , caseXVaccRandGrpList = caseXVaccRandGrpList
-          , caseXPT_ImmuneList = caseXPT_ImmuneList
+            , weeklyAnsList = weeklyAnsList
+            , caseXVaccRandGrpList = caseXVaccRandGrpList
+            , caseXPT_ImmuneList = caseXPT_ImmuneList
             , endFinRes=endFinRes
-        ))
+            ))
     if(!returnAll)
         return(list(stopPoints=stopPoints, endFinRes=endFinRes))
 }

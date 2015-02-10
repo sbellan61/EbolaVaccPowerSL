@@ -25,6 +25,8 @@ parmsMat$nsims <- 200
 nrow(parmsMat)
 
 fls <- list.files(batchdirnm, pattern=nmtmp)
+sz <- unlist(sapply(fls, function(x) file.info(file.path(batchdirnm, x))['size']))
+fls <- fls[sz>0]
 done <- gsub(nmtmp, '', fls)
 done <- as.numeric(gsub('.Rdata', '', done))
 length(done)
