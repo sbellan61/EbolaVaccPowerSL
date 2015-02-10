@@ -13,6 +13,7 @@ numEach <- 12
 parmsMat <- as.data.table(expand.grid(
     seed =  1:numEach
     , trial = tnms
+    , propInTrial = c(.03, .05, .1)
     , sdLogIndiv = makeParms()$sdLogIndiv
     , vaccEff = c(0, seq(.4, .9, by = .05))
     ))
@@ -20,7 +21,7 @@ parmsMat$simNum <- 1:nrow(parmsMat)
 parmsMat$batchdirnm <- batchdirnm
 nmtmp <- 'simSL-1'
 parmsMat$saveNm <- nmtmp
-parmsMat$nsims <- 100
+parmsMat$nsims <- 200
 nrow(parmsMat)
 
 fls <- list.files(batchdirnm, pattern=nmtmp)
@@ -42,11 +43,11 @@ addParm <- function(x, parmsMat,ii) {
     return(x)
 }
 
-sink('falsePosSims.txt')
+sink('SLsims.txt')
 for(ii in parmsMatDo$simNum) {
     cmd <- "R CMD BATCH '--no-restore --no-save --args"
     cmd <- addParm(cmd, parmsMatDo, ii)
-    cmd <- paste0(cmd, " ' falsePos.R ", file.path(batchdirnm,'Routs', paste0('falsePosSim', ii,'.Rout')), sep='')
+    cmd <- paste0(cmd, " ' startSim.R ", file.path(batchdirnm,'Routs', paste0('SLSim', ii,'.Rout')), sep='')
     cat(cmd)               # add command
     cat('\n')              # add new line
 }

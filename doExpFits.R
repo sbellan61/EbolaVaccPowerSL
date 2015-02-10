@@ -37,7 +37,7 @@ for(jj in 1:10) {
 }
 graphics.off()
 
-save(fits, createHazTraj, regs, file = 'data/createHT.Rdata')
+save(fits, regs, file = 'data/createHT.Rdata')
 
 ## Get distribution of decay rates
 decayRates <- unlist(lapply(fits, function(x) as.numeric(x$fit$par['decay_rate'])))

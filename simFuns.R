@@ -16,7 +16,7 @@ makeParms <- function(
     , varClus=mu^2/2 ##  variance in cluster-level hazards for gamma distribution 
     , sdLogIndiv = 1 ## variance of lognormal distribution of individual RR within a hazard (constant over time, i.e. due to job)
     , vaccEff = .8
-    , maxInfectDay = 7*36 ## end of trial (36 weeks default; 9 months)
+    , maxInfectDay = 7*24 ## end of trial (24 weeks default; 6 months)
     , immunoDelay = 21 ## delay from vaccination to immunity
     , immunoDelayThink = immunoDelay ## delay from vaccination to immunity used in analysis (realistically would be unknown)
     , weeklyDecay=.9, weeklyDecayVar=.007 ## log-normally distributed incidence decay rates (set var = 0 for constant)
@@ -49,14 +49,15 @@ makePop <- function(parms=makeParms()) within(parms, {
 ## RR around cluster mean constant
 setHazs <- function(parms=makePop(), browse=F) within(parms, {
     if(browse) browser()
+    daySeq <- seq(-hazIntUnit*ceiling(reordLag/hazIntUnit),maxInfectDay,by=hazIntUnit)
     if(hazSL) {
         hazT <- data.table(createHazTraj(fits, nbsize = nbsize, propInTrial = propInTrial, 
                                          clusSize = clusSize, numClus = numClus, weeks = T))
-        hazT <- hazT[day >= -reordLag & day <= maxInfectDay]
+        hazT <- hazT[day %in% daySeq]
+        hazT[clusHaz==0, clusHaz := 10^-8] ## to stablize things
     }else{ ## simulate hazards
         baseClusHaz <- reParmRgamma(numClus, mean = mu, var = varClus) ## gamma distributed baseline hazards
         dailyDecayRates <- rlnorm(numClus, meanlog = log(weeklyDecay^(1/7)), weeklyDecayVar) 
-        daySeq <- seq(-hazIntUnit*ceiling(reordLag/hazIntUnit),maxInfectDay,by=hazIntUnit)
         hazT <- data.table(day = rep(daySeq, each = numClus), cluster = rep(1:numClus, length(daySeq)), clusHaz = 0)
         cHind <- which(names(hazT)=='clusHaz')
         ## mean cluster hazard trajectory
