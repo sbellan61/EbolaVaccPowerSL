@@ -96,8 +96,8 @@ for(ii in 1:length(pits)) {
 plot.new()
 legend('topleft', leg=powFin[,levels(trial)], col = cols, lwd = 2, bty = 'n')
 title(main='24 week power', outer = T)
-mtext('# cases', 1, 0, outer = T)
-mtext('vaccine efficacy', 2, 0, outer = T)
+mtext('# cases', 2, 0, outer = T)
+mtext('vaccine efficacy', 1, 0, outer = T)
 graphics.off()
 
 ## Power by efficacy & weekly decay rate, panels by cluster level variation
