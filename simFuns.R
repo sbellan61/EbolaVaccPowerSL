@@ -1,4 +1,5 @@
 library(blme); library(survival); library(coxme); library(data.table); library(parallel); library(dplyr); 
+load('data/createHT.Rdata')
 
 yearToDays <- 1/365.25
 monthToDays <- 1/30
@@ -8,6 +9,9 @@ makeParms <- function(
     , numClus=20, clusSize=300
     , delayUnit = 7 ## logistically imposed interval in between each new cluster receiving vaccination
     , ord = 'none' ## order clusters' receipt of vaccination ('none', by baseline visit 'BL', by time-updated 'TU' last interval incidence)
+    , hazSL = T ## use hazards from SL
+    , nbsize = .8 ## for above
+    , propInTrial = .03 ## for above
     , mu=.03 * yearToDays ## mean hazard in all participants at baseline
     , varClus=mu^2/2 ##  variance in cluster-level hazards for gamma distribution 
     , sdLogIndiv = 1 ## variance of lognormal distribution of individual RR within a hazard (constant over time, i.e. due to job)
@@ -45,13 +49,20 @@ makePop <- function(parms=makeParms()) within(parms, {
 ## RR around cluster mean constant
 setHazs <- function(parms=makePop(), browse=F) within(parms, {
     if(browse) browser()
-    baseClusHaz <- reParmRgamma(numClus, mean = mu, var = varClus) ## gamma distributed baseline hazards
-    dailyDecayRates <- rlnorm(numClus, meanlog = log(weeklyDecay^(1/7)), weeklyDecayVar) 
-    daySeq <- seq(-hazIntUnit*ceiling(reordLag/hazIntUnit),maxInfectDay,by=hazIntUnit)
-    hazT <- data.table(day = rep(daySeq, each = numClus), cluster = rep(1:numClus, length(daySeq)), clusHaz = 0)
-    cHind <- which(names(hazT)=='clusHaz')
-    ## mean cluster hazard trajectory
-    for(ii in 1:numClus) hazT[which(hazT[,cluster]==ii), clusHaz := baseClusHaz[ii]*dailyDecayRates[ii]^day]
+    if(hazSL) {
+        hazT <- data.table(createHazTraj(fits, nbsize = nbsize, propInTrial = propInTrial, 
+                                         clusSize = clusSize, numClus = numClus, weeks = T))
+        hazT <- hazT[day >= -reordLag & day <= maxInfectDay]
+    }else{ ## simulate hazards
+        baseClusHaz <- reParmRgamma(numClus, mean = mu, var = varClus) ## gamma distributed baseline hazards
+        dailyDecayRates <- rlnorm(numClus, meanlog = log(weeklyDecay^(1/7)), weeklyDecayVar) 
+        daySeq <- seq(-hazIntUnit*ceiling(reordLag/hazIntUnit),maxInfectDay,by=hazIntUnit)
+        hazT <- data.table(day = rep(daySeq, each = numClus), cluster = rep(1:numClus, length(daySeq)), clusHaz = 0)
+        cHind <- which(names(hazT)=='clusHaz')
+        ## mean cluster hazard trajectory
+        for(ii in 1:numClus) hazT[which(hazT[,cluster]==ii), clusHaz := baseClusHaz[ii]*dailyDecayRates[ii]^day]
+        rm(ii, cHind, baseClusHaz, hazT)
+    }
     ## give every individual a lognormally distributed relative risk
     pop$indivRR <- rlnorm(numClus*clusSize, meanlog = 0, sdlog = sdLogIndiv)
     ## create popH which has weekly hazards for all individuals
@@ -60,7 +71,7 @@ setHazs <- function(parms=makePop(), browse=F) within(parms, {
     daySeqLong <- seq(0,maxInfectDay+1000,by=hazIntUnit) ## to avoid problems later
     popHearly <- copy(popH)
     popH <- popH[day >= 0]
-    rm(ii, cHind, baseClusHaz, hazT)
+    rm(hazT)
 })
 ## setHazs(makePop(makeParms(weeklyDecay=1, weeklyDecayVar=0)))$popH[cluster==1,]
 ## setHazs(makePop(makeParms(weeklyDecay=.9, weeklyDecayVar=0)))$popH[cluster==1,]

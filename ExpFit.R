@@ -1,6 +1,8 @@
-## From https://github.com/ICI3D/ebola-forecast/ (Carl Pearson)
+## Code adapted from https://github.com/ICI3D/ebola-forecast/ (Carl Pearson)
+## Steve Bellan 2015
+
 library(boot); library(ggplot2)
-load(file='cleanSLData.Rdata')
+load(file='data/cleanSLData.Rdata')
 
 param.xform <- function(x) c(x['rate_0'], decay_rate = as.numeric(inv.logit(x['logitdecay_rate'])))
 param.xform(c(rate_0=30, logitdecay_rate=logit(0.01)))
@@ -57,9 +59,6 @@ params <- function(src, censor_interval, include_interval, param.guess = c(rate_
     list(t0 = start_date, par=res$par, cis=cis)
 }
 
-allSL <- sl[,list(cases=sum(cases,na.rm=T)),Date]
-allSL <- allSL[,list(Date,cases)]
-
 doProj <- function(src, forecast_date = tail(src$Date,1), censor_interval = 0, include_interval = 30, minCases = 15, 
                       beforeDays = 30, moreDays = 90, minDecayRate = .01) {
     endDate <- max(src$Date) - censor_interval
@@ -80,7 +79,7 @@ forecast <- function(fit, main=NULL, nbsize = .9, doPlot = T) with(fit, {
     ##    browser()
     startX <- startDate - beforeDays
     endX <- endDate + moreDays    
-    srcProj <- data.table(Date = seq.Date(startX, startX + 365, by = 1))
+    srcProj <- data.table(Date = seq.Date(startX, endDate + 52*7, by = 1))
     src <- merge(src, srcProj, by = 'Date', all=T)
     src[, reg := reg[1]]
     src$fit <- expcurve(fit, date_zero = as.numeric(startDate))(as.numeric(src$Date))
@@ -100,88 +99,28 @@ forecast <- function(fit, main=NULL, nbsize = .9, doPlot = T) with(fit, {
     return(src)
 })
 
-createHazTraj <- function(fit, nbsize = .8, propInTrial = .03, clusSize = 300, weeks = T) {
-    src <- forecast(fit, doPlot = F)
-    src$day <- src[, as.numeric(Date - Sys.Date())]
-    src$haz <- src$cases
-    src[day > -20, haz := proj]
-    src[, haz := haz * propInTrial / clusSize]
-    src[day > -60, list(day, haz)]
-    if(weeks) {
-        src$week <- src[, floor(day/7)]
-        src <- src[, list(haz = mean(haz, na.rm=T)), week] ## get mean daily hazard by week
+createHazTraj <- function(fits, nbsize = .8, propInTrial = .03, numClus = 20, clusSize = 300, weeks = T) {
+    hazTList <- NULL
+    for(cc in 1:numClus) {
+        fit <- fits[[sample(regs, 1)]]
+        src <- forecast(fit, doPlot = F)
+        src$day <- src[, as.numeric(Date - Sys.Date())]
+        src$haz <- src$cases
+        src[day > -20, haz := proj]
+        src[, haz := haz * propInTrial / clusSize]
+        src[day > -60, list(day, haz)]
+        if(weeks) {
+            src$week <- src[, floor(day/7)]
+            src <- src[, list(haz = mean(haz, na.rm=T)), week] ## get mean daily hazard by week
+        }
+        src$cluster <- cc
+        hazTList[[cc]] <- as.data.frame(src)
     }
-    return(src)
-}
- 
-pdf('Figures/example hazT.pdf')
-for(jj in 1:10) {
-    par(mar=c(5,5,2,.5), 'ps'=12, mgp = c(4,1,0))
-    plot(0,0, type = 'n', xlab = 'weeks', ylab = 'hazard per person-month', main='', bty = 'n', las = 1,
-         xlim = c(0, 35), ylim = c(0,.015))
-    rrs <- factor(NULL, levels = regs)
-    for(ii in 1:20) {
-        rr <- sample(regs, 1)
-        rrs[ii] <- rr
-        ht <- createHazTraj(fits[[rr]])
-        lines(ht[,list(week,haz*30)], type = 'l', col = rainbow(20)[ii], lwd = 2)
-    }
-    legend('topright', leg = rrs, col = rainbow(20), lwd = 1, ncol = 3, cex = .8, bty = 'n')
-}
-graphics.off()
-
-forecastInc(fits)
-
-plotFit(fits[[1]])
-
-## By subregion
-
-fits <- NULL
-for(rr in regs) fits[[rr]] <- doProj(sl[reg==rr], include_interval = 60, minCases = 30)
-
-pdf('../Figures/forecasted Paneled SL cleaned subnational data fromMax.pdf',  w = 10, h = 8)
-nbsize <- .8
-par(lwd=1, 'ps' = 12, mar = c(5,3,1.5,.5),mfrow = c(4,4))
-regs <- sl[,unique(reg)]
-srcs <- NULL
-for(rr in regs) srcs[[rr]] <- forecast(fits[[rr]], main = rr, nbsize = nbsize)
-graphics.off()
-srcProj <- rbindlist(srcs)
-
-## Get distribution of decay rates
-decayRates <- unlist(lapply(fits, function(x) as.numeric(x$fit$par['decay_rate'])))
-wdr <- 1-(1-decayRates)^7
-
-## Fit normal distribution function
-wdrFit <- fitdistr(logit(wdr), dnorm, start = list(mean = -1, sd = .5))$estimate
-
-pdf('../Figures/histogram of logit weekly decay rates.pdf', w = 5, h = 5.5)
-par('ps'=12)
-hist(logit(wdr), breaks = 10, col = 'black', xlab = 'logit(weekly decay rate)', main = 'variation in decay rate', freq = F)
-xs <- seq(-3,3, by = .1)
-ys <- dnorm(xs, wdrFit['mean'], wdrFit['sd'])
-lines(xs, ys, lwd = 2, col = 'dodger blue')
-graphics.off()
-
-pdf('../Figures/histogram of weekly decay rates.pdf', w = 5, h = 5.5)
-par('ps'=12)
-h1 <- hist(wdr, breaks = 10, col = 'black', xlab = 'weekly decay rate', main = 'variation in decay rate', xlim = c(0, .7), freq = F)
-xs <- seq(-3,3, by = .1)
-ys <- dnorm(xs, wdrFit['mean'], wdrFit['sd'])
-ys <- ys*max(h1$density)/max(ys)
-lines(inv.logit(xs), ys, lwd = 2, col = 'dodger blue')
-graphics.off()
-
-decayRateFXN <- function(n, wdrparms = wdrFit, unit = 'week') {
-    logitwdr <- rnorm(n, wdrparms['mean'], wdrparms['sd'])
-    rand <- inv.logit(logitwdr)
-    if(unit == 'day') {
-        rand <- (1 - rand)^(1/7)
-        rand <- 1-rand
-    }
-    return(rand)
+    hazT <- rbindlist(hazTList)
+    setnames(hazT, 'haz', 'clusHaz')
+    hazT$day <- hazT[, week*7]
+    hazT <- arrange(hazT, day, cluster)
+    return(hazT[, list(cluster, day, clusHaz)])
 }
 
-decayRateFXN(10, unit='day')
-save(wdrFit, decayRateFXN, file = 'wdrRNG.Rdata')
 
