@@ -40,11 +40,11 @@ sl[,Localite:=factor(Localite)]
 sl[,unique(Category)]
 sl[Category=='New cases']
 
+## Plot all variables
 pdf('../Figures/SL subnational data.pdf',  w = 12, h = 7)
 par(lwd=1, mfrow = c(2,3))
 shortRange <- range(sl[,Date])
 threshDate <- as.Date('2014-12-10')
-## shortRange <- c(as.Date('2014-12-01'),Sys.Date())
 for(ii in 1:6) {
     plot(0,0, type = 'n', xlim = shortRange, ylim = c(0, max(sl[Category==levels(Category)[ii],Value],na.rm=T)), xaxt='n', xlab = '', bty = 'n', las = 1, ylab = '',
          main=  paste('Sierra Leone', levels(sl[,Category])[ii]))
@@ -69,6 +69,7 @@ sl[Date==sl[int==0,unique(Date)], dupl:=duplicated(Date), reg]
 sl[,sum(dupl)]
 sl <- sl[dupl==F]
 
+## Plot New Cases
 cols <- rep(rainbow(7),2) ##rep(brewer.pal(11, 'RdBu'),2)
 ltys <- rep(1:2, each =7)
 pdf('../Figures/SL cleaned subnational data.pdf',  w = 6, h = 5)
@@ -83,6 +84,7 @@ legend('top', leg = sl[,unique(reg)], col = cols[as.numeric(sl[,unique(reg)])], 
        bty = 'n', ncol=3, cex = .75)
 graphics.off()
 
+## By subregion
 sl[,reg2:=reg]
 cols <- rep(rainbow(7),2) ##rep(brewer.pal(11, 'RdBu'),2)
 ltys <- rep(1:2, each =7)
@@ -97,20 +99,6 @@ sl[, {plot(Date,inc, xlim = xRange, ylim = c(0, ymax), xaxt='n', xlab = '', bty 
     }, reg]
 dev.off()
 
-
-sl[, lines(Date, inc, col = cols[as.numeric(reg)], lty = ltys[as.numeric(reg)]), reg]
-legend('top', leg = sl[,unique(reg)], col = cols[as.numeric(sl[,unique(reg)])], lty = ltys[as.numeric(sl[,unique(reg)])],
-       bty = 'n', ncol=3, cex = .75)
-graphics.off()
-
+## Save cleaned data
+sl <- sl[!is.na(int), list(Country, reg, Date, cases, int, inc)]
 save(sl, file='cleanSLData.Rdata')
-
-####################################################################################################
-## Nbinom GAM to each subnational to forecast
-m1 <- gam(inc ~ s(Date), family=negbin(c(1,10), 'log'), data= sl[reg=='Bombali'])
-m1 <- gam(inc ~ s(as.numeric(Date)), family=poisson(link='log'), data= sl[reg=='Bombali'])
-warnings()
-summary(m1)
-plot(m1)
-sl[,Date]
-negbin(c(1,10), link = log)
