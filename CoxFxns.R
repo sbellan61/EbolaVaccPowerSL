@@ -27,6 +27,12 @@ doGlmer <- function(csd, bayes=F, browse = F) {## take censored survival object 
     if(browse) browser()
     if(bayes) mod <- bglmer(infected ~ immuneGrp + (1|cluster) + offset(log(perstime)), family=binomial(link='cloglog'),  data = csd)
     if(!bayes) mod <- glmer(infected ~ immuneGrp + (1|cluster) + offset(log(perstime)), family=binomial(link='cloglog'),  data = csd)
+    
+    ## glmer(infected ~ immuneGrp + (1|cluster) + offset(log(perstime)), 
+    ##       family=binomial(link='cloglog'),  data = csd,
+    ##       start = list(fixef = c(-4, 0)),
+    ##       control = glmerControl(nAGQ0initStep = FALSE))
+    
     vaccRes <- summary(mod)$coefficients['immuneGrp', c('Estimate','Std. Error','Pr(>|z|)')] 
     vaccEffEst <- c(1 - exp(vaccRes[1] + c(0, 1.96, -1.96) * vaccRes[2]), vaccRes[3])
     names(vaccEffEst) <- c('mean','lci','uci','P')
@@ -34,5 +40,9 @@ doGlmer <- function(csd, bayes=F, browse = F) {## take censored survival object 
 }
 
 doBayesCox <- function(csd, browse = F) {
+
+}
+
+doGEE <- function(csd, browse=F) {
 
 }
