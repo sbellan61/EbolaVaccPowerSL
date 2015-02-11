@@ -19,19 +19,22 @@ parmsMat <- as.data.table(expand.grid(
     ))
 parmsMat$simNum <- 1:nrow(parmsMat)
 parmsMat$batchdirnm <- batchdirnm
-nmtmp <- 'simSL-1'
+nmtmp <- 'simSL-2-'
 parmsMat$saveNm <- nmtmp
-parmsMat$nsims <- 200
+parmsMat$nsims <- 100
+parmsMat$ord <- "TU"
+parmsMat$reordLag <- 14
 nrow(parmsMat)
 
-fls <- list.files(batchdirnm, pattern=nmtmp)
-sz <- unlist(sapply(fls, function(x) file.info(file.path(batchdirnm, x))['size']))
-fls <- fls[sz>0]
-done <- gsub(nmtmp, '', fls)
-done <- as.numeric(gsub('.Rdata', '', done))
-length(done)
+## fls <- list.files(batchdirnm, pattern=nmtmp)
+## sz <- unlist(sapply(fls, function(x) file.info(file.path(batchdirnm, x))['size']))
+## fls <- fls[sz>0]
+## done <- gsub(nmtmp, '', fls)
+## done <- as.numeric(gsub('.Rdata', '', done))
+## length(done)
 
-parmsMatDo <- parmsMat[!simNum %in% done]
+## parmsMatDo <- parmsMat[!simNum %in% done]
+parmsMatDo <- parmsMat[trial %in% c('RCT','FRCT')]
 nrow(parmsMatDo)
 
 addParm <- function(x, parmsMat,ii) {
