@@ -4,11 +4,16 @@ if(grepl('tacc', Sys.info()['nodename'])) setwd('/home1/02413/sbellan/VaccEbola/
 ## Simulate SWCT vs RCT vs CRCT for SL
 sapply(c('simFuns.R','AnalysisFuns.R','CoxFxns.R','EndTrialFuns.R'), source)
 
+load(file.path('BigResults/SLSims', paste0('simSL-2-',formatC(1654, width=6, flag="0"),'.Rdata')))
+names(sim$sim)
+sim$sim$finPoint
+
 batchdirnm <- file.path('BigResults','SLSims')
 fls <- list.files(batchdirnm, pattern='.Rdata', full.names = T)
+#fls <- list.files(batchdirnm, pattern='SL-2', full.names = T)
 length(fls)
 
-dparms <- c('trial','ord','sdLogIndiv','vaccEff','doSL','propInTrial','nbsize')
+dparms <- c('trial','ord','sdLogIndiv','vaccEff','doSL','propInTrial','nbsize','ord','reordLag')
 nbatch <- length(fls)
 finList <- stopList <- parmsList <- list(NULL)
 length(stopList) <- length(finList) <- length(parmsList) <- nbatch
@@ -29,7 +34,8 @@ save(stopTrials, finTrials, file=file.path('Results','SLSumm.Rdata'))
 
 load(file=file.path('Results','SLSumm.Rdata'))
  
-powFin <- summarise(group_by(finTrials[sdLogIndiv==1], vaccEff, trial, propInTrial)
+powFin <- summarise(group_by(finTrials[sdLogIndiv==1], vaccEff, trial, propInTrial, ord)
+                    , nsim = length(stopped)
                     , stopped = mean(stopped)
                     , vaccGood = mean(stopped & vaccGood)
                     , stopDay = mean(stopDay)
@@ -56,18 +62,24 @@ powStop <- summarise(group_by(stopTrials[sdLogIndiv==1], vaccEff, trial, propInT
 powStop[,propInTrial:= as.numeric(levels(propInTrial)[propInTrial])]
 powFin[,propInTrial:= as.numeric(levels(propInTrial)[propInTrial])]
 
+    powFin[vaccEff <=.85 & (trial=='SWCT' | (trial %in% c('FRCT','RCT') & ord=='TU'))]
+
+powFin <- powFin[trial!='CRCT']
+powFin[, trial:= factor(trial, levels = unique(trial))]
+
 ## Power by efficacy & weekly decay rate, panels by weeklydecayvar
 cols <- rainbow(4)
-pdf('Figures/power by efficacy in SL propInTrial.pdf', w = 8, h = 6)
+##pdf('Figures/power by efficacy in SL propInTrial.pdf', w = 8, h = 6)
+jpeg('Figures/power by efficacy in SL propInTrial.jpg', w = 8, h = 6, units = 'in', res = 200)
 par(lwd=2, mfrow = c(2,2), mar = c(3,3,3,.5), oma = c(1.5,1.5,1.5,0))
 pits <- powFin[,unique(propInTrial)]
 pits <- pits[order(pits)]
 for(ii in 1:length(pits)) {
     pit <- pits[ii]
-    main <- paste0('proportion of subnational\n cases in trial = ', signif(pit,3))
-    plot(0,0, type = 'n', xlab = '', ylab = '', xlim = c(0,1), ylim = c(0,1), bty = 'n', main = main, las = 1)
-    abline(h=.025)
-    powFin[propInTrial==pit & vaccEff <=.85,
+    main <- paste0('proportion of district-level\n cases in trial = ', signif(pit,3))
+    plot(0,0, type = 'n', xlab = '', ylab = '', xlim = c(0,1), ylim = c(0,.6), bty = 'n', main = main, las = 1)
+    abline(h=.025, lty = 3)
+    powFin[propInTrial==pit & vaccEff <=.85 & (trial=='SWCT' | (trial %in% c('FRCT','RCT') & ord=='TU')),
            lines(vaccEff, vaccGood, col = cols[as.numeric(trial)]), 
            by = list(trial)]
 }
@@ -85,7 +97,7 @@ pits <- powFin[,unique(propInTrial)]
 pits <- pits[order(pits)]
 for(ii in 1:length(pits)) {
     pit <- pits[ii]
-    main <- paste0('proportion of subnational\n cases in trial = ', signif(pit,3))
+    main <- paste0('proportion of district-level\n cases in trial = ', signif(pit,3))
     plot(0,0, type = 'n', xlab = '', ylab = '', xlim = c(0,1), ylim = c(0,130), bty = 'n', main = main, las = 1)
     abline(h=.025)
     powFin[propInTrial==pit & vaccEff <=.85,
@@ -95,7 +107,7 @@ for(ii in 1:length(pits)) {
 plot.new()
 legend('topleft', leg=powFin[,levels(trial)], col = cols, lwd = 2, bty = 'n')
 title(main='24 week power', outer = T)
-mtext('# cases', 2, 0, outer = T)
+mtext('# cases in trial', 2, 0, outer = T)
 mtext('vaccine efficacy', 1, 0, outer = T)
 graphics.off()
 

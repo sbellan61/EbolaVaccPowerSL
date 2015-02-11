@@ -3,36 +3,35 @@ if(grepl('stevebellan', Sys.info()['login'])) setwd('~/Documents/R Repos/EbolaVa
 if(grepl('tacc', Sys.info()['nodename'])) setwd('/home1/02413/sbellan/VaccEbola/')
 sapply(c('simFuns.R','AnalysisFuns.R','CoxFxns.R','EndTrialFuns.R'), source)
 
-batchdirnm <- file.path('BigResults','FalsePosSims')
-routdirnm <- file.path('BigResults','FalsePosSims','Routs')
+batchdirnm <- file.path('BigResults','FalsePosSims2')
+routdirnm <- file.path(batchdirnm,'Routs')
 if(!file.exists(batchdirnm)) dir.create(batchdirnm)
 if(!file.exists(routdirnm)) dir.create(routdirnm)
-tnms <- c('SWCT','RCT','FRCT','CRCT')
-numEach <- 12
+tnms <- c('SWCT','FRCT') #,'FRCT','CRCT')
+numEach <- 4
 
 parmsMat <- as.data.table(expand.grid(
     seed =  1:numEach
     , trial = tnms
     , sdLogIndiv = makeParms()$sdLogIndiv
-    , varClus = c(0, makeParms()$varClus*c(1,2,3)) 
-    , weeklyDecay = c(1, .98,.95,.9)
-    , weeklyDecayVar = c(0, makeParms()$weeklyDecayVar*c(1,2,3))
-    , vaccEff = c(0, .5, .6, .7, .8, .9)
+    , cvClus = c(0, 1, 1.5)
+    , weeklyDecay = .9
+    , cvWeeklyDecay = c(0, .5, 1, 1.5)
+    , vaccEff = c(0, seq(.4, .95, by = .05))
     ))
-parmsMat <- parmsMat[! ( weeklyDecay==1 & weeklyDecayVar!=0 )] ## not interested in variance around stability
 parmsMat$simNum <- 1:nrow(parmsMat)
 parmsMat$batchdirnm <- batchdirnm
 nmtmp <- 'simFP-big'
 parmsMat$saveNm <- nmtmp
-parmsMat$nsims <- 100
+parmsMat$nsims <- 300
 nrow(parmsMat)
 
-fls <- list.files(batchdirnm, pattern=nmtmp)
-done <- gsub(nmtmp, '', fls)
-done <- as.numeric(gsub('.Rdata', '', done))
-length(done)
+## fls <- list.files(batchdirnm, pattern=nmtmp)
+## done <- gsub(nmtmp, '', fls)
+## done <- as.numeric(gsub('.Rdata', '', done))
+## length(done)
 
-parmsMatDo <- parmsMat[!simNum %in% done]
+parmsMatDo <- parmsMat ##[!simNum %in% done]
 nrow(parmsMatDo)
 
 addParm <- function(x, parmsMat,ii) {
@@ -50,7 +49,7 @@ sink('falsePosSims.txt')
 for(ii in parmsMatDo$simNum) {
     cmd <- "R CMD BATCH '--no-restore --no-save --args"
     cmd <- addParm(cmd, parmsMatDo, ii)
-    cmd <- paste0(cmd, " ' falsePos.R ", file.path(batchdirnm,'Routs', paste0('falsePosSim', ii,'.Rout')), sep='')
+    cmd <- paste0(cmd, " ' startSim.R ", file.path(batchdirnm,'Routs', paste0(nmtmp, formatC(ii, width=6, flag="0"),'.Rout')), sep='')
     cat(cmd)               # add command
     cat('\n')              # add new line
 }

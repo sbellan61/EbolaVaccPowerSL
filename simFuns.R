@@ -90,14 +90,15 @@ reParmRgamma <- function(n, mean, cv) {
     }
 }
 
-reordPop <- function(parms) { ## wrapper around other functions below
+reordPop <- function(parms, browse=F) { ## wrapper around other functions below
     reordFXN <- get(paste0('reord',parms$trial))
     parms <- reordFXN(parms)
     within(parms, { ## return parms
         if(parms$ord!='none') { ## but first, if reordered
+            if(browse) browser()
             popH[, cluster:=clusIncRank[popH[, cluster]]]
             popH <- arrange(popH, day, cluster)
-            popH[,indiv:= rep(1:(numClus*clusSize), length(daySeq))] ## reset indices so they're ordered again by vaccination sequence
+            popH[,indiv:= rep(1:(numClus*clusSize), popH[, length(unique(day))])] ## reset indices so they're ordered again by vaccination sequence
             rm(clusIncRank)
         }
         popH$pair <-  NA ## pairs matched for randomization (if matching)

@@ -108,9 +108,9 @@ seqStop <- function(parms, start = parms$immunoDelayThink + 14, checkIncrement =
             if(!fullSeq & !is.na(newout['p']) & numCases > minCases)
                 if(newout['p'] < .05)
                     trialOngoing <- F
-            if(checkDay > maxDay) trialOngoing <- F
         }
         checkDay <- checkDay + 7
+        if(checkDay > maxDay) trialOngoing <- F
     }
     rownames(out) <- NULL
     out <- as.data.table(out)
@@ -122,69 +122,11 @@ seqStop <- function(parms, start = parms$immunoDelayThink + 14, checkIncrement =
 
 getEndResults <- function(parms) within(parms, {
     tmp <- censSurvDat(parms, maxInfectDay)
-    vaccEE <- doCoxPH(tmp)
+    vaccEE <- try(doCoxPH(tmp), silent=T)
+    if(inherits(vaccEE, 'try-error')) vaccEE <- c(mean = NA, lci = NA, uci = NA, p = NA)
     stopFin <- compileStopInfo(maxInfectDay, vaccEE, tmp) 
     rm(vaccEE,tmp)
 })
-
-simNtrials <- function(seed = 1, parms=makeParms(), N = 2, returnAll = F,
-                       showSeqStops = F, flnm='test', verbose=1) {
-    set.seed(seed)
-    caseXVaccRandGrpList <- caseXPT_ImmuneList <- weeklyAnsList <- list()
-    length(caseXVaccRandGrpList) <- length(caseXPT_ImmuneList) <- length(weeklyAnsList) <- N
-    endFinRes <- stopPoints <- data.frame(NULL)
-    if(showSeqStops) pdf(paste0(flnm, '.pdf'), w = 8, h = 6)
-    for(ss in 1:N) {
-        if(verbose>0 & (ss %% 10 == 0)) print(paste('on',ss,'of',N))
-        if(verbose>1) browser()
-        res <- simTrial(parms)
-        res <- makeSurvDat(res)
-        res <- activeFXN(res)
-        res <- seqStop(res)
-        res <- getEndResults(res)
-        if(showSeqStops) {
-            resfull <- seqStop(res, fullSeq = T)
-            showSeqStop(resfull)
-        }
-        res <- endT(res)
-        res <- makeCaseSummary(res)
-        stopPt <- as.data.frame(tail(res$weeklyAns,1)) ## active cases by immmune grouping at time of case at end of trial
-        stopPt <- with(res, {
-            cbind(stopPt
-                , caseCXrandFinA = casesXVaccRandGrp[type=='EVstActive', contCases] ## active cases by vaccination randomization group at final
-                , caseVXrandFinA = casesXVaccRandGrp[type=='EVstActive', vaccCases]
-                , hazCXrandFinA = casesXVaccRandGrp[type=='EVstActive', contCases/contPT]/yearToDays
-                , hazVXrandFinA = casesXVaccRandGrp[type=='EVstActive', vaccCases/vaccPT]/yearToDays
-                , caseCXrandFin = casesXVaccRandGrp[type=='EVst', contCases]         ## total cases by vaccination randomization group at final
-                , caseVXrandFin = casesXVaccRandGrp[type=='EVst', vaccCases]
-                , hazCXrandFin = casesXVaccRandGrp[type=='EVst', contCases/contPT]/yearToDays
-                , hazVXrandFin = casesXVaccRandGrp[type=='EVst', vaccCases/vaccPT]/yearToDays
-                  )
-        })
-        stopPoints <- rbind(stopPoints, stopPt)
-        endFinRes <- rbind(endFinRes, res$stopFin)
-        if(returnAll) {
-            weeklyAnsList[[ss]] <- as.data.frame(res$weeklyAns)
-            caseXVaccRandGrpList[[ss]] <- as.data.frame(res$casesXVaccRandGrp)
-            caseXPT_ImmuneList[[ss]] <- as.data.frame(res$casesXPT_Immune)
-        }
-        rm(res)
-        gc()
-    }
-    if(showSeqStops) graphics.off()
-    rownames(stopPoints) <- NULL
-    stop
-    if(returnAll)
-        return(list(
-            stopPoints = stopPoints
-            , weeklyAnsList = weeklyAnsList
-            , caseXVaccRandGrpList = caseXVaccRandGrpList
-            , caseXPT_ImmuneList = caseXPT_ImmuneList
-            , endFinRes=endFinRes
-            ))
-    if(!returnAll)
-        return(list(stopPoints=stopPoints, endFinRes=endFinRes))
-}
 
 showSeqStop <- function(resfull, flnm= NULL, ...) {
     with(resfull, {
@@ -224,6 +166,67 @@ showSeqStop <- function(resfull, flnm= NULL, ...) {
         mtext('week of trial', 1, 1, T)
         if(!is.null(flnm)) graphics.off()
     })
+}
+
+simNtrials <- function(seed = 1, parms=makeParms(), N = 2, returnAll = F,
+                       doSeqStops = F, showSeqStops = F, flnm='test', verbose=1, verbFreq=10) {
+    set.seed(seed)
+    caseXVaccRandGrpList <- caseXPT_ImmuneList <- weeklyAnsList <- list()
+    length(caseXVaccRandGrpList) <- length(caseXPT_ImmuneList) <- length(weeklyAnsList) <- N
+    finPoint <- stopPoints <- data.frame(NULL)
+    if(showSeqStops) pdf(paste0(flnm, '.pdf'), w = 8, h = 6)
+    for(ss in 1:N) {
+        if(verbose>0 & (ss %% verbFreq == 0)) print(paste('on',ss,'of',N))
+        if(verbose>1) browser()
+        ## pseed <- .Random.seed ## for debugging
+        ## save(pseed, file = paste0(seed, '-seed.Rdata'))
+        res <- simTrial(parms)
+        res <- makeSurvDat(res)
+        res <- activeFXN(res)
+        res <- getEndResults(res)
+        finPoint <- rbind(finPoint, res$stopFin)
+        if(doSeqStops) {
+            res <- seqStop(res, verbose = 3)
+            if(showSeqStops) {
+                resfull <- seqStop(res, fullSeq = T)
+                showSeqStop(resfull)
+            }
+            res <- endT(res)
+            res <- makeCaseSummary(res)
+            stopPt <- as.data.frame(tail(res$weeklyAns,1)) ## active cases by immmune grouping at time of case at end of trial
+            stopPt <- with(res, {
+                cbind(stopPt
+                    , caseCXrandFinA = casesXVaccRandGrp[type=='EVstActive', contCases] ## active cases by vaccination randomization group at final
+                    , caseVXrandFinA = casesXVaccRandGrp[type=='EVstActive', vaccCases]
+                    , hazCXrandFinA = casesXVaccRandGrp[type=='EVstActive', contCases/contPT]/yearToDays
+                    , hazVXrandFinA = casesXVaccRandGrp[type=='EVstActive', vaccCases/vaccPT]/yearToDays
+                    , caseCXrandFin = casesXVaccRandGrp[type=='EVst', contCases]         ## total cases by vaccination randomization group at final
+                    , caseVXrandFin = casesXVaccRandGrp[type=='EVst', vaccCases]
+                    , hazCXrandFin = casesXVaccRandGrp[type=='EVst', contCases/contPT]/yearToDays
+                    , hazVXrandFin = casesXVaccRandGrp[type=='EVst', vaccCases/vaccPT]/yearToDays
+                      )
+            })
+            stopPoints <- rbind(stopPoints, stopPt)
+        }
+        if(returnAll) {
+            weeklyAnsList[[ss]] <- as.data.frame(res$weeklyAns)
+            caseXVaccRandGrpList[[ss]] <- as.data.frame(res$casesXVaccRandGrp)
+            caseXPT_ImmuneList[[ss]] <- as.data.frame(res$casesXPT_Immune)
+        }
+        rm(res)
+        gc()
+    }
+    if(showSeqStops) graphics.off()
+    if(returnAll)
+        return(list(
+            stopPoints = stopPoints
+            , weeklyAnsList = weeklyAnsList
+            , caseXVaccRandGrpList = caseXVaccRandGrpList
+            , caseXPT_ImmuneList = caseXPT_ImmuneList
+            , finPoint=finPoint
+            ))
+    if(!returnAll)
+        return(list(stopPoints=stopPoints, finPoint=finPoint))
 }
 
 
