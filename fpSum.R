@@ -54,7 +54,7 @@ maxPwr <- 1
 
 ## Power by efficacy & weekly decay rate, panels by weeklydecayvar
 cols <- rainbow(4)
-pdf('Figures/power by efficacy Exphaz wdr.pdf', w = 8, h = 6)
+jpeg('Figures/power by efficacy Exphaz wdr.jpg', w = 8, h = 6, units = 'in', res = 300)
 par(lwd=2, mfrow=c(2,2), mar = c(3,3,3,.5), oma = c(1.5,1.5,1.5,0))
 for(ii in 1:length(cvcls)) {
     cvwd <- cvwds[ii]
