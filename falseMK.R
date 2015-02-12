@@ -8,10 +8,10 @@ routdirnm <- file.path(batchdirnm,'Routs')
 if(!file.exists(batchdirnm)) dir.create(batchdirnm)
 if(!file.exists(routdirnm)) dir.create(routdirnm)
 tnms <- c('SWCT','FRCT') #,'FRCT','CRCT')
-numEach <- 4
+numEach <- 8
 
 parmsMat <- as.data.table(expand.grid(
-    seed =  1:numEach
+    seed =  5:(5+numEach)
     , trial = tnms
     , sdLogIndiv = makeParms()$sdLogIndiv
     , cvClus = c(0, 1, 1.5)
@@ -22,9 +22,9 @@ parmsMat <- as.data.table(expand.grid(
 parmsMat$simNum <- 1:nrow(parmsMat)
 parmsMat$batchdirnm <- batchdirnm
 parmsMat$hazSL <- F
-nmtmp <- 'simFP-big'
+nmtmp <- 'simFP-big2'
 parmsMat$saveNm <- nmtmp
-parmsMat$nsims <- 300
+parmsMat$nsims <- 600
 nrow(parmsMat)
 
 ## fls <- list.files(batchdirnm, pattern=nmtmp)
@@ -33,6 +33,7 @@ nrow(parmsMat)
 ## length(done)
 
 parmsMatDo <- parmsMat ##[!simNum %in% done]
+parmsMatDo <- parmsMat[vaccEff==0]
 nrow(parmsMatDo)
 
 addParm <- function(x, parmsMat,ii) {

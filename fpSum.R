@@ -8,7 +8,7 @@ batchdirnm <- file.path('BigResults','FalsePosSims2')
 fls <- list.files(batchdirnm, pattern='.Rdata', full.names = T)
 length(fls)
 
-dparms <- c('trial','ord','mu','hazSL', 'cvClus','sdLogIndiv','vaccEff','weeklyDecay','cvWeeklyDecay')
+dparms <- c('trial','ord','mu','hazSL', 'cvClus','sdLogIndiv','vaccEff','weeklyDecay','cvWeeklyDecay','delayUnit')
 nbatch <- length(fls)
 finList <- stopList <- parmsList <- list(NULL)
 length(stopList) <- length(finList) <- length(parmsList) <- nbatch
@@ -42,46 +42,52 @@ powFin <- summarise(group_by(finTrials[sdLogIndiv==1], cvClus, weeklyDecay, cvWe
 powFin[,cvWeeklyDecay:= as.numeric(levels(cvWeeklyDecay)[cvWeeklyDecay])]
 powFin[,weeklyDecay:= as.numeric(levels(weeklyDecay)[weeklyDecay])]
 powFin[,cvClus:= as.numeric(levels(cvClus)[cvClus])]
+wds <- powFin[,unique(weeklyDecay)]
+wds <- wds[order(wds)]
+cvcls <- powFin[,unique(cvClus)]
+cvcls <- cvcls[order(cvcls)]
+cvwds <- powFin[,unique(cvWeeklyDecay)]
+cvwds <- cvwds[order(cvwds)]
+
+maxVE <- 1
+maxPwr <- 1
 
 ## Power by efficacy & weekly decay rate, panels by weeklydecayvar
 cols <- rainbow(4)
-pdf('Figures/power by efficacy wdr.pdf', w = 8, h = 6)
+pdf('Figures/power by efficacy Exphaz wdr.pdf', w = 8, h = 6)
 par(lwd=2, mfrow=c(2,2), mar = c(3,3,3,.5), oma = c(1.5,1.5,1.5,0))
-wds <- powFin[,unique(weeklyDecay)]
-cvcs <- powFin[,unique(cvClus)]
-wdvs <- powFin[,unique(cvWeeklyDecay)]
-wdvs <- wdvs[order(wdvs)]
-for(ii in 1:length(cvcs)) {
-    wdv <- wdvs[ii]
-    main <- paste0('weekly decay CV = ', signif(wdv,3))
+for(ii in 1:length(cvcls)) {
+    cvwd <- cvwds[ii]
+    main <- paste0('weekly decay CV = ', signif(cvwd,3))
     plot(0,0, type = 'n', xlab = '', ylab = '', xlim = c(0,1), ylim = c(0,1), bty = 'n', main = main, las = 1)
     abline(h=.025)
-    powFin[cvWeeklyDecay==wdv & vaccEff <= .85,
-           lines(vaccEff, vaccGood, col = cols[as.numeric(trial)], lty = which(cvClus == cvcs)),
+    powFin[cvWeeklyDecay==cvwd & vaccEff <= .85,
+           lines(vaccEff, vaccGood, col = cols[as.numeric(trial)], lty = which(cvClus == cvcls)),
            by = list(cvClus, weeklyDecay, cvWeeklyDecay,trial)]
 }
 plot.new()
 legend('topleft', leg=powFin[,levels(trial)], col = cols, lwd = 2, bty = 'n')
-legend('left', leg=cvcs, lty = 1:length(cvcs), lwd = 2, bty = 'n', 
+legend('left', leg=cvcls, lty = 1:length(cvcls), lwd = 2, bty = 'n', 
        title = 'cv of baseline cluster hazard')
 title(main='24 week power', outer = T)
 mtext('probability of rejecting the null', 2, 0, outer = T)
 mtext('vaccine efficacy', 1, 0, outer = T)
 graphics.off()
 
+powFin[vaccEff==0]
 
 ## ## Power by efficacy & weekly decay rate, panels by weeklydecayvar STOP TIME
 ## cols <- rainbow(4)
 ## pdf('Figures/power at STOP TIME by efficacy wdr.pdf', w = 8, h = 6)
 ## par(lwd=2, mar = c(3,3,3,.5), oma = c(1.5,1.5,1.5,0))
-## wdvs <- powStop[,unique(cvWeeklyDecay)]
+## cvwds <- powStop[,unique(cvWeeklyDecay)]
 ## for(ii in 1) {
-##     wdv <- wdvs[ii]
-##     wdvst <- as.numeric(levels(wdv)[wdv])
-##     main <- paste0('weekly decay variance = ', signif(wdvst,3))
+##     cvwd <- cvwds[ii]
+##     cvwdst <- as.numeric(levels(cvwd)[cvwd])
+##     main <- paste0('weekly decay variance = ', signif(cvwdst,3))
 ##     plot(0,0, type = 'n', xlab = '', ylab = '', xlim = c(0,1), ylim = c(0,1), bty = 'n', main = main, las = 1)
 ##     abline(h=.025)
-##     powStop[cvWeeklyDecay==wdv & signif(cvClus,2)==signif(with(makeParms(), sqrt(cvClus)/mu),2),
+##     powStop[cvWeeklyDecay==cvwd & signif(cvClus,2)==signif(with(makeParms(), sqrt(cvClus)/mu),2),
 ##            lines(vaccEff, vaccGood, col = cols[as.numeric(trial)], lty = as.numeric(weeklyDecay)),
 ##            by = list(cvClus, weeklyDecay, cvWeeklyDecay,trial)]
 ##         legend('topleft', leg=powStop[,levels(trial)], col = cols, lwd = 2, bty = 'n')
@@ -97,16 +103,16 @@ graphics.off()
 cols <- rainbow(4)
 pdf('Figures/power by efficacy wdr wdrvar.pdf', w = 8, h = 6)
 par(lwd=2, mfrow = c(2,2), mar = c(3,3,3,.5), oma = c(1.5,1.5,1.5,0))
-wdvs <- powFin[,unique(cvWeeklyDecay)]
-wdvs <- wdvs[order(wdvs)]
+cvwds <- powFin[,unique(cvWeeklyDecay)]
+cvwds <- cvwds[order(cvwds)]
 wds <- unique(powFin[,weeklyDecay])
 wds <- wds[rev(order(wds))][-4]
-for(ii in 1:length(wdvs)) {
-    wdv <- wdvs[ii]
-    main <- paste0('weekly decay variance = ', signif(wdv,3))
+for(ii in 1:length(cvwds)) {
+    cvwd <- cvwds[ii]
+    main <- paste0('weekly decay variance = ', signif(cvwd,3))
     plot(0,0, type = 'n', xlab = '', ylab = '', xlim = c(0,1), ylim = c(0,1), bty = 'n', main = main, las = 1)
     abline(h=.025)
-    powFin[trial!='FRCT' & weeklyDecay > .9 & cvWeeklyDecay==wdv & signif(cvClus,2)==signif(with(makeParms(), sqrt(cvClus)/mu),2),
+    powFin[trial!='FRCT' & weeklyDecay > .9 & cvWeeklyDecay==cvwd & signif(cvClus,2)==signif(with(makeParms(), sqrt(cvClus)/mu),2),
            lines(vaccEff, vaccGood, col = cols[as.numeric(trial)], lty = which(weeklyDecay==wds)),
            by = list(cvClus, weeklyDecay, cvWeeklyDecay,trial)]
     if(ii==3)    legend('topleft', leg=powFin[,levels(trial)][-3], col = cols[-3], lwd = 2, bty = 'n')
@@ -138,7 +144,7 @@ mtext('vaccine efficacy', 2, 0, outer = T)
 graphics.off()
 
 
-p1 <- simTrial(makeParms('RCT',small=F, clusSize=1, numClus = 20, weeklyDecay= .95, cvWeeklyDecay = wdvs[2]))
+p1 <- simTrial(makeParms('RCT',small=F, clusSize=1, numClus = 20, weeklyDecay= .95, cvWeeklyDecay = cvwds[2]))
 nm <- 'default variation in EVD hazard \nfor trial participants'
 plotHazT(p1, flnm='hazard trajectories' , main=nm )
 
