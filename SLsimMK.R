@@ -29,16 +29,16 @@ parmsMat[trial %in% c('RCT','FRCT','CRCT'), ord := 'TU']
 parmsMat$reordLag <- 14
 nrow(parmsMat)
 
-## fls <- list.files(batchdirnm, pattern=nmtmp)
-## sz <- unlist(sapply(fls, function(x) file.info(file.path(batchdirnm, x))['size']))
-## fls <- fls[sz>0]
-## done <- gsub(nmtmp, '', fls)
-## done <- as.numeric(gsub('.Rdata', '', done))
-## length(done)
+fls <- list.files(batchdirnm, pattern=nmtmp)
+sz <- unlist(sapply(fls, function(x) file.info(file.path(batchdirnm, x))['size']))
+fls <- fls[sz>0]
+done <- gsub(nmtmp, '', fls)
+done <- as.numeric(gsub('.Rdata', '', done))
+length(done)
 
-## parmsMatDo <- parmsMat[!simNum %in% done]
+parmsMatDo <- parmsMat[!simNum %in% done]
 ## parmsMatDo <- parmsMat[trial %in% c('RCT','FRCT')]
-## nrow(parmsMatDo)
+nrow(parmsMatDo)
 
 addParm <- function(x, parmsMat,ii) {
     for(pp in 1:length(parmsMat)) {

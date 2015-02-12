@@ -21,6 +21,7 @@ parmsMat <- as.data.table(expand.grid(
     ))
 parmsMat$simNum <- 1:nrow(parmsMat)
 parmsMat$batchdirnm <- batchdirnm
+parmsMat$hazSL <- F
 nmtmp <- 'simFP-big'
 parmsMat$saveNm <- nmtmp
 parmsMat$nsims <- 300

@@ -4,11 +4,7 @@ if(grepl('tacc', Sys.info()['nodename'])) setwd('/home1/02413/sbellan/VaccEbola/
 ## Simulate SWCT vs RCT vs CRCT for SL
 sapply(c('simFuns.R','AnalysisFuns.R','CoxFxns.R','EndTrialFuns.R'), source)
 
-load(file.path('BigResults/SLSims', paste0('simSL-2-',formatC(1654, width=6, flag="0"),'.Rdata')))
-names(sim$sim)
-sim$sim$finPoint
-
-batchdirnm <- file.path('BigResults','SLSims')
+batchdirnm <- file.path('BigResults','SLSims3')
 fls <- list.files(batchdirnm, pattern='.Rdata', full.names = T)
 #fls <- list.files(batchdirnm, pattern='SL-2', full.names = T)
 length(fls)
@@ -22,17 +18,17 @@ for(ii in 1:nbatch) {
     ff <- fls[ii]
     load(ff)
     parmsList[[ii]] <- data.frame(nbatch = ii, t(unlist(sim$parms[dparms])))
-    stopList[[ii]] <- data.frame(nbatch = ii, sim$sim$stopPoints)
-    finList[[ii]] <- data.frame(nbatch = ii, sim$sim$endFinRes)
+##    stopList[[ii]] <- data.frame(nbatch = ii, sim$sim$stopPoints)
+    finList[[ii]] <- data.frame(nbatch = ii, sim$sim$finPoint)
 }
 parmsDT <- rbindlist(parmsList)
-stopTrials <- merge(rbindlist(stopList), parmsDT, by = 'nbatch')
+## stopTrials <- merge(rbindlist(stopList), parmsDT, by = 'nbatch')
 finTrials <- merge(rbindlist(finList), parmsDT, by = 'nbatch')
-stopTrials[,vaccEff := levels(vaccEff)[vaccEff]]
+## stopTrials[,vaccEff := levels(vaccEff)[vaccEff]]
 finTrials[,vaccEff := levels(vaccEff)[vaccEff]]
-save(stopTrials, finTrials, file=file.path('Results','SLSumm.Rdata'))
+save(finTrials, file=file.path('Results','SLSumm3.Rdata'))
 
-load(file=file.path('Results','SLSumm.Rdata'))
+## load(file=file.path('Results','SLSumm.Rdata'))
  
 powFin <- summarise(group_by(finTrials[sdLogIndiv==1], vaccEff, trial, propInTrial, ord)
                     , nsim = length(stopped)
@@ -44,22 +40,7 @@ powFin <- summarise(group_by(finTrials[sdLogIndiv==1], vaccEff, trial, propInTri
                     , caseV_stopActive = mean(caseVXimmGrpEnd)
                     )
 
-powStop <- summarise(group_by(stopTrials[sdLogIndiv==1], vaccEff, trial, propInTrial)
-                    , stopped = mean(stopped)
-                    , vaccGood = mean(stopped & vaccGood)
-                    , stopDay = mean(stopDay)
-                    , totCase_stopActive = mean(caseCXimmGrpEnd + caseVXimmGrpEnd )
-                    , caseC_stopActive = mean(caseCXimmGrpEnd)
-                    , caseV_stopActive = mean(caseVXimmGrpEnd)
-                    , totCase_finActive = mean(caseCXrandFinA + caseVXrandFinA)
-                    , caseC_finActive = mean(caseCXrandFinA)          
-                    , caseV_finActive = mean(caseVXrandFinA)
-                    , totCase_fin = mean(caseCXrandFin + caseVXrandFin)          
-                    , caseC_fin = mean(caseCXrandFin)
-                    , caseV_fin = mean(caseVXrandFin)
-                    )
 
-powStop[,propInTrial:= as.numeric(levels(propInTrial)[propInTrial])]
 powFin[,propInTrial:= as.numeric(levels(propInTrial)[propInTrial])]
 
     powFin[vaccEff <=.85 & (trial=='SWCT' | (trial %in% c('FRCT','RCT') & ord=='TU'))]
@@ -111,3 +92,20 @@ mtext('# cases in trial', 2, 0, outer = T)
 mtext('vaccine efficacy', 1, 0, outer = T)
 graphics.off()
 
+
+
+## powStop <- summarise(group_by(stopTrials[sdLogIndiv==1], vaccEff, trial, propInTrial)
+##                     , stopped = mean(stopped)
+##                     , vaccGood = mean(stopped & vaccGood)
+##                     , stopDay = mean(stopDay)
+##                     , totCase_stopActive = mean(caseCXimmGrpEnd + caseVXimmGrpEnd )
+##                     , caseC_stopActive = mean(caseCXimmGrpEnd)
+##                     , caseV_stopActive = mean(caseVXimmGrpEnd)
+##                     , totCase_finActive = mean(caseCXrandFinA + caseVXrandFinA)
+##                     , caseC_finActive = mean(caseCXrandFinA)          
+##                     , caseV_finActive = mean(caseVXrandFinA)
+##                     , totCase_fin = mean(caseCXrandFin + caseVXrandFin)          
+##                     , caseC_fin = mean(caseCXrandFin)
+##                     , caseV_fin = mean(caseVXrandFin)
+##                     )
+## powStop[,propInTrial:= as.numeric(levels(propInTrial)[propInTrial])]

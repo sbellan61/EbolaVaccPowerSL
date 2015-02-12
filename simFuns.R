@@ -69,6 +69,7 @@ setHazs <- function(parms=makePop(), browse=F) within(parms, {
     ## create popH which has weekly hazards for all individuals
     popH <- arrange(merge(pop, hazT, by='cluster', allow.cartesian=T),day)
     popH[, indivHaz := clusHaz*indivRR]
+    daySeq <- daySeq[daySeq>=0] ## don't do anything before zero, just stored hazard in popHearly for ordering
     daySeqLong <- seq(0,maxInfectDay+1000,by=hazIntUnit) ## to avoid problems later
     popHearly <- copy(popH)
     popH <- popH[day >= 0]
@@ -92,7 +93,7 @@ reParmRgamma <- function(n, mean, cv) {
 
 reordPop <- function(parms, browse=F) { ## wrapper around other functions below
     reordFXN <- get(paste0('reord',parms$trial))
-    parms <- reordFXN(parms)
+    parms <- reordFXN(parms, browse=browse)
     within(parms, { ## return parms
         if(parms$ord!='none') { ## but first, if reordered
             if(browse) browser()
@@ -109,7 +110,8 @@ reordPop <- function(parms, browse=F) { ## wrapper around other functions below
     })
 }
 
-reordSWCT <- reordFRCT <- reordRCT <- function(parms) within(parms, {
+reordSWCT <- reordFRCT <- reordRCT <- function(parms, browse=F) within(parms, {
+    if(browse) browser()
     if(ord=='BL') { ## if vaccinating highest incidence clusters first (i.e. *NOT* SW randomization of vaccination sequence)
         clusIncRank <- popH[idByClus==1 & day == 0,order(rev(order(clusHaz)))]
     }
@@ -127,7 +129,8 @@ reordSWCT <- reordFRCT <- reordRCT <- function(parms) within(parms, {
     }
 })
 
-reordCRCT <- function(parms) within(parms, {
+reordCRCT <- function(parms, browse = F) within(parms, {
+    if(browse) browser()
     if(ord=='BL') { ## if matching clusters on incidence, then randomizing within pairs, then vaccinating highest incidence first
         if(numClus %% 2 == 1) stop("need even # of clusters")
         ## order clusters by mean hazard, in pairs (each row)
@@ -144,7 +147,7 @@ reordCRCT <- function(parms) within(parms, {
         if(numClus %% 2 == 1) stop("need even # of clusters")
         numPairs <- numClus/2
         clusIncRank <- NULL
-        for(ii in 1:min(numPairs,length(daySeq))) { ## for each vaccination day
+        for(ii in 1:numPairs) { ## for each vaccination day
             dd <- daySeq[ii]
             notRandomized <- (1:numClus)[! 1:numClus %in% as.vector(clusIncRank)] ## haven't already been randomized
             currIncOrd <- notRandomized[rev(order(popHearly[day==dd - reordLag & idByClus==1 & cluster %in% notRandomized, clusHaz]))]
