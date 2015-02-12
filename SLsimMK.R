@@ -13,30 +13,30 @@ numEach <- 4
 parmsMat <- as.data.table(expand.grid(
     seed =  1:numEach
     , trial = tnms
+    , ord = c('none','TU')
     , propInTrial = c(.03, .05, .1)
     , sdLogIndiv = makeParms()$sdLogIndiv
     , delayUnit = c(0,7)
     , vaccEff = c(0, seq(.4, .95, by = .05))
     ))
-parmsMat <- parmsMat[!(trial=='SWCT' & delayUnit==0)] ## SWCT must have delay
+parmsMat <- parmsMat[!(trial=='SWCT' & (delayUnit==0 | ord=='TU'))] ## SWCT must have delay and cannot be ordered
 parmsMat$simNum <- 1:nrow(parmsMat)
 parmsMat$batchdirnm <- batchdirnm
 nmtmp <- 'simSL-3-'
 parmsMat$saveNm <- nmtmp
-parmsMat$nsims <- 300
-parmsMat$ord <- "none"
-parmsMat[trial %in% c('RCT','FRCT','CRCT'), ord := 'TU']
+parmsMat$nsims <- 600
 parmsMat$reordLag <- 14
 nrow(parmsMat)
 
-fls <- list.files(batchdirnm, pattern=nmtmp)
-sz <- unlist(sapply(fls, function(x) file.info(file.path(batchdirnm, x))['size']))
-fls <- fls[sz>0]
-done <- gsub(nmtmp, '', fls)
-done <- as.numeric(gsub('.Rdata', '', done))
-length(done)
+## fls <- list.files(batchdirnm, pattern=nmtmp)
+## sz <- unlist(sapply(fls, function(x) file.info(file.path(batchdirnm, x))['size']))
+## fls <- fls[sz>0]
+## done <- gsub(nmtmp, '', fls)
+## done <- as.numeric(gsub('.Rdata', '', done))
+## length(done)
 
-parmsMatDo <- parmsMat[!simNum %in% done]
+parmsMatDo <- parmsMat 
+## parmsMatDo <- parmsMat[!simNum %in% done]
 ## parmsMatDo <- parmsMat[trial %in% c('RCT','FRCT')]
 nrow(parmsMatDo)
 

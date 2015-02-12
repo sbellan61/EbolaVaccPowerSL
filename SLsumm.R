@@ -39,14 +39,7 @@ powFin <- summarise(group_by(finTrials[sdLogIndiv==1], vaccEff, trial, propInTri
                     , caseC_stopActive = mean(caseCXimmGrpEnd)
                     , caseV_stopActive = mean(caseVXimmGrpEnd)
                     )
-
-
 powFin[,propInTrial:= as.numeric(levels(propInTrial)[propInTrial])]
-
-    powFin[vaccEff <=.85 & (trial=='SWCT' | (trial %in% c('FRCT','RCT') & ord=='TU'))]
-
-powFin <- powFin[trial!='CRCT']
-powFin[, trial:= factor(trial, levels = unique(trial))]
 
 ## Power by efficacy & weekly decay rate, panels by weeklydecayvar
 cols <- rainbow(4)
