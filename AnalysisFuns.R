@@ -65,10 +65,12 @@ summTrial <- function(st) list(summarise(group_by(st, cluster), sum(infected))
                                , summarise(group_by(st, cluster, immuneGrp), sum(infected))
                                , summarise(group_by(st, immuneGrp), sum(infected))
                                )
-
-compileStopInfo <- function(minDay, vaccEffEst, tmp) {
+ 
+compileStopInfo <- function(minDay, vaccEffEst, tmp, verbose=0) {
+        if(verbose==4) browser()
     out <- data.table(stopDay=minDay
-                      , mean = vaccEffEst['mean'], lci = vaccEffEst['lci'], uci = vaccEffEst['uci'], p = vaccEffEst['p']
+                      , mean = vaccEffEst[1,'mean'], lci = vaccEffEst[1,'lci'], uci = vaccEffEst[1,'uci'], p = vaccEffEst[1,'p']
+                      , mod = vaccEffEst[1,'mod']
                       , caseCXimmGrpEnd = tmp[immuneGrp==0, sum(infected)]
                       , caseVXimmGrpEnd = tmp[immuneGrp==1, sum(infected)]
                       , hazCXimmGrpEnd = tmp[immuneGrp==0, sum(infected)/sum(perstime)]
@@ -78,7 +80,7 @@ compileStopInfo <- function(minDay, vaccEffEst, tmp) {
     out$stopped <- out[, p<.05 & !is.na(p)]
     out$vaccGood <- NA
     out[stopped==T, vaccGood:= lci > 0]
-    out <- setcolorder(out, c("stopped", "vaccGood", "stopDay", "mean", "lci", "uci", "p"
+    out <- setcolorder(out, c("stopped", "vaccGood", "stopDay", "mean", "lci", "uci", "p",  'mod'
                               , "caseCXimmGrpEnd", "caseVXimmGrpEnd"
                               , "hazCXimmGrpEnd", "hazVXimmGrpEnd"
                               , "ptRatioCVXimmGrpEnd"
@@ -120,12 +122,28 @@ seqStop <- function(parms, start = parms$immunoDelayThink + 14, checkIncrement =
     return(parms)
 }
 
-getEndResults <- function(parms) within(parms, {
+getEndResults <- function(parms, verbose = 0) within(parms, {
     tmp <- censSurvDat(parms, maxInfectDay)
-    vaccEE <- try(doCoxPH(tmp), silent=T)
-    if(inherits(vaccEE, 'try-error')) vaccEE <- c(mean = NA, lci = NA, uci = NA, p = NA)
-    stopFin <- compileStopInfo(maxInfectDay, vaccEE, tmp) 
-    rm(vaccEE,tmp)
+    notFitted <- T
+    bump <- 0
+    ## while(notFitted) {
+        tmpElas <- copy(tmp)
+        vaccEE_ME <- try(doCoxME(tmpElas, verbose=verbose), silent=T)
+    vaccEE_PH <- try(doCoxPH(tmpElas, verbose=verbose), silent=T)
+    vaccEE_CL <- try(doGlmer(tmpElas, verbose=verbose), silent=T)
+    ##     if(vaccEE['lci'] > -Inf) notFitted <- F
+    ##     ## pick two individualsin each immune group that weren't infected, and pretend they're infected to do +.5 type analysis in 2x2 table
+    ##     selIndiv <- tmpElas[infectDay==Inf & endDay==168, list(indiv = sample(indiv,1)), immuneGrp]
+    ##     tmpElas[infectDay==Inf & endDay==168 & indiv %in% selIndiv[,indiv], infectDay := endDay] ## perstime still correct
+    ##     tmpElas[endDay==168 & indiv %in% selIndiv[,indiv], infected := 1] 
+    ##     tmpElas[endDay==168 & indiv %in% selIndiv[,indiv], ]
+    ##     bump <- bump+1
+    ## }
+    ## vaccEE <- c(vaccEE, bump=bump)
+    if(verbose>1) browser()
+    stopFin <- rbind(compileStopInfo(maxInfectDay, vaccEE_ME, tmp, verbose=verbose), 
+                     compileStopInfo(maxInfectDay, vaccEE_PH, tmp, verbose = verbose))
+    rm(vaccEE_ME,vaccEE_PH, tmp,tmpElas)#,selIndiv,bump)
 })
 
 showSeqStop <- function(resfull, flnm= NULL, ...) {
@@ -177,13 +195,13 @@ simNtrials <- function(seed = 1, parms=makeParms(), N = 2, returnAll = F,
     if(showSeqStops) pdf(paste0(flnm, '.pdf'), w = 8, h = 6)
     for(ss in 1:N) {
         if(verbose>0 & (ss %% verbFreq == 0)) print(paste('on',ss,'of',N))
-        if(verbose>1) browser()
+        if(verbose==2) browser()
         ## pseed <- .Random.seed ## for debugging
         ## save(pseed, file = paste0(seed, '-seed.Rdata'))
         res <- simTrial(parms)
         res <- makeSurvDat(res)
         res <- activeFXN(res)
-        res <- getEndResults(res)
+        res <- getEndResults(res, verbose=verbose)
         finPoint <- rbind(finPoint, res$stopFin)
         if(doSeqStops) {
             res <- seqStop(res, verbose = 3)

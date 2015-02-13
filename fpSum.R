@@ -1,6 +1,7 @@
 if(grepl('stevebe', Sys.info()['nodename'])) setwd('~/Documents/R Repos/EbolaVaccSim/')
 if(grepl('stevebellan', Sys.info()['login'])) setwd('~/Documents/R Repos/EbolaVaccSim/')
 if(grepl('tacc', Sys.info()['nodename'])) setwd('/home1/02413/sbellan/VaccEbola/')
+library(RColorBrewer)
 ## Simulate SWCT vs RCT vs CRCT for SL
 sapply(c('simFuns.R','AnalysisFuns.R','CoxFxns.R','EndTrialFuns.R'), source)
 
@@ -49,6 +50,8 @@ cvcls <- cvcls[order(cvcls)]
 cvwds <- powFin[,unique(cvWeeklyDecay)]
 cvwds <- cvwds[order(cvwds)]
 
+powFin[vaccEff==0]
+
 maxVE <- 1
 maxPwr <- 1
 
@@ -60,7 +63,6 @@ for(ii in 1:length(cvcls)) {
     cvwd <- cvwds[ii]
     main <- paste0('weekly decay CV = ', signif(cvwd,3))
     plot(0,0, type = 'n', xlab = '', ylab = '', xlim = c(0,1), ylim = c(0,1), bty = 'n', main = main, las = 1)
-    abline(h=.025)
     powFin[cvWeeklyDecay==cvwd & vaccEff <= .85,
            lines(vaccEff, vaccGood, col = cols[as.numeric(trial)], lty = which(cvClus == cvcls)),
            by = list(cvClus, weeklyDecay, cvWeeklyDecay,trial)]
@@ -73,6 +75,29 @@ title(main='24 week power', outer = T)
 mtext('probability of rejecting the null', 2, 0, outer = T)
 mtext('vaccine efficacy', 1, 0, outer = T)
 graphics.off()
+
+##
+cols <- c('black','brown','green','blue')
+jpeg('Figures/FalsePos exphazmod.jpg', w = 8, h = 6, units = 'in', res = 200)
+par(lwd=2, mar = c(5,5,3,.5))
+plot(0,0, type = 'n', xlab = '', ylab = '', xlim = c(0.03,.1), ylim = c(0,.2), bty = 'n', main = '', las = 1, xaxt='n')
+axis(1, at = c(0,.03, .05, .1))
+powFin[subs,
+       {
+           lty <- which(c('none','TU')==ord)
+           if(delayUnit==0) lty <- 3
+           lines(propInTrial, vaccGood, col = cols[as.numeric(trial)], lty = lty, type = 'b')
+       },
+       by = list(trial, ord, delayUnit > 0)]
+abline(h=.025, lty = 3)
+## plot.new()
+legend('topleft', leg=powFin[,levels(trial)], col = cols, lwd = 2, bty = 'n')
+legend('topright', leg=c('random','highest risk first','simultaneous instant'), lty = 1:3, lwd = 2, bty = 'n', title = 'order of cluster vaccination')
+## title(main='24 week power', outer = T)
+mtext('Type I error rate', 2, 4)#, outer = T)
+mtext('proportion of district-level cases in trial population', 1, 3)#, outer = T)
+graphics.off()
+
 
 powFin[vaccEff==0]
 
