@@ -1,34 +1,38 @@
+library(geepack)
 
 doBoot <- function(csd, nboot=200, doFXN=doCoxME, verbose = 0) {
     if(verbose==3.4) browser()
+    modNm <- paste0('boot', sub('do','',as.character(substitute(doFXN))))
     vee <- try(doFXN(csd, verbose=verbose), silent=T)
-    effMean <- vee['mean']
-    effEsts <- as.numeric(NULL)
-
-    err <- 0
-    for(bb in 1:nboot) {
-        if(trial=='CRCT' & ord!='none')
-            bootby <- csd[,unique(pair)]    else    bootby <- csd[,unique(cluster)]
-        clsB <- sample(bootby, length(bootby), replace=T)
-        clsB <- clsB[order(clsB)]
-        clsB <- table(factor(clsB, bootby))
-        csdB <- copy(csd)
-        csdB$reps <- NA
-        if(trial=='CRCT' & ord!='none')
-            csdB[, reps := clsB[pair]] else csdB[, reps := clsB[cluster]] 
-        csdB <- csdB[rep(1:length(reps), reps)]
-        tmpEst <- try(doFXN(csdB, verbose = 1)['mean'], silent=T)
-        if(!inherits(tmpEst, 'try-error')) {
-            effEsts <- c(effEsts, as.numeric(tmpEst))
-        }else{
-            err <- err+1
+    if(!inherits(vee, 'try-error')) {
+        effMean <- vee['mean']
+        effEsts <- as.numeric(NULL)
+        err <- 0
+        for(bb in 1:nboot) {
+            if(trial=='CRCT' & ord!='none')
+                bootby <- csd[,unique(pair)]    else    bootby <- csd[,unique(cluster)]
+            clsB <- sample(bootby, length(bootby), replace=T)
+            clsB <- clsB[order(clsB)]
+            clsB <- table(factor(clsB, bootby))
+            csdB <- copy(csd)
+            csdB$reps <- NA
+            if(trial=='CRCT' & ord!='none')
+                csdB[, reps := clsB[pair]] else csdB[, reps := clsB[cluster]] 
+            csdB <- csdB[rep(1:length(reps), reps)]
+            tmpEst <- try(doFXN(csdB, verbose = 1)['mean'], silent=T)
+            if(!inherits(tmpEst, 'try-error')) {
+                effEsts <- c(effEsts, as.numeric(tmpEst))
+            }else{
+                err <- err+1
+            }
         }
+        lci <- quantile(effEsts, .025, na.rm=T)
+        uci <- quantile(effEsts, .975, na.rm=T)
+        bootVee <- data.frame(mean=effMean, lci = lci, uci = uci, p = NA, mod=modNm, err=err)
+    }else{
+        bootVee <- data.frame(mean=NA, lci = NA, uci = NA, p = NA, mod=modNm, err=NA)
     }
-
-    lci <- quantile(effEsts, .025, na.rm=T)
-    uci <- quantile(effEsts, .975, na.rm=T)
-
-    return(data.frame(mean=effMean, lci = lci, uci = uci, p = NA, mod=paste0('boot_',vee[1,'mod']), err=err))  
+    return(bootVee)
 }
 
 doCoxME <- function(csd, verbose=0) { ## take censored survival object and return vacc effectiveness estimates
@@ -72,7 +76,7 @@ doGlmer <- function(csd, bayes=T, verbose = 0) {## take censored survival object
     
     vaccRes <- summary(mod)$coefficients['immuneGrp', c('Estimate','Std. Error','Pr(>|z|)')] 
     vaccEffEst <- c(1 - exp(vaccRes[1] + c(0, 1.96, -1.96) * vaccRes[2]), vaccRes[3])
-    names(vaccEffEst) <- c('mean','lci','uci','P')
+    names(vaccEffEst) <- c('mean','lci','uci','p')
     return(signif(vaccEffEst,3))
 }
 
@@ -80,6 +84,23 @@ doBayesCox <- function(csd, browse = F) {
 
 }
 
-doGEE <- function(csd, browse=F) {
 
+doGEEsurv <- function(csd, verbose=0) {
+    if(verbose==3.5) browser()
+    mod <- geeglm(infected ~ immuneGrp, data = csd, family = binomial(link='cloglog'), id = cluster, corstr = 'exchangeable')
+    vaccRes <- as.numeric(summary(mod)$coef['immuneGrp', c('Estimate','Std.err','Pr(>|W|)')])
+    vaccEffEst <- c(1 - exp(vaccRes[1] + c(0, 1.96, -1.96) * vaccRes[2]), vaccRes[3])
+    names(vaccEffEst) <- c('mean','lci','uci','p')
+    vaccEffEst <- data.frame(t(signif(vaccEffEst,3)),  mod='GEEIndivCloglog')
+    return(vaccEffEst)
+}
+
+doGEEclusAR1 <- function(clusDat, verbose=0) {
+    if(verbose==3.6) browser()
+    mod <- geeglm(cases ~ immuneGrp + day, id = cluster, data = clusDat, family = poisson, corstr = "ar1")
+    vaccRes <- as.numeric(summary(mod)$coef['immuneGrp', c('Estimate','Std.err','Pr(>|W|)')])
+    vaccEffEst <- c(1 - exp(vaccRes[1] + c(0, 1.96, -1.96) * vaccRes[2]), vaccRes[3])
+    names(vaccEffEst) <- c('mean','lci','uci','p')
+    vaccEffEst <- data.frame(t(signif(vaccEffEst,3)),  mod='GEEClusAR1')
+    return(vaccEffEst)
 }

@@ -24,6 +24,20 @@ makeSurvDat <- function(parms,  whichDo='pop', browse=F) within(parms, {
     rm(stPre, stPost, popTmp, nmSt)
 }) ## careful with modifying parms, st depends on analysis a bit too (immunoDelayThink), so we can have different st for same popH
 
+## Restructure for GEE/GLMM with weekly observations of each cluster.
+makeGEEDat <- function(parms, whichDo='pop', verbose=0) within(parms, {
+    if(verbose ==1.5) browser()
+    popHTmp <- get(paste0(whichDo,'H'))
+    popHTmp$immuneDayThink <- popHTmp[,vaccDay] + immunoDelayThink ## vaccine refractory period ASSUMED in analysis
+    popHTmp$infectDayRCens <- popHTmp$infectDay
+    popHTmp[infectDay==Inf, infectDayRCens := NA]
+    popHTmp$immuneGrp <- 0
+    popHTmp[day >= immuneDayThink, immuneGrp := 1]
+    clusDat <- popHTmp[,list(cases = sum(!is.na(infectDayRCens))), list(cluster, day, immuneGrp)]
+    clusDat <- clusDat[order(cluster, day)]
+    rm(popHTmp)
+})
+
 ## Select subset of survival table to analyze
 activeFXN <- function(parms, whichDo='st', browse=F) within(parms, { 
     if(browse) browser()
@@ -65,9 +79,9 @@ summTrial <- function(st) list(summarise(group_by(st, cluster), sum(infected))
                                , summarise(group_by(st, cluster, immuneGrp), sum(infected))
                                , summarise(group_by(st, immuneGrp), sum(infected))
                                )
- 
+
 compileStopInfo <- function(minDay, vaccEffEst, tmp, verbose=0) {
-        if(verbose==4) browser()
+    if(verbose==4) browser()
     out <- data.table(stopDay=minDay
                       , mean = vaccEffEst[1,'mean'], lci = vaccEffEst[1,'lci'], uci = vaccEffEst[1,'uci'], p = vaccEffEst[1,'p']
                       , mod = vaccEffEst[1,'mod']
@@ -88,7 +102,6 @@ compileStopInfo <- function(minDay, vaccEffEst, tmp, verbose=0) {
     out <- as.data.frame(out)
     return(out)
 }
-
 
 ## Check whether stopping point has been reached at intervals
 seqStop <- function(parms, start = parms$immunoDelayThink + 14, checkIncrement = 7, minCases = 15,
@@ -126,26 +139,31 @@ getEndResults <- function(parms, verbose = 0) within(parms, {
     tmp <- censSurvDat(parms, maxInfectDay)
     notFitted <- T
     bump <- 0
-    ## while(notFitted) {
     tmpElas <- copy(tmp)
+    if(verbose==2.9) browser()
     vaccEE_ME <- try(doCoxME(tmpElas, verbose=verbose), silent=T)
-    vaccEE_MEboot <- doBoot(tmpElas, nboot=200, doFXN = doCoxME, verbose = verbose)
-    vaccEE_PH <- try(doCoxPH(tmpElas, verbose=verbose), silent=T)
-    ## vaccEE_CL <- try(doGlmer(tmpElas, verbose=verbose), silent=T)
-    ##     if(vaccEE['lci'] > -Inf) notFitted <- F
-    ##     ## pick two individualsin each immune group that weren't infected, and pretend they're infected to do +.5 type analysis in 2x2 table
-    ##     selIndiv <- tmpElas[infectDay==Inf & endDay==168, list(indiv = sample(indiv,1)), immuneGrp]
-    ##     tmpElas[infectDay==Inf & endDay==168 & indiv %in% selIndiv[,indiv], infectDay := endDay] ## perstime still correct
-    ##     tmpElas[endDay==168 & indiv %in% selIndiv[,indiv], infected := 1] 
-    ##     tmpElas[endDay==168 & indiv %in% selIndiv[,indiv], ]
-    ##     bump <- bump+1
-    ## }
-    ## vaccEE <- c(vaccEE, bump=bump)
-    stopFin <- rbind(compileStopInfo(maxInfectDay, vaccEE_ME, tmp, verbose=verbose)
-                     ,compileStopInfo(maxInfectDay, vaccEE_MEboot, tmp, verbose = verbose)
-                     ,compileStopInfo(maxInfectDay, vaccEE_PH, tmp, verbose = verbose))    
-    rm(vaccEE_ME,vaccEE_PH, tmp,tmpElas)#,selIndiv,bump)
+    vaccEE_MEboot <- doBoot(tmpElas, nboot=nboot, doFXN = doCoxME, verbose = verbose)
+    vaccEE_GEEindivExch <- try(doGEEsurv(tmpElas, verbose = verbose), silent=T)
+    vaccEE_GEEclusAR1 <- try(doGEEclusAR1(clusDat, verbose = verbose), silent=T)
+    vEEs <- list(vaccEE_ME, vaccEE_MEboot, vaccEE_GEEindivExch, vaccEE_GEEclusAR1)
+    stopFin <- rbindlist(lapply(vEEs, compileStopInfo, minDay = maxInfectDay, tmp = tmp, verbose=verbose))
+    rm(vaccEE_ME,vaccEE_MEboot, tmp,tmpElas)
 })
+
+## while(notFitted) {
+## vaccEE_GEEar1 <- try(doGEE(tmpElas, verbose = 3.5, corstr = "ar1"), silent=T)
+##    vaccEE_PH <- try(doCoxPH(tmpElas, verbose=verbose), silent=T)
+## vaccEE_CL <- try(doGlmer(tmpElas, verbose=verbose), silent=T)
+##     if(vaccEE['lci'] > -Inf) notFitted <- F
+##     ## pick two individualsin each immune group that weren't infected, and pretend they're infected to do +.5 type analysis in 2x2 table
+##     selIndiv <- tmpElas[infectDay==Inf & endDay==168, list(indiv = sample(indiv,1)), immuneGrp]
+##     tmpElas[infectDay==Inf & endDay==168 & indiv %in% selIndiv[,indiv], infectDay := endDay] ## perstime still correct
+##     tmpElas[endDay==168 & indiv %in% selIndiv[,indiv], infected := 1] 
+##     tmpElas[endDay==168 & indiv %in% selIndiv[,indiv], ]
+##     bump <- bump+1
+## }
+## vaccEE <- c(vaccEE, bump=bump)
+
 
 showSeqStop <- function(resfull, flnm= NULL, ...) {
     with(resfull, {
@@ -201,9 +219,11 @@ simNtrials <- function(seed = 1, parms=makeParms(), N = 2, returnAll = F,
         ## save(pseed, file = paste0(seed, '-seed.Rdata'))
         res <- simTrial(parms)
         res <- makeSurvDat(res)
+        res <- makeGEEDat(res, verbose=verbose)
         res <- activeFXN(res)
         res <- getEndResults(res, verbose=verbose)
-        finPoint <- rbind(finPoint, res$stopFin)
+        finTmp <- data.frame(sim = ss, res$stopFin)
+        finPoint <- rbind(finPoint, finTmp)
         if(doSeqStops) {
             res <- seqStop(res, verbose = 3)
             if(showSeqStops) {

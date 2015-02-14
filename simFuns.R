@@ -26,6 +26,7 @@ makeParms <- function(
     , RCTendOption = 2        ## order to vaccinate unvaccinated invididuals when an RCT ends, see EndTrialFuns.R
     , instVaccDelay = 7 ## delay til instant vacc of everyone after trial ends in trials where delayUnit=0 otherwise
     , small=F ## do a small trial for illustration
+    , nboot = 200 ## bootstrap samples
     ){
     if(small) {
         numClus <- 4

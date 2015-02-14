@@ -20,8 +20,8 @@ if(length(args)>0)  {## Then cycle through each element of the list and evaluate
     saveNm <- 'simFPX-'
 }
 
-## seed=1;trial="CRCT";ord="none";propInTrial=0.03;sdLogIndiv=1;delayUnit=0;vaccEff=0;simNum=1717;batchdirnm="BigResults/SLSims3";saveNm="simSL-3-";nsims=11;reordLag=14
-## parmArgs <- subsArgs(as.list(environment()), makeParms)
+seed=1;trial="SWCT";ord="none";propInTrial=0.03;sdLogIndiv=1;delayUnit=0;vaccEff=.7;simNum=1717;batchdirnm="BigResults/SLSims3";saveNm="simSL-3-";nsims=1;reordLag=14
+parmArgs <- subsArgs(as.list(environment()), makeParms)
 
 print(parmArgs)
 parms <- do.call(makeParms, parmArgs)
