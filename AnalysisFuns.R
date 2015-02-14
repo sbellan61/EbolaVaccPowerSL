@@ -127,10 +127,11 @@ getEndResults <- function(parms, verbose = 0) within(parms, {
     notFitted <- T
     bump <- 0
     ## while(notFitted) {
-        tmpElas <- copy(tmp)
-        vaccEE_ME <- try(doCoxME(tmpElas, verbose=verbose), silent=T)
+    tmpElas <- copy(tmp)
+    vaccEE_ME <- try(doCoxME(tmpElas, verbose=verbose), silent=T)
+    vaccEE_MEboot <- doBoot(tmpElas, nboot=200, doFXN = doCoxME, verbose = verbose)
     vaccEE_PH <- try(doCoxPH(tmpElas, verbose=verbose), silent=T)
-    vaccEE_CL <- try(doGlmer(tmpElas, verbose=verbose), silent=T)
+    ## vaccEE_CL <- try(doGlmer(tmpElas, verbose=verbose), silent=T)
     ##     if(vaccEE['lci'] > -Inf) notFitted <- F
     ##     ## pick two individualsin each immune group that weren't infected, and pretend they're infected to do +.5 type analysis in 2x2 table
     ##     selIndiv <- tmpElas[infectDay==Inf & endDay==168, list(indiv = sample(indiv,1)), immuneGrp]
@@ -140,9 +141,9 @@ getEndResults <- function(parms, verbose = 0) within(parms, {
     ##     bump <- bump+1
     ## }
     ## vaccEE <- c(vaccEE, bump=bump)
-    if(verbose>1) browser()
-    stopFin <- rbind(compileStopInfo(maxInfectDay, vaccEE_ME, tmp, verbose=verbose), 
-                     compileStopInfo(maxInfectDay, vaccEE_PH, tmp, verbose = verbose))
+    stopFin <- rbind(compileStopInfo(maxInfectDay, vaccEE_ME, tmp, verbose=verbose)
+                     ,compileStopInfo(maxInfectDay, vaccEE_MEboot, tmp, verbose = verbose)
+                     ,compileStopInfo(maxInfectDay, vaccEE_PH, tmp, verbose = verbose))    
     rm(vaccEE_ME,vaccEE_PH, tmp,tmpElas)#,selIndiv,bump)
 })
 

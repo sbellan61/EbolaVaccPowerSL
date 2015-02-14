@@ -1,3 +1,36 @@
+
+doBoot <- function(csd, nboot=200, doFXN=doCoxME, verbose = 0) {
+    if(verbose==3.4) browser()
+    vee <- try(doFXN(csd, verbose=verbose), silent=T)
+    effMean <- vee['mean']
+    effEsts <- as.numeric(NULL)
+
+    err <- 0
+    for(bb in 1:nboot) {
+        if(trial=='CRCT' & ord!='none')
+            bootby <- csd[,unique(pair)]    else    bootby <- csd[,unique(cluster)]
+        clsB <- sample(bootby, length(bootby), replace=T)
+        clsB <- clsB[order(clsB)]
+        clsB <- table(factor(clsB, bootby))
+        csdB <- copy(csd)
+        csdB$reps <- NA
+        if(trial=='CRCT' & ord!='none')
+            csdB[, reps := clsB[pair]] else csdB[, reps := clsB[cluster]] 
+        csdB <- csdB[rep(1:length(reps), reps)]
+        tmpEst <- try(doFXN(csdB, verbose = 1)['mean'], silent=T)
+        if(!inherits(tmpEst, 'try-error')) {
+            effEsts <- c(effEsts, as.numeric(tmpEst))
+        }else{
+            err <- err+1
+        }
+    }
+
+    lci <- quantile(effEsts, .025, na.rm=T)
+    uci <- quantile(effEsts, .975, na.rm=T)
+
+    return(data.frame(mean=effMean, lci = lci, uci = uci, p = NA, mod=paste0('boot_',vee[1,'mod']), err=err))  
+}
+
 doCoxME <- function(csd, verbose=0) { ## take censored survival object and return vacc effectiveness estimates
     if(verbose==3.1) browser()
     mod <- suppressWarnings(coxme(Surv(startDay, endDay, infected) ~ immuneGrp + (1|cluster), data = csd))
@@ -17,8 +50,7 @@ doCoxPH <- function(csd, verbose=0) {
        mod <- try(coxph(Surv(startDay, endDay, infected) ~ immuneGrp + cluster(cluster),
                         data=csd), silent=T)
     if(trial %in% c('RCT','FRCT'))
-       mod <- try(coxph(Surv(startDay, endDay, infected) ~ immuneGrp ## + cluster(cluster),
-                        data=csd), silent=T)
+       mod <- try(coxph(Surv(startDay, endDay, infected) ~ immuneGrp, data=csd), silent=T)
     vaccEffEst <- 1-summary(mod)$conf.int['immuneGrp',c(1,4:3)] 
     pval <- summary(mod)$coefficients['immuneGrp','Pr(>|z|)']
     vaccEffEst <- data.frame(t(signif(vaccEffEst,3)), signif(pval,3), mod='coxph')

@@ -53,9 +53,12 @@ pits <- pits[order(pits)]
 maxVE <- 1
 maxPwr <- 1
 cols <- c('black','brown','green','blue')
+cols <- rainbow(3)
 
 ## power by order
-subs <- powFin[, !(delayUnit==0 & ord!='none') & ((trial=='SWCT' & ord=='none') | trial %in% c('FRCT','RCT','CRCT')) & vaccEff <=maxVE ]
+subs <- powFin[, !(delayUnit==0 & ord!='none') & ((trial=='SWCT' & ord=='none') | trial %in% c('FRCT','RCT')) & vaccEff <=maxVE ]
+powTmp <- powFin[subs]
+powTmp[,trial:=factor(trial)]
 jpeg('Figures/power SL propInTrial TU vs ord.jpg', w = 8, h = 6, units = 'in', res = 200)
 par(lwd=2, mfrow = c(2,2), mar = c(3,3,3,.5), oma = c(1.5,1.5,1.5,0))
 for(ii in 1:length(pits)) {
@@ -63,7 +66,7 @@ for(ii in 1:length(pits)) {
     main <- paste0('proportion of district-level\n cases in trial = ', signif(pit,3))
     plot(0,0, type = 'n', xlab = '', ylab = '', xlim = c(0,1), ylim = c(0,maxPwr), bty = 'n', main = main, las = 1)
     ##    abline(h=.025, lty = 3)
-    powFin[propInTrial==pit & subs, {
+    powTmp[propInTrial==pit, {
         lty <- which(c('none','TU')==ord)
         if(delayUnit==0) lty <- 3
         lines(vaccEff, vaccGood, col = cols[as.numeric(trial)], lty = lty)
@@ -71,7 +74,8 @@ for(ii in 1:length(pits)) {
            by = list(trial, ord, delayUnit > 0)]
 }
 plot.new()
-legend('topleft', leg=powFin[,levels(trial)], col = cols, lwd = 2, bty = 'n')
+tnmsTmp <- powTmp[,unique(trial)]
+legend('topleft', leg=tnmsTmp, col = cols, lwd = 2, bty = 'n')
 legend('bottomleft', leg=c('random','highest risk first','simultaneous instant'), lty = 1:3, lwd = 2, bty = 'n', title = 'order of cluster vaccination')
 title(main='24 week power', outer = T)
 mtext('probability of rejecting the null hypothesis', 2, 0, outer = T)
@@ -80,8 +84,6 @@ graphics.off()
 
 ## cases by order
 maxCases <- 120
-subs <- powFin[, !(delayUnit==0 & ord!='none') & ((trial=='SWCT' & ord=='none') | trial %in% c('FRCT','RCT','CRCT')) & vaccEff <=maxVE ]
-
 jpeg('Figures/cases SL propInTrial TU vs ord.jpg', w = 8, h = 6, units = 'in', res = 200)
 par(lwd=2, mfrow = c(2,2), mar = c(3,3,3,.5), oma = c(1.5,1.5,1.5,0))
 for(ii in 1:length(pits)) {
@@ -89,7 +91,7 @@ for(ii in 1:length(pits)) {
     main <- paste0('proportion of district-level\n cases in trial = ', signif(pit,3))
     plot(0,0, type = 'n', xlab = '', ylab = '', xlim = c(0,1), ylim = c(0,maxCases), bty = 'n', main = main, las = 1)
     ##    abline(h=.025, lty = 3)
-    powFin[propInTrial==pit & subs, {
+    powTmp[propInTrial==pit, {
         lty <- which(c('none','TU')==ord)
         if(delayUnit==0) lty <- 3
         lines(vaccEff, totCase_stopActive, col = cols[as.numeric(trial)], lty = lty)
@@ -97,7 +99,7 @@ for(ii in 1:length(pits)) {
            by = list(trial, ord, delayUnit > 0)]
 }
 plot.new()
-legend('topleft', leg=powFin[,levels(trial)], col = cols, lwd = 2, bty = 'n')
+legend('topleft', leg=powTmp[,levels(trial)], col = cols, lwd = 2, bty = 'n')
 legend('bottomleft', leg=c('random','highest risk first','simultaneous instant'), lty = 1:3, lwd = 2, bty = 'n', title = 'order of cluster vaccination')
 title(main='24 week power', outer = T)
 mtext('# cases in trial', 2, 0, outer = T)
@@ -105,14 +107,15 @@ mtext('vaccine efficacy', 1, 0, outer = T)
 graphics.off()
 
 ## Type 1 Error
-subs <- powFin[, !(delayUnit==0 & ord!='none') & ((trial=='SWCT' & ord=='none') | trial %in% c('FRCT','RCT','CRCT')) & vaccEff ==0 ]
-
+subs <- powFin[, !(delayUnit==0 & ord!='none') & ((trial=='SWCT' & ord=='none') | trial %in% c('FRCT','RCT')) & vaccEff ==0 ]
+powTmp <- powFin[subs]
+powTmp[,trial:=factor(trial)]
 jpeg('Figures/FalsePos SL propInTrial TU vs ord.jpg', w = 8, h = 6, units = 'in', res = 200)
-par(lwd=2, mar = c(5,5,3,.5))
-plot(0,0, type = 'n', xlab = '', ylab = '', xlim = c(0.03,.1), ylim = c(0,.2), bty = 'n', main = '', las = 1, xaxt='n')
+par(lwd=2, mar = c(5,5,1,.5))
+plot(0,0, type = 'n', xlab = '', ylab = '', xlim = c(0.03,.1), ylim = c(0,.07), bty = 'n', main = '', las = 1, xaxt='n')
 axis(1, at = c(0,.03, .05, .1))
 ##    abline(h=.025, lty = 3)
-powFin[subs,
+powTmp[,
        {
            lty <- which(c('none','TU')==ord)
            if(delayUnit==0) lty <- 3
@@ -121,13 +124,13 @@ powFin[subs,
        by = list(trial, ord, delayUnit > 0)]
 abline(h=.025, lty = 3)
 ## plot.new()
-legend('topleft', leg=powFin[,levels(trial)], col = cols, lwd = 2, bty = 'n')
+legend('topleft', leg=powTmp[,levels(trial)], col = cols, lwd = 2, bty = 'n')
 legend('topright', leg=c('random','highest risk first','simultaneous instant'), lty = 1:3, lwd = 2, bty = 'n', title = 'order of cluster vaccination')
 ## title(main='24 week power', outer = T)
 mtext('Type I error rate', 2, 4)#, outer = T)
 mtext('proportion of district-level cases in trial population', 1, 3)#, outer = T)
 graphics.off()
-
+ 
 
 ## 
 ## pdf('Figures/number cases by efficacy in SL propInTrial.pdf', w = 8, h = 6)

@@ -3,28 +3,28 @@ if(grepl('stevebellan', Sys.info()['login'])) setwd('~/Documents/R Repos/EbolaVa
 if(grepl('tacc', Sys.info()['nodename'])) setwd('/home1/02413/sbellan/VaccEbola/')
 sapply(c('simFuns.R','AnalysisFuns.R','CoxFxns.R','EndTrialFuns.R'), source)
 
-batchdirnm <- file.path('BigResults','SLSims3')
+batchdirnm <- file.path('BigResults','SLSimsFP')
 routdirnm <- file.path(batchdirnm,'Routs')
 if(!file.exists(batchdirnm)) dir.create(batchdirnm)
 if(!file.exists(routdirnm)) dir.create(routdirnm)
 tnms <- c('SWCT','RCT','FRCT','CRCT')
-numEach <- 4
+numEach <- 12
 
 parmsMat <- as.data.table(expand.grid(
     seed =  1:numEach
     , trial = tnms
     , ord = c('none','TU')
-    , propInTrial = c(.03, .05, .1)
+    , propInTrial = .1 #c(.03, .05, .1)
     , sdLogIndiv = makeParms()$sdLogIndiv
-    , delayUnit = c(0,7)
-    , vaccEff = c(0, seq(.4, .95, by = .05))
+    , delayUnit = 7 #c(0,7)
+    , vaccEff = 0 #c(0, seq(.4, .95, by = .05))
     ))
 parmsMat <- parmsMat[!(trial=='SWCT' & (delayUnit==0 | ord=='TU'))] ## SWCT must have delay and cannot be ordered
 parmsMat$simNum <- 1:nrow(parmsMat)
 parmsMat$batchdirnm <- batchdirnm
 nmtmp <- 'simSL-3-'
 parmsMat$saveNm <- nmtmp
-parmsMat$nsims <- 600
+parmsMat$nsims <- 300
 parmsMat$reordLag <- 14
 nrow(parmsMat)
 

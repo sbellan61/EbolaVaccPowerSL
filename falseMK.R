@@ -3,11 +3,11 @@ if(grepl('stevebellan', Sys.info()['login'])) setwd('~/Documents/R Repos/EbolaVa
 if(grepl('tacc', Sys.info()['nodename'])) setwd('/home1/02413/sbellan/VaccEbola/')
 sapply(c('simFuns.R','AnalysisFuns.R','CoxFxns.R','EndTrialFuns.R'), source)
 
-batchdirnm <- file.path('BigResults','FalsePosSims2')
+batchdirnm <- file.path('BigResults','FalsePosSims3')
 routdirnm <- file.path(batchdirnm,'Routs')
 if(!file.exists(batchdirnm)) dir.create(batchdirnm)
 if(!file.exists(routdirnm)) dir.create(routdirnm)
-tnms <- c('SWCT','FRCT') #,'FRCT','CRCT')
+tnms <- c('SWCT','CRCT','FRCT') #,'FRCT','CRCT')
 numEach <- 8
 
 parmsMat <- as.data.table(expand.grid(

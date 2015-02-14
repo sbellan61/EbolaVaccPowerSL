@@ -17,8 +17,12 @@ plotHazT <- function(parms, flnm = NULL, browse=F, main='', ymax = NULL, ...) wi
     if(!is.null(flnm)) graphics.off()
 })
 
-plotHazT(p1, flnm='SL hazard trajectories' , main='mean cluster hazards from SL forecasts\n (3% district cases in trial)', ymax = .01)
 p1 <- simTrial(makeParms('RCT',small=F, ord='none', delayUnit = 0, clusSize=300, propInTrial = .03, numClus = 20), br = F)
+
+jpeg('Figures/sim Sl hazards.jpg', w = 4.5, h = 4, units='in', res = 200)
+par('ps'=10, mgp = c(3,1,0), mar = c(5,4,2,.5))
+plotHazT(p1, main='simulated hazards based \non Sierra Leone forecast', ymax = .01)
+graphics.off()
 
 p2 <- simTrial(makeParms('RCT',small=F, ord='none', delayUnit = 0, clusSize=300, hazSL = F, weeklyDecay = .9, cvWeeklyDecay = 1, cvClus = 1.5, numClus = 20), br = F)
 plotHazT(p2, flnm='sim hazard trajectories' , main='mean cluster hazards from\n (weekly decay = .9, decayCV = .5, baselineCV=1.5)', ymax = .01)
