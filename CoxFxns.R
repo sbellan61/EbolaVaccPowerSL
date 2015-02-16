@@ -1,12 +1,20 @@
 library(geepack)
 
-doRelabel <- function(parms, csd, nboot=200, doFXN=doCoxME, verbose = 0) {
+## make the highest hazard uninfected individuals in a vacc and control group be infected to allow
+## for conservative CI calculation when 0 infections in certain groups
+infBump <- function(parms, verbose = 0) {
+
+}
+
+doRelabel <- function(parms, csd, nboot=200, doFXN=doCoxME, verbose = 0, verbFreqRelab=10) {
     if(verbose==3.45) browser()
+    if(verbose>0) print('doing relabeled models')
     modNm <- paste0('relab', sub('do','',as.character(substitute(doFXN))))
-    vee <- doFXN(csd, verbose=verbose)
+    vee <- doFXN(csd, verbose=0)
     effMean <- vee['mean']
     effEsts <- as.numeric(NULL)
     for(bb in 1:nboot) {
+        if(verbose>.5 & (bb %% verbFreqRelab == 0)) print(paste('on',bb,'of',nboot))
         ## randomly reorder the vaccination sequence of clusters, null is their order doesn't affect the
         ## effect size
         if(trial %in% c('SWCT','CRCT'))
@@ -46,21 +54,24 @@ doRelabel <- function(parms, csd, nboot=200, doFXN=doCoxME, verbose = 0) {
         parmsB <- activeFXN(parmsB, whichDo = 'st')
         csdB <- censSurvDat(parmsB, parmsB$maxInfectDay)
         ## summTrial(csdB)[[3]]
-        tmpEst <- doFXN(csdB, verbose = 1)['mean']
+        tmpEst <- doFXN(csdB, verbose = 0)['mean']
         effEsts <- c(effEsts, as.numeric(tmpEst))
     }
-    pval <- 1 - ecdf(effEsts)(effMean) ## for vaccine being more effective than expected by chance alone
+    pval <- ecdf(effEsts)(effMean) ## for vaccine being more effective than expected by chance alone
+    if(effMean > 0) pval <- 1 - pval
     bootVee <- data.frame(mean=effMean, lci = NA, uci = NA, p = pval, mod=modNm, err=sum(is.na(effEsts)))
     return(bootVee)
 }
 
-doBoot <- function(csd, nboot=200, doFXN=doCoxME, verbose = 0) {
+doBoot <- function(csd, nboot=200, doFXN=doCoxME, verbose = 0, verbFreqBoot=10) {
     if(verbose==3.4) browser()
+    if(verbose>0) print('bootstrapping')
     modNm <- paste0('boot', sub('do','',as.character(substitute(doFXN))))
-    vee <- doFXN(csd, verbose=verbose)
+    vee <- doFXN(csd, verbose=0)
     effMean <- vee['mean']
     effEsts <- as.numeric(NULL)
     for(bb in 1:nboot) {
+        if(verbose>.5 & (bb %% verbFreqBoot == 0)) print(paste('on',bb,'of',nboot))
         if(trial=='CRCT' & ord!='none')
             bootby <- csd[,unique(pair)]    else    bootby <- csd[,unique(cluster)]
         clsB <- sample(bootby, length(bootby), replace=T)
@@ -71,7 +82,7 @@ doBoot <- function(csd, nboot=200, doFXN=doCoxME, verbose = 0) {
         if(trial=='CRCT' & ord!='none')
             csdB[, reps := clsB[pair]] else csdB[, reps := clsB[cluster]] 
         csdB <- csdB[rep(1:length(reps), reps)]
-        tmpEst <- doFXN(csdB, verbose = 1)['mean']
+        tmpEst <- doFXN(csdB, verbose = 0)['mean']
         effEsts <- c(effEsts, as.numeric(tmpEst))
     }
     lci <- quantile(effEsts, .025, na.rm=T)
@@ -83,6 +94,7 @@ doBoot <- function(csd, nboot=200, doFXN=doCoxME, verbose = 0) {
 
 doCoxME <- function(csd, verbose=0) { ## take censored survival object and return vacc effectiveness estimates
     if(verbose==3.1) browser()
+    if(verbose>0) print('fitting vanilla coxME')
     mod <- suppressMessages(try(coxme(Surv(startDay, endDay, infected) ~ immuneGrp + (1|cluster), data = csd), silent=T))
     if(!inherits(mod, 'try-error')) {
         vaccEffEst <- 1-exp(mod$coef + c(0, 1.96, -1.96)*sqrt(vcov(mod)))
@@ -99,6 +111,7 @@ doCoxME <- function(csd, verbose=0) { ## take censored survival object and retur
 }
 
 doCoxPH <- function(csd, verbose=0) {
+    if(verbose>0) print('fitting vanilla coxPH')
     if(verbose==3.2) browser()
     mod <- try(coxph(Surv(startDay, endDay, infected) ~ immuneGrp + cluster(cluster),
                      data=csd), silent=T)
@@ -120,6 +133,7 @@ doBayesCox <- function(csd, browse = F) {
 ## classes within cluster level, would need individual approach for that)
 doGEEclusAR1 <- function(clusDat, verbose=0) { 
     if(verbose==3.6) browser()
+    if(verbose>0) print('fitting GEEclusAR1')
     if(trial %in% c('SWCT','CRCT')) {
         mod <- try(geeglm(cases ~ immuneGrp + day, offset = log(atRisk), id = cluster, data = clusDat, family = poisson, corstr = "ar1"), 
                    silent=T)
@@ -139,6 +153,7 @@ doGEEclusAR1 <- function(clusDat, verbose=0) {
 
 doGLMMclus <- function(clusDat, bayes=T, verbose=0) {
     if(verbose==3.7) browser()
+    if(verbose>0) print('fitting GLMMclus')
     if(!bayes) mod <- try(glmer(cases ~ immuneGrp + day + (1|cluster) + offset(log(atRisk)), data = clusDat, family = poisson), silent = T)
     if(bayes) mod <- try(bglmer(cases ~ immuneGrp + day + (1|cluster) + offset(log(atRisk)), data = clusDat, family = poisson), silent = T)
     if(!inherits(mod, 'try-error')) {
@@ -155,6 +170,7 @@ doGLMMclus <- function(clusDat, bayes=T, verbose=0) {
 
 doGEEsurv <- function(csd, verbose=0) {
     if(verbose==3.5) browser()
+    if(verbose>0) print('fitting GEEIndivCloglog')
     mod <- try(geeglm(infected ~ immuneGrp, data = csd, family = binomial(link='cloglog'), id = cluster, corstr = 'exchangeable'),
                silent=T)
     if(!inherits(mod, 'try-error')) {

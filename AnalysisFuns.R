@@ -85,6 +85,7 @@ summTrial <- function(st) list(summarise(group_by(st, cluster), sum(infected))
 
 compileStopInfo <- function(minDay, vaccEffEst, tmp, verbose=0) {
     if(verbose==4) browser()
+    if(verbose>0) print(paste0('compiling stop info for ', vaccEffEst[1,'mod']))
     out <- data.table(stopDay=minDay
                       , mean = vaccEffEst[1,'mean'], lci = vaccEffEst[1,'lci'], uci = vaccEffEst[1,'uci'], p = vaccEffEst[1,'p']
                       , mod = vaccEffEst[1,'mod']
@@ -94,7 +95,7 @@ compileStopInfo <- function(minDay, vaccEffEst, tmp, verbose=0) {
                       , hazVXimmGrpEnd = tmp[immuneGrp==1, sum(infected)/sum(perstime)]
                       , ptRatioCVXimmGrpEnd = tmp[immuneGrp==0, sum(perstime)] / tmp[immuneGrp==1, sum(perstime)]
                       )
-    out$stopped <- out[, p<.05 & !is.na(p)]
+    out$stopped <- out[, (p<.025 & !is.na(p)) | ((lci > 0 & !is.na(lci)) | (uci < 0 & !is.na(uci)))]
     out$vaccGood <- NA
     out[stopped==T, vaccGood:= mean > 0]
     out <- setcolorder(out, c("stopped", "vaccGood", "stopDay", "mean", "lci", "uci", "p",  'mod'
@@ -139,6 +140,7 @@ seqStop <- function(parms, start = parms$immunoDelayThink + 14, checkIncrement =
 }
 
 getEndResults <- function(parms, verbose = 0) within(parms, {
+    if(verbose>0) print('getting end results')
     tmp <- censSurvDat(parms, maxInfectDay)
     notFitted <- T
     bump <- 0
@@ -153,21 +155,6 @@ getEndResults <- function(parms, verbose = 0) within(parms, {
     stopFin <- rbindlist(lapply(vEEs, compileStopInfo, minDay = maxInfectDay, tmp = tmp, verbose=verbose))
     rm(vaccEE_ME,vaccEE_MEboot,tmp)
 })
-
-## while(notFitted) {
-## vaccEE_GEEar1 <- try(doGEE(tmp, verbose = 3.5, corstr = "ar1")
-##    vaccEE_PH <- try(doCoxPH(tmp, verbose=verbose)
-## vaccEE_CL <- try(doGlmer(tmp, verbose=verbose)
-##     if(vaccEE['lci'] > -Inf) notFitted <- F
-##     ## pick two individualsin each immune group that weren't infected, and pretend they're infected to do +.5 type analysis in 2x2 table
-##     selIndiv <- tmp[infectDay==Inf & endDay==168, list(indiv = sample(indiv,1)), immuneGrp]
-##     tmp[infectDay==Inf & endDay==168 & indiv %in% selIndiv[,indiv], infectDay := endDay] ## perstime still correct
-##     tmp[endDay==168 & indiv %in% selIndiv[,indiv], infected := 1] 
-##     tmp[endDay==168 & indiv %in% selIndiv[,indiv], ]
-##     bump <- bump+1
-## }
-## vaccEE <- c(vaccEE, bump=bump)
-
 
 showSeqStop <- function(resfull, flnm= NULL, ...) {
     with(resfull, {
@@ -209,18 +196,18 @@ showSeqStop <- function(resfull, flnm= NULL, ...) {
     })
 }
 
-simNtrials <- function(seed = 1, parms=makeParms(), N = 2, returnAll = F,
+simNtrials <- function(seed = 1, parms=makeParms(), N = 2, returnAll = F, 
                        doSeqStops = F, showSeqStops = F, flnm='test', verbose=1, verbFreq=10) {
     set.seed(seed)
     caseXVaccRandGrpList <- caseXPT_ImmuneList <- weeklyAnsList <- list()
     length(caseXVaccRandGrpList) <- length(caseXPT_ImmuneList) <- length(weeklyAnsList) <- N
     finPoint <- stopPoints <- data.frame(NULL)
-    if(showSeqStops) pdf(paste0(flnm, '.pdf'), w = 8, h = 6)
     for(ss in 1:N) {
         if(verbose>0 & (ss %% verbFreq == 0)) print(paste('on',ss,'of',N))
+        if(verbose>.5 & (ss %% 1 == 0)) print(paste('on',ss,'of',N))
         if(verbose==2) browser()
-        ## pseed <- .Random.seed ## for debugging
-        ## save(pseed, file = paste0(seed, '-seed.Rdata'))
+        pseed <- .Random.seed ## for debugging, last seed & parms always saved
+        save(pseed, parms, file = flnm)
         res <- simTrial(parms)
         res <- makeSurvDat(res)
         res <- makeGEEDat(res, verbose=verbose)
@@ -230,10 +217,10 @@ simNtrials <- function(seed = 1, parms=makeParms(), N = 2, returnAll = F,
         finPoint <- rbind(finPoint, finTmp)
         if(doSeqStops) {
             res <- seqStop(res, verbose = 3)
-            if(showSeqStops) {
-                resfull <- seqStop(res, fullSeq = T)
-                showSeqStop(resfull)
-            }
+            ## if(showSeqStops) {
+            ##     resfull <- seqStop(res, fullSeq = T)
+            ##     showSeqStop(resfull)
+            ## }
             res <- endT(res)
             res <- makeCaseSummary(res)
             stopPt <- as.data.frame(tail(res$weeklyAns,1)) ## active cases by immmune grouping at time of case at end of trial
@@ -259,7 +246,6 @@ simNtrials <- function(seed = 1, parms=makeParms(), N = 2, returnAll = F,
         rm(res)
         gc()
     }
-    if(showSeqStops) graphics.off()
     if(returnAll)
         return(list(
             stopPoints = stopPoints

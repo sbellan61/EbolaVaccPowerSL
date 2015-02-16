@@ -30,12 +30,13 @@ parmsMat$reordLag <- 14
 parmsMat$nboot <- 200
 nrow(parmsMat)
 
-## fls <- list.files(batchdirnm, pattern=nmtmp)
-## sz <- unlist(sapply(fls, function(x) file.info(file.path(batchdirnm, x))['size']))
-## fls <- fls[sz>0]
-## done <- gsub(nmtmp, '', fls)
-## done <- as.numeric(gsub('.Rdata', '', done))
-## length(done)
+fls <- list.files(batchdirnm, pattern=nmtmp)
+flsfull <- list.files(batchdirnm, pattern=nmtmp, full.names=T)
+sz <- unlist(sapply(fls, function(x) file.info(file.path(batchdirnm, x))['size']))
+fls <- fls[sz>6000]
+done <- gsub(nmtmp, '', fls)
+done <- as.numeric(gsub('.Rdata', '', done))
+length(done)
 
 addParm <- function(x, parmsMat,ii) {
     for(pp in 1:length(parmsMat)) {
@@ -48,8 +49,9 @@ addParm <- function(x, parmsMat,ii) {
     return(x)
 }
 
-
 parmsMatDo <- parmsMat 
+parmsMatDo <- parmsMat[!simNum %in% done]
+parmsMatDo[, ceiling(length(nboot)/12)*12, vaccEff]
 for(ii in 1:length(ves)) {
     parmsMatDo <- parmsMat[vaccEff==ves[ii]]
     ## parmsMatDo <- parmsMat[trial %in% c('RCT','FRCT')]
@@ -63,4 +65,4 @@ for(ii in 1:length(ves)) {
     }
     sink()
 }
-parmsMat[, length(nboot), vaccEff]
+
