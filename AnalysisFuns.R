@@ -19,23 +19,26 @@ makeSurvDat <- function(parms,  whichDo='pop', browse=F) within(parms, {
     stPost$immuneGrp <- 1
     stPost <- stPost[,list(indiv, cluster, pair, idByClus, vaccDay, immuneDay, 
                            immuneDayThink, startDay, endDay, infectDay,  infected, immuneGrp)]
-    nmSt <- paste0(sub('pop','',whichDo),'st') ## makes EVpop into EVst for example
+    nmSt <- paste0('st', sub('pop','',whichDo)) ## makes EVpop into EVst for example
     assign(nmSt, rbind(stPre, stPost)) ## combine tables
     rm(stPre, stPost, popTmp, nmSt)
 }) ## careful with modifying parms, st depends on analysis a bit too (immunoDelayThink), so we can have different st for same popH
 
 ## Restructure for GEE/GLMM with weekly observations of each cluster.
-makeGEEDat <- function(parms, whichDo='pop', verbose=0) within(parms, {
+makeGEEDat <- function(parms, whichDo='popH', verbose=0) within(parms, {
     if(verbose ==1.5) browser()
-    popHTmp <- get(paste0(whichDo,'H'))
+    popHTmp <- get(whichDo)
     popHTmp$immuneDayThink <- popHTmp[,vaccDay] + immunoDelayThink ## vaccine refractory period ASSUMED in analysis
     popHTmp$infectDayRCens <- popHTmp$infectDay
     popHTmp[infectDay==Inf, infectDayRCens := NA]
     popHTmp$immuneGrp <- 0
     popHTmp[day >= immuneDayThink, immuneGrp := 1]
-    clusDat <- popHTmp[,list(cases = sum(!is.na(infectDayRCens))), list(cluster, day, immuneGrp)]
-    clusDat <- clusDat[order(cluster, day)]
-    rm(popHTmp)
+    clusD <- popHTmp[,list(cases = sum(!is.na(infectDayRCens))), list(cluster, day, immuneGrp)]
+    clusD <- clusD[order(cluster, day)]
+    clusD <- mutate(group_by(clusD, cluster), atRisk = clusSize - c(0, cumsum(cases[-length(cases)])))
+    nmSt <- paste0('clusDat', sub('popH','',whichDo)) ## makes EVpop into EVst for example
+    assign(nmSt, clusD) ## combine tables
+    rm(popHTmp, clusD, nmSt)
 })
 
 ## Select subset of survival table to analyze
@@ -53,7 +56,7 @@ activeFXN <- function(parms, whichDo='st', browse=F) within(parms, {
     }
     stA <- stA[!endDay <= firstActive] ## remove inactive observation intervals
     stA[startDay < firstActive, startDay := firstActive] ## set accumulation of person time as when the cluster/pair is active
-    nmStA <- paste0(sub('st','',whichDo),'stActive') ## makes EVpop into EVst for example
+    nmStA <- paste0('stActive', sub('st','',whichDo)) ## makes EVpop into EVst for example
     assign(nmStA, stA)
     rm(stA, nmStA)
 })
@@ -93,7 +96,7 @@ compileStopInfo <- function(minDay, vaccEffEst, tmp, verbose=0) {
                       )
     out$stopped <- out[, p<.05 & !is.na(p)]
     out$vaccGood <- NA
-    out[stopped==T, vaccGood:= lci > 0]
+    out[stopped==T, vaccGood:= mean > 0]
     out <- setcolorder(out, c("stopped", "vaccGood", "stopDay", "mean", "lci", "uci", "p",  'mod'
                               , "caseCXimmGrpEnd", "caseVXimmGrpEnd"
                               , "hazCXimmGrpEnd", "hazVXimmGrpEnd"
@@ -139,27 +142,28 @@ getEndResults <- function(parms, verbose = 0) within(parms, {
     tmp <- censSurvDat(parms, maxInfectDay)
     notFitted <- T
     bump <- 0
-    tmpElas <- copy(tmp)
     if(verbose==2.9) browser()
-    vaccEE_ME <- try(doCoxME(tmpElas, verbose=verbose), silent=T)
-    vaccEE_MEboot <- doBoot(tmpElas, nboot=nboot, doFXN = doCoxME, verbose = verbose)
-    vaccEE_GEEindivExch <- try(doGEEsurv(tmpElas, verbose = verbose), silent=T)
-    vaccEE_GEEclusAR1 <- try(doGEEclusAR1(clusDat, verbose = verbose), silent=T)
-    vEEs <- list(vaccEE_ME, vaccEE_MEboot, vaccEE_GEEindivExch, vaccEE_GEEclusAR1)
+    vaccEE_ME <- doCoxME(tmp, verbose=verbose)
+    vaccEE_GEEclusAR1 <- doGEEclusAR1(clusDat, verbose = verbose)
+    vaccEE_GLMMclus <- doGLMMclus(clusDat, verbose = verbose)
+    vaccEE_MErelab <- doRelabel(parms, tmp, nboot=nboot, doFXN = doCoxME, verbose = verbose)
+    vaccEE_MEboot <- doBoot(tmp, nboot=nboot, doFXN = doCoxME, verbose = verbose)
+    ## vaccEE_GEEindivExch <- doGEEsurv(tmp, verbose = verbose) ## doesn't include time
+    vEEs <- list(vaccEE_ME, vaccEE_MEboot, vaccEE_MErelab, vaccEE_GEEclusAR1, vaccEE_GLMMclus)
     stopFin <- rbindlist(lapply(vEEs, compileStopInfo, minDay = maxInfectDay, tmp = tmp, verbose=verbose))
-    rm(vaccEE_ME,vaccEE_MEboot, tmp,tmpElas)
+    rm(vaccEE_ME,vaccEE_MEboot,tmp)
 })
 
 ## while(notFitted) {
-## vaccEE_GEEar1 <- try(doGEE(tmpElas, verbose = 3.5, corstr = "ar1"), silent=T)
-##    vaccEE_PH <- try(doCoxPH(tmpElas, verbose=verbose), silent=T)
-## vaccEE_CL <- try(doGlmer(tmpElas, verbose=verbose), silent=T)
+## vaccEE_GEEar1 <- try(doGEE(tmp, verbose = 3.5, corstr = "ar1")
+##    vaccEE_PH <- try(doCoxPH(tmp, verbose=verbose)
+## vaccEE_CL <- try(doGlmer(tmp, verbose=verbose)
 ##     if(vaccEE['lci'] > -Inf) notFitted <- F
 ##     ## pick two individualsin each immune group that weren't infected, and pretend they're infected to do +.5 type analysis in 2x2 table
-##     selIndiv <- tmpElas[infectDay==Inf & endDay==168, list(indiv = sample(indiv,1)), immuneGrp]
-##     tmpElas[infectDay==Inf & endDay==168 & indiv %in% selIndiv[,indiv], infectDay := endDay] ## perstime still correct
-##     tmpElas[endDay==168 & indiv %in% selIndiv[,indiv], infected := 1] 
-##     tmpElas[endDay==168 & indiv %in% selIndiv[,indiv], ]
+##     selIndiv <- tmp[infectDay==Inf & endDay==168, list(indiv = sample(indiv,1)), immuneGrp]
+##     tmp[infectDay==Inf & endDay==168 & indiv %in% selIndiv[,indiv], infectDay := endDay] ## perstime still correct
+##     tmp[endDay==168 & indiv %in% selIndiv[,indiv], infected := 1] 
+##     tmp[endDay==168 & indiv %in% selIndiv[,indiv], ]
 ##     bump <- bump+1
 ## }
 ## vaccEE <- c(vaccEE, bump=bump)
