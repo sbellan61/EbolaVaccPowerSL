@@ -3,7 +3,7 @@ if(grepl('stevebellan', Sys.info()['login'])) setwd('~/Documents/R Repos/EbolaVa
 if(grepl('tacc', Sys.info()['nodename'])) setwd('/home1/02413/sbellan/VaccEbola/')
 sapply(c('simFuns.R','AnalysisFuns.R','CoxFxns.R','EndTrialFuns.R'), source)
 
-batchdirnm <- file.path('BigResults','SLSimsFP')
+batchdirnm <- file.path('BigResults','SLSimsFPbump')
 routdirnm <- file.path(batchdirnm,'Routs')
 if(!file.exists(batchdirnm)) dir.create(batchdirnm)
 if(!file.exists(routdirnm)) dir.create(routdirnm)
@@ -50,6 +50,7 @@ addParm <- function(x, parmsMat,ii) {
 
 
 parmsMatDo <- parmsMat 
+parmsMatDo[, length(nboot), vaccEff]
 for(ii in 1:length(ves)) {
     parmsMatDo <- parmsMat[vaccEff==ves[ii]]
     ## parmsMatDo <- parmsMat[trial %in% c('RCT','FRCT')]
@@ -63,4 +64,4 @@ for(ii in 1:length(ves)) {
     }
     sink()
 }
-parmsMat[, length(nboot), vaccEff]
+
