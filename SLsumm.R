@@ -150,3 +150,6 @@ title(main='24 week power', outer = T)
 mtext('# cases in trial', 2, 0, outer = T)
 mtext('vaccine efficacy', 1, 0, outer = T)
 graphics.off()
+
+## to delete a range of jobs
+## qdel echo `seq -f "%.0f" 2282389 2282404`
