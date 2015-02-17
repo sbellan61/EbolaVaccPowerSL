@@ -33,7 +33,13 @@ makeGEEDat <- function(parms, whichDo='popH', verbose=0) within(parms, {
     popHTmp[infectDay==Inf, infectDayRCens := NA]
     popHTmp$immuneGrp <- 0
     popHTmp[day >= immuneDayThink, immuneGrp := 1]
-    clusD <- popHTmp[,list(cases = sum(!is.na(infectDayRCens))), list(cluster, day, immuneGrp)]
+    popHTmp$firstActive <- 0
+    if(trial=='CRCT' & ord!='none') ## active once anyone considered immune in matched cluster pair
+        popHTmp[, firstActive := min(immuneDayThink), by = pair]
+    if(trial %in% c('RCT','FRCT')) ## active once anyone considered immune in cluster
+        popHTmp[, firstActive := min(immuneDayThink), cluster]
+    popHTmp$active <- popHTmp[,day>=firstActive]
+    clusD <- popHTmp[active==T, list(cases = sum(!is.na(infectDayRCens))), list(cluster, day, immuneGrp)]
     clusD <- clusD[order(cluster, day)]
     clusD <- mutate(group_by(clusD, cluster), atRisk = clusSize - c(0, cumsum(cases[-length(cases)])))
     nmSt <- paste0('clusDat', sub('popH','',whichDo)) ## makes EVpop into EVst for example
@@ -66,7 +72,8 @@ activeFXN <- function(parms, whichDo='st', browse=F) within(parms, {
 ## s1$st[idByClus%in%1:2, list(indiv, cluster, pair, idByClus,immuneDayThink, startDay,endDay)]
 
 ## Take a survival data from above function and censor it by a specified time in months
-censSurvDat <- function(parms, censorDay = parms$maxInfectDay+parms$hazIntUnit, whichDo = 'stActive') with(parms, {
+censSurvDat <- function(parms, censorDay = parms$maxInfectDay+parms$hazIntUnit, whichDo = 'stActive', verbose=0) with(parms, {
+    if(verbose==2.7) browser()
     stTmp <- copy(get(whichDo))
     intervalNotStarted <- stTmp[,startDay] > censorDay
     stTmp <- stTmp[!intervalNotStarted,] 
@@ -88,7 +95,7 @@ compileStopInfo <- function(minDay, vaccEffEst, tmp, verbose=0) {
     if(verbose>0) print(paste0('compiling stop info for ', vaccEffEst[1,'mod']))
     out <- data.table(stopDay=minDay
                       , mean = vaccEffEst[1,'mean'], lci = vaccEffEst[1,'lci'], uci = vaccEffEst[1,'uci'], p = vaccEffEst[1,'p']
-                      , mod = vaccEffEst[1,'mod']
+                      , mod = vaccEffEst[1,'mod'], bump = vaccEffEst[1,'bump']
                       , caseCXimmGrpEnd = tmp[immuneGrp==0, sum(infected)]
                       , caseVXimmGrpEnd = tmp[immuneGrp==1, sum(infected)]
                       , hazCXimmGrpEnd = tmp[immuneGrp==0, sum(infected)/sum(perstime)]
@@ -98,7 +105,7 @@ compileStopInfo <- function(minDay, vaccEffEst, tmp, verbose=0) {
     out$stopped <- out[, (p<.025 & !is.na(p)) | ((lci > 0 & !is.na(lci)) | (uci < 0 & !is.na(uci)))]
     out$vaccGood <- NA
     out[stopped==T, vaccGood:= mean > 0]
-    out <- setcolorder(out, c("stopped", "vaccGood", "stopDay", "mean", "lci", "uci", "p",  'mod'
+    out <- setcolorder(out, c("stopped", "vaccGood", "stopDay", "mean", "lci", "uci", "p",  'mod', 'bump'
                               , "caseCXimmGrpEnd", "caseVXimmGrpEnd"
                               , "hazCXimmGrpEnd", "hazVXimmGrpEnd"
                               , "ptRatioCVXimmGrpEnd"
@@ -154,20 +161,20 @@ getEndResults <- function(parms, bump = T, verbose = 0) {
         parmsE <- infBump(parms, verbose=verbose)
         parmsE$bump <- T
     }
-    tmpCSD <- censSurvDat(parmsE, parmsE$maxInfectDay)
+    tmpCSD <- censSurvDat(parms, verbose=verbose)
+    tmpCSDE <- censSurvDat(parmsE, verbose=verbose)
     within(parmsE, {
-        vaccEE_ME <- doCoxME(tmpCSD, bump = bump, verbose=verbose)
-        vaccEE_GEEclusAR1 <- doGEEclusAR1(clusDat, csd=tmpCSD, bump = bump, verbose = verbose)
-        vaccEE_GLMMclus <- doGLMMclus(clusDat, csd=tmpCSD, bump = bump, verbose = verbose)
-        vaccEE_MErelab <- doRelabel(parms, csd=tmpCSD, bump=bump, nboot=nboot, doFXN = doCoxME, verbose = verbose)
-        vaccEE_MEboot <- doBoot(csd=tmpCSD, bump=bump, nboot=nboot, doFXN = doCoxME, verbose = verbose)
+        vaccEE_ME <- doCoxME(tmpCSDE, bump = bump, verbose=verbose)
+        vaccEE_GEEclusAR1 <- doGEEclusAR1(clusDat, csd=tmpCSDE, bump = bump, verbose = verbose)
+        vaccEE_GLMMclus <- doGLMMclus(clusDat, csd=tmpCSDE, bump = bump, verbose = verbose)
+        vaccEE_MErelab <- doRelabel(parms, csd=tmpCSDE, bump=bump, nboot=nboot, doFXN = doCoxME, verbose = verbose)
+        vaccEE_MEboot <- doBoot(csd=tmpCSDE, bump=bump, nboot=nboot, doFXN = doCoxME, verbose = verbose)
         vEEs <- list(vaccEE_ME, vaccEE_MEboot, vaccEE_MErelab, vaccEE_GEEclusAR1, vaccEE_GLMMclus)
         stopFin <- rbindlist(lapply(vEEs, compileStopInfo, minDay = maxInfectDay, tmp = tmpCSD, verbose=verbose))
         rm(vaccEE_ME, vaccEE_MEboot, vaccEE_MErelab, vaccEE_GEEclusAR1, vaccEE_GLMMclus)
         return(stopFin)
     })
 }
-
 
 simNtrials <- function(seed = 1, parms=makeParms(), N = 2, returnAll = F,
                        doSeqStops = F, showSeqStops = F, flnm='test', verbose=1, verbFreq=10) {
@@ -179,6 +186,8 @@ simNtrials <- function(seed = 1, parms=makeParms(), N = 2, returnAll = F,
         if(verbose>0 & (ss %% verbFreq == 0)) print(paste('on',ss,'of',N))
         if(verbose>.5 & (ss %% 1 == 0)) print(paste('on',ss,'of',N))
         if(verbose==2) browser()
+        ## load(flnm)
+        ## .Randomseed <- pseed; 
         pseed <- .Random.seed ## for debugging, last seed & parms always saved
         save(pseed, parms, file = flnm)
         res <- simTrial(parms)

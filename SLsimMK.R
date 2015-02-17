@@ -10,7 +10,7 @@ if(!file.exists(routdirnm)) dir.create(routdirnm)
 tnms <- c('SWCT','RCT','FRCT','CRCT')
 numEach <- 12
 
-ves <- c(0, seq(.4, .9, by = .05))
+ves <- c(0, seq(.4, .9, by = .1))
 parmsMat <- as.data.table(expand.grid(
     seed =  1:numEach
     , trial = tnms
@@ -28,15 +28,16 @@ parmsMat$saveNm <- nmtmp
 parmsMat$nsims <- 100
 parmsMat$reordLag <- 14
 parmsMat$nboot <- 200
+parmsMat[vaccEff==0, nsims :=nsims*3] ## should be fast without relabeling
 nrow(parmsMat)
 
-fls <- list.files(batchdirnm, pattern=nmtmp)
-flsfull <- list.files(batchdirnm, pattern=nmtmp, full.names=T)
-sz <- unlist(sapply(fls, function(x) file.info(file.path(batchdirnm, x))['size']))
-fls <- fls[sz>6000]
-done <- gsub(nmtmp, '', fls)
-done <- as.numeric(gsub('.Rdata', '', done))
-length(done)
+## fls <- list.files(batchdirnm, pattern=nmtmp)
+## flsfull <- list.files(batchdirnm, pattern=nmtmp, full.names=T)
+## sz <- unlist(sapply(fls, function(x) file.info(file.path(batchdirnm, x))['size']))
+## fls <- fls[sz>6000]
+## done <- gsub(nmtmp, '', fls)
+## done <- as.numeric(gsub('.Rdata', '', done))
+## length(done)
 
 addParm <- function(x, parmsMat,ii) {
     for(pp in 1:length(parmsMat)) {
@@ -49,11 +50,9 @@ addParm <- function(x, parmsMat,ii) {
     return(x)
 }
 
-parmsMatDo <- parmsMat 
-parmsMatDo[, length(nboot), vaccEff]
+parmsMat[, length(nboot), vaccEff]
 for(ii in 1:length(ves)) {
     parmsMatDo <- parmsMat[vaccEff==ves[ii]]
-    ## parmsMatDo <- parmsMat[trial %in% c('RCT','FRCT')]
     sink(paste0('SLsims',ves[ii],'.txt'))
     for(ii in parmsMatDo$simNum) {
         cmd <- "R CMD BATCH '--no-restore --no-save --args"
