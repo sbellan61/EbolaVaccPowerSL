@@ -165,13 +165,21 @@ getEndResults <- function(parms, bump = T, verbose = 0) {
     tmpCSDE <- censSurvDat(parmsE, verbose=verbose)
     within(parmsE, {
         vaccEE_ME <- doCoxME(tmpCSDE, bump = bump, verbose=verbose)
-        vaccEE_GEEclusAR1 <- doGEEclusAR1(clusDat, csd=tmpCSDE, bump = bump, verbose = verbose)
-        vaccEE_GLMMclus <- doGLMMclus(clusDat, csd=tmpCSDE, bump = bump, verbose = verbose)
+        ## vaccEE_GEEclusAR1 <- doGEEclusAR1(clusDat, csd=tmpCSDE, bump = bump, verbose = verbose)
+        ## vaccEE_GLMMclus <- doGLMMclus(clusDat, csd=tmpCSDE, bump = bump, verbose = verbose)
         vaccEE_MErelab <- doRelabel(parms, csd=tmpCSD, bump=F, nboot=nboot, doFXN = doCoxME, verbose = verbose)
         vaccEE_MEboot <- doBoot(csd=tmpCSD, bump=F, nboot=nboot, doFXN = doCoxME, verbose = verbose)
-        vEEs <- list(vaccEE_ME, vaccEE_MEboot, vaccEE_MErelab, vaccEE_GEEclusAR1, vaccEE_GLMMclus)
+        vEEs <- list(vaccEE_ME
+                     , vaccEE_MEboot
+                     , vaccEE_MErelab
+                     ## , vaccEE_GEEclusAR1
+                     ## , vaccEE_GLMMclus
+                     )
         stopFin <- rbindlist(lapply(vEEs, compileStopInfo, minDay = maxInfectDay, tmp = tmpCSD, verbose=verbose))
-        rm(vaccEE_ME, vaccEE_MEboot, vaccEE_MErelab, vaccEE_GEEclusAR1, vaccEE_GLMMclus)
+        rm(vaccEE_ME, vaccEE_MEboot, vaccEE_MErelab
+           ## , vaccEE_GEEclusAR1
+           ## , vaccEE_GLMMclus
+           )
         return(stopFin)
     })
 }

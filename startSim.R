@@ -11,7 +11,6 @@ if(length(args)>0)  {## Then cycle through each element of the list and evaluate
     for(i in 1:length(args)) {
         eval(parse(text=args[[i]]))
     }
-    parmArgs <- subsArgs(as.list(environment()), makeParms)
 }else{
     parmArgs <- list(trial='RCT', vaccEff = 0, weeklyDecay = 1, weeklyDecayVar = 0, varClus = 0, sdLogIndiv=0, small=F)
     nsims <- 1
@@ -20,9 +19,7 @@ if(length(args)>0)  {## Then cycle through each element of the list and evaluate
     saveNm <- 'simFPX-'
 }
 
-seed=1;trial="CRCT";ord="none";propInTrial=0.05;sdLogIndiv=1;delayUnit=0;vaccEff=0.9;simNum=2905;batchdirnm="BigResults/SLSimsFPbump";saveNm="simSL-3-";nsims=100;reordLag=14;nboot=30;
 parmArgs <- subsArgs(as.list(environment()), makeParms)
-
 print(parmArgs)
 parms <- do.call(makeParms, parmArgs)
 saveFl <- file.path(batchdirnm, paste0(saveNm,formatC(simNum, width=6, flag="0"),'.Rdata'))
