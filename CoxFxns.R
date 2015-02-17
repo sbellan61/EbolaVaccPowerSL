@@ -42,9 +42,9 @@ doRelabel <- function(parms, csd, bump=F, nboot=200, doFXN=doCoxME, verbose = 0,
     modNm <- paste0('relab', sub('do','',as.character(substitute(doFXN))))
     vee <- doFXN(csd, bump=bump, verbose=0)
     effMean <- vee['mean']
-    effEsts <- as.numeric(NULL)
     numCases <- csd[,sum(infectDay!=Inf)]
-    if(numCases >= minCases) {
+    effEsts <- NULL
+    if(numCases >= minCases) { #
         for(bb in 1:nboot) {
             if(verbose>.5 & (bb %% verbFreqRelab == 0)) print(paste('on',bb,'of',nboot))
             ## randomly reorder the vaccination sequence of clusters, null is their order doesn't affect the
@@ -83,18 +83,17 @@ doRelabel <- function(parms, csd, bump=F, nboot=200, doFXN=doCoxME, verbose = 0,
                     popH <- setcolorder(popH, pnms)
                     rm(relabDT, pnms)
                 }) }
-            parmsB <- makeSurvDat(parmsB, whichDo='pop', br=F)
+            parmsB <- makeSurvDat(parmsB, whichDo='pop', br=T)
             parmsB <- makeGEEDat(parmsB, whichDo = 'popH', verbose=verbose)
             parmsB <- activeFXN(parmsB, whichDo = 'st')
             csdB <- censSurvDat(parmsB)
-            ## summTrial(csdB)[[3]]
-            tmpEst <- doFXN(csdB, verbose = 0)['mean']
+            tmpEst <- doFXN(csdB, verbose = verbose)['mean']
+##          if(is.na(tmpEst)) browser()
             effEsts <- c(effEsts, as.numeric(tmpEst))
         }
         pval <- NA
-        if(sum(!is.na(effEsts))>0)
-            pval <- ecdf(effEsts)(effMean) ## for vaccine being more effective than expected by chance alone
-        if(effMean > 0) pval <- 1 - pval
+        effMean <- as.numeric(effMean)
+        pval <- min(mean(c(effEsts,effMean)>=effMean,na.rm=T), mean(c(effEsts,effMean)>=effMean,na.rm=T))
         bootVee <- data.frame(mean=effMean, lci = NA, uci = NA, p = pval, mod=modNm, bump = NA, err=sum(is.na(effEsts)))
         bootVee <- bumpAdjust(bootVee, csd, bump, nonpar=T)
     }else{
@@ -162,7 +161,7 @@ bumpAdjust <- function(vee, csd, bump, nonpar=F) {
 doCoxME <- function(csd, bump = F, verbose=0) { ## take censored survival object and return vacc effectiveness estimates
     if(verbose==3.1) browser()
     if(verbose>0) print('fitting vanilla coxME')
-    mod <- suppressMessages(try(coxme(Surv(startDay, endDay, infected) ~ immuneGrp + (1|cluster), data = csd), silent=T))
+    mod <- try(coxme(Surv(startDay, endDay, infected) ~ immuneGrp + (1|cluster), data = csd), silent=T)
     if(!inherits(mod, 'try-error')) {
         vaccEffEst <- 1-exp(mod$coef + c(0, 1.96, -1.96)*sqrt(vcov(mod)))
         pval <- pnorm(mod$coef/sqrt(vcov(mod)), lower.tail = vaccEffEst[1]>0)*2

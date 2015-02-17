@@ -7,7 +7,7 @@ batchdirnm <- file.path('BigResults','SLSimsFPbump')
 routdirnm <- file.path(batchdirnm,'Routs')
 if(!file.exists(batchdirnm)) dir.create(batchdirnm)
 if(!file.exists(routdirnm)) dir.create(routdirnm)
-tnms <- c('SWCT','RCT','FRCT','CRCT')
+tnms <- c('SWCT')##,'RCT','FRCT','CRCT')
 numEach <- 12
 
 ves <- c(0, seq(.4, .9, by = .1))
@@ -17,7 +17,7 @@ parmsMat <- as.data.table(expand.grid(
     , ord = c('none','TU')
     , propInTrial = c(.03, .05, .1)
     , sdLogIndiv = makeParms()$sdLogIndiv
-    , delayUnit = c(0,7)
+    , delayUnit = 7#c(0,7)
     , vaccEff = ves
     ))
 parmsMat <- parmsMat[!(trial=='SWCT' & (delayUnit==0 | ord=='TU'))] ## SWCT must have delay and cannot be ordered

@@ -20,12 +20,15 @@ if(length(args)>0)  {## Then cycle through each element of the list and evaluate
     saveNm <- 'simFPX-'
 }
 
+seed=1;trial="CRCT";ord="none";propInTrial=0.05;sdLogIndiv=1;delayUnit=0;vaccEff=0.9;simNum=2905;batchdirnm="BigResults/SLSimsFPbump";saveNm="simSL-3-";nsims=100;reordLag=14;nboot=30;
+parmArgs <- subsArgs(as.list(environment()), makeParms)
+
 print(parmArgs)
 parms <- do.call(makeParms, parmArgs)
 saveFl <- file.path(batchdirnm, paste0(saveNm,formatC(simNum, width=6, flag="0"),'.Rdata'))
 
 system.time(sim <- simNtrials(seed=seed, parms=parms, N=nsims, flnm=saveFl, verbose = 1, verbFreq=10))
-sim <- list(sim=sim, parms=parms, seed=seed)
+sim <- list(sim=sim, parms=parms, seed=seed, simNum=simNum)
 save(sim, file = saveFl)
 
 rm(list=ls(all=T))
