@@ -123,7 +123,7 @@ seqStop <- function(parms, start = parms$immunoDelayThink + 14, checkIncrement =
 }
 
 testZeros <- function(parmsTmp) {
-    tmpCSD <- censSurvDat(parmsTmp, parmsTmp$maxInfectDay)
+    tmpCSD <- censSurvDat(parmsTmp)
     casesXgroup <- tmpCSD[,list(cases = sum(infected)), immuneGrp]
     return(0 %in% casesXgroup[,cases])
 }
@@ -190,10 +190,6 @@ simNtrials <- function(seed = 1, parms=makeParms(), N = 2, returnAll = F,
         if(verbose>0 & (ss %% verbFreq == 0)) print(paste('on',ss,'of',N))
         if(verbose>.5 & (ss %% 1 == 0)) print(paste('on',ss,'of',N))
         if(verbose==2) browser()
-        ## load(flnm)
-        ## .Randomseed <- pseed; 
-        pseed <- .Random.seed ## for debugging, last seed & parms always saved
-        save(pseed, parms, file = flnm)
         res <- simTrial(parms)
         res <- makeSurvDat(res)
         res <- makeGEEDat(res, verbose=verbose)

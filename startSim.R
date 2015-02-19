@@ -19,11 +19,13 @@ if(length(args)>0)  {## Then cycle through each element of the list and evaluate
     saveNm <- 'simFPX-'
 }
 
-## seed=25;trial="SWCT";ord="none";propInTrial=0.03;sdLogIndiv=1;delayUnit=7;vaccEff=0;simNum=25;batchdirnm="BigResults/SLSimsSW";saveNm="simSL-3-";nsims=30;reordLag=14;nboot=20;
+## seed=1;trial="RCT";ord="none";propInTrial=0.1;sdLogIndiv=1;delayUnit=0;vaccEff=0.9;simNum=10681;batchdirnm="BigResults/SLSims5";saveNm="simSL-3-";nsims=1;reordLag=14;nboot=15
+
 parmArgs <- subsArgs(as.list(environment()), makeParms)
 print(parmArgs)
 parms <- do.call(makeParms, parmArgs)
 saveFl <- file.path(batchdirnm, paste0(saveNm,formatC(simNum, width=6, flag="0"),'.Rdata'))
+modsToDo <- list('CoxME','GLMclus','GLMFclus') ##,'GLMMclusBy') #'GLMMclusFr')
 
 system.time(sim <- simNtrials(seed=seed, parms=parms, N=nsims, flnm=saveFl, verbose = 1, verbFreq=10))
 sim <- list(sim=sim, parms=parms, seed=seed, simNum=simNum)
@@ -31,3 +33,4 @@ save(sim, file = saveFl)
 
 rm(list=ls(all=T))
 gc()
+

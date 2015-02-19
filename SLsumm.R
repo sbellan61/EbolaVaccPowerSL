@@ -5,15 +5,14 @@ library(RColorBrewer)
 ## Simulate SWCT vs RCT vs CRCT for SL
 sapply(c('simFuns.R','AnalysisFuns.R','CoxFxns.R','EndTrialFuns.R'), source)
 
-thing <- 'SLSimsSW'
+thing <- 'SLSims5'
 batchdirnm <- file.path('BigResults',thing)
 fls <- list.files(batchdirnm, pattern='.Rdata', full.names = T)
 length(fls)
 
 dparms <- c('trial','sdLogIndiv','vaccEff','doSL','propInTrial','nbsize','ord','reordLag','delayUnit')
 nbatch <- length(fls)
-finList <- stopList <- parmsList <- list(NULL)
-length(stopList) <- length(finList) <- length(parmsList) <- nbatch
+finInfoList <- finModList <- stopList <- parmsList <- list(NULL)
 for(ii in 1:nbatch) {
     if(ii%%100 ==0) print(ii)
     ff <- fls[ii]
@@ -21,52 +20,60 @@ for(ii in 1:nbatch) {
     load(ff)
     if(exists('sim')) {
         parmsList[[ii]] <- data.frame(nbatch = ii, t(unlist(sim$parms[dparms])))
-        finList[[ii]] <- data.frame(nbatch = ii, sim$sim$finPoint)
+         tmpMod <- data.frame(nbatch = ii, sim$sim$finMods)
+        finModList[[ii]] <- merge(tmpMod, sim$sim$finInfo, by = 'sim')
     }
 }
 
-### CHECK STUFF HERE!!! CULD be roblem
 parmsDT <- rbindlist(parmsList)
-## stopTrials <- merge(rbindlist(stopList), parmsDT, by = 'nbatch')
-finTrials <- merge(rbindlist(finList), parmsDT, by = c('nbatch'))
-## stopTrials[,vaccEff := levels(vaccEff)[vaccEff]]
+finTrials <- merge(rbindlist(finModList), parmsDT, by = c('nbatch'))
 finTrials[,vaccEff := levels(vaccEff)[vaccEff]]
-finTrials[mod=='bootCoxME', stopped := lci > 0 | uci < 0]
-finTrials[mod=='bootCoxME' & stopped==T, vaccGood := lci > 0]
-finTrials[mod=='bootCoxME' & !stopped, vaccGood := NA]
-finTrials[mod=='relabCoxME', stopped := p < .05]
-finTrials[mod=='relabCoxME' & stopped==T, vaccGood := p < .05 & mean > 0 ]
-finTrials[mod=='relabCoxME' & !stopped, vaccGood := NA]
-finTrials[is.na(stopped), stopped := F] ## CAREFUL
-finTrials[is.na(vaccGood), stopped := F]
-finTrials$vaccBad <- finTrials[, !vaccGood]
-finTrials[is.na(vaccGood), vaccGood := F] ## fill in Falses for unstopped trials
-finTrials[is.na(vaccBad), vaccBad := F]
+
+finTrials[, sum(is.na(p)), mod]
+finTrials[, sum(is.na(lci)), mod]
+finTrials[, length(lci), list(propInTrial, mod)]
+finTrials[mod=='coxME' & is.na(p), err:=1] ## sometimes cox returns NaNs, or partial NA's for certain values
+
+## Determine if stopped
+finTrials[grepl('boot',mod), stopped := lci > 0 | uci < 0]
+finTrials[grepl('relab',mod), stopped := p < .025]
+finTrials[!grepl('boot',mod) & !grepl('relab',mod), stopped := p < .05]
+finTrials[, vaccGood := stopped==T &  mean > 0]
+finTrials[, vaccBad := stopped==T &  mean < 0]
+front <- c('mod','stopped','vaccGood','vaccBad')
+setcolorder(finTrials, c(front, setdiff(names(finTrials), front)))
+back <- c('nbatch','sim')
+setcolorder(finTrials, c(setdiff(names(finTrials), back), back))
 save(finTrials, file=file.path('BigResults', paste0(thing, '.Rdata')))
 
 load(file=file.path('BigResults',paste0(thing, '.Rdata')))
 
-powFin <- summarise(group_by(finTrials[sdLogIndiv==1], vaccEff, trial, propInTrial, ord, delayUnit, mod)
+
+powFin <- summarise(group_by(finTrials, vaccEff, trial, propInTrial, ord, delayUnit, mod)
                     , nsim = length(stopped)
                     , stopped = mean(stopped)
                     , vaccGood = mean(vaccGood)
                     , vaccBad = mean(vaccBad)
+                    , stoppedNAR = mean(stopped,na.rm=T)
+                    , vaccGoodNAR = mean(vaccGood,na.rm=T)
+                    , vaccBadNAR = mean(vaccBad,na.rm=T)
+                    , meanErr = mean(err)
+                    , meanBump = mean(bump)
                     , stopDay = mean(stopDay)
-                    , totCase_stopActive = mean(caseCXimmGrpEnd + caseVXimmGrpEnd )
-                    , caseC_stopActive = mean(caseCXimmGrpEnd)
-                    , caseV_stopActive = mean(caseVXimmGrpEnd)
+                    , caseTot = mean(caseCXimmGrpEnd + caseVXimmGrpEnd )
+                    , caseC = mean(caseCXimmGrpEnd)
+                    , caseV = mean(caseVXimmGrpEnd)
                     )
 powFin[,propInTrial:= as.numeric(levels(propInTrial)[propInTrial])]
 powFin[,delayUnit:= as.numeric(levels(delayUnit)[delayUnit])]
-##powFin[,vaccEff:= as.numeric(levels(vaccEff)[vaccEff])]
-powFin[,vaccEff:= as.numeric(vaccEff)]
 powFin[,trial:=factor(trial)]
-powFin <- powFin[!(mod=='GEEClusAR1' & trial %in% c('RCT','FRCT'))]
-pits <- powFin[,unique(propInTrial)]
-pits <- pits[order(pits)]
-save(powFin, file=file.path('BigResults',paste0('powFin_',thing,'.Rdata'))
+front <- c('mod','vaccEff','stopped','stoppedNAR','vaccGood','vaccGoodNAR','nsim','meanErr','propInTrial','vaccBad')
+setcolorder(powFin, c(front, setdiff(names(powFin), front)))
+pF <- data.table(powFin)
+
+save(pF, file=file.path('BigResults',paste0('powFin_',thing,'.Rdata')))
 
 ## to delete a range of jobs
 ## qdel echo `seq -f "%.0f" 2282389 2282404`
 
-finTrials[is.na(p) & mod=='relabCoxME' ,c(2:4,6:9,12:13),with=F]
+pF <- data.table(powFin[nsim<1200, list(mean(nsim), mean(meanBump)), list(vaccEff, propInTrial)])

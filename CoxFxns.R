@@ -38,7 +38,6 @@ infBump <- function(parms, verbose = 0) {
 
 permP <- function(x,na.rm=T) min(mean(x>=x[1],na.rm=na.rm), mean(x<=x[1],na.rm=na.rm))
 
-modsToDo <- list('CoxME','GLMclus','GLMFclus','GLMMclusBy') #'GLMMclusFr')
 doRelabel <- function(parms, csd, bump=F, nboot=200, doMods=modsToDo, verbose = 0, verbFreqRelab=10, minCases=0) {
     if(verbose==3.45) browser()
     if(verbose>0) print('doing relabeled models')

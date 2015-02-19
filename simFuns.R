@@ -6,6 +6,8 @@ monthToDays <- 1/30
 trialTypes <- c('RCT','FRCT','SWCT','CRCT')
 makeParms <- function(
     trial='RCT'
+    , trialStartDate = 0 ## days since Feb 1, 2015
+    
     , numClus=20, clusSize=300
     , delayUnit = 7 ## logistically imposed interval in between each new cluster receiving vaccination
     , ord = 'none' ## order clusters' receipt of vaccination ('none', by baseline visit 'BL', by time-updated 'TU' last interval incidence)
@@ -48,8 +50,8 @@ makePop <- function(parms=makeParms()) within(parms, {
 
 ## Set cluster- and individual-level hazards, with cluster means changing over time and individual
 ## RR around cluster mean constant
-setHazs <- function(parms=makePop(), browse=F) within(parms, {
-    if(browse) browser()
+setHazs <- function(parms=makePop(), verbose=0) within(parms, {
+    if(verbose>10) browser()
     daySeq <- seq(-hazIntUnit*ceiling(reordLag/hazIntUnit),maxInfectDay,by=hazIntUnit)
     if(hazSL) {
         hazT <- data.table(createHazTraj(fits, nbsize = nbsize, propInTrial = propInTrial, 
@@ -92,17 +94,16 @@ reParmRgamma <- function(n, mean, cv) {
     }
 }
 
-reordPop <- function(parms, browse=F) { ## wrapper around other functions below
+reordPop <- function(parms, verbose=0) { ## wrapper around other functions below
     reordFXN <- get(paste0('reord',parms$trial))
-    parms <- reordFXN(parms, browse=browse)
+    parms <- reordFXN(parms, verbose=verbose)
     within(parms, { ## return parms
-        if(parms$ord!='none') { ## but first, if reordered
-            if(browse) browser()
-            popH[, cluster:=clusIncRank[popH[, cluster]]]
-            popH <- arrange(popH, day, cluster)
-            popH[,indiv:= rep(1:(numClus*clusSize), popH[, length(unique(day))])] ## reset indices so they're ordered again by vaccination sequence
-            rm(clusIncRank)
-        }
+        if(verbose>10) browser()
+        popH[, cluster:=clusIncRank[popH[, cluster]]]
+        popH <- arrange(popH, day, cluster)
+        ## reset indices so they're ordered again by vaccination sequence
+        popH[,indiv:= rep(1:(numClus*clusSize), popH[, length(unique(day))])] 
+        rm(clusIncRank)
         popH$pair <-  NA ## pairs matched for randomization (if matching)
         if(trial=='CRCT' & ord!='none') { ## only paired clusters exist in matched CRCT
             popH$pair <- popH[, cluster %% (numClus/2)]
@@ -111,8 +112,11 @@ reordPop <- function(parms, browse=F) { ## wrapper around other functions below
     })
 }
 
-reordSWCT <- reordFRCT <- reordRCT <- function(parms, browse=F) within(parms, {
-    if(browse) browser()
+reordSWCT <- reordFRCT <- reordRCT <- function(parms, verbose=0) within(parms, {
+    if(verbose>10) browser()
+    if(ord=='none') { ## should already be random but do it agan for good measure (debugging randomziation)
+        clusIncRank <- sample(1:numClus, numClus, replace = F)
+    }
     if(ord=='BL') { ## if vaccinating highest incidence clusters first (i.e. *NOT* SW randomization of vaccination sequence)
         clusIncRank <- popH[idByClus==1 & day == 0,order(rev(order(clusHaz)))]
     }
@@ -130,8 +134,11 @@ reordSWCT <- reordFRCT <- reordRCT <- function(parms, browse=F) within(parms, {
     }
 })
 
-reordCRCT <- function(parms, browse = F) within(parms, {
-    if(browse) browser()
+reordCRCT <- function(parms, verbose=0) within(parms, {
+    if(verbose>10) browser()
+    if(ord=='none') { ## should already be random but do it agan for good measure (debugging randomziation)
+        clusIncRank <- sample(1:numClus, numClus, replace = F)
+    }
     if(ord=='BL') { ## if matching clusters on incidence, then randomizing within pairs, then vaccinating highest incidence first
         if(numClus %% 2 == 1) stop("need even # of clusters")
         ## order clusters by mean hazard, in pairs (each row)
@@ -170,13 +177,7 @@ reordCRCT <- function(parms, browse = F) within(parms, {
 setVaccDays <- function(parms) { ## wrapper around other functions below
     setVaccFXN <- get(paste0('set',parms$trial,'vaccDays'))
     parms <- setVaccFXN(parms)
-    within(parms, {
-        popH$immuneDay <- popH[,vaccDay] + immunoDelay ## vaccine refractory period
-        popH$vacc <- popH[, day>=vaccDay]
-        popH$immune <- popH[, day>=immuneDay]
-        ## reset pop to refrence data table after reordering and then assignment of vaccday stuff
-        pop <- select(popH[day==0], indiv, cluster, pair, idByClus, indivRR, vaccDay, immuneDay) 
-    })
+    return(parms)
 }
 setSWCTvaccDays <- function(parms) within(parms, {
     popH$vaccDay <- delayUnit*(popH[,cluster]-1)
@@ -194,12 +195,19 @@ setCRCTvaccDays <- function(parms) within(parms, {
 ## setVaccDays(p1)$popH[,list(cluster,clusHaz, day,vacc,immune)]
 ## p1 <- setVaccDays(p1)
 ## p1$popH[idByClus==1,list(cluster,clusHaz, day,vacc,immune)]
+setImmuneDays <- function(parms) within(parms, {
+        popH$immuneDay <- popH[,vaccDay] + immunoDelay ## vaccine refractory period
+        popH$vacc <- popH[, day>=vaccDay]
+        popH$immune <- popH[, day>=immuneDay]
+        ## reset pop to refrence data table after reordering and then assignment of vaccday stuff
+        pop <- select(popH[day==0], indiv, cluster, pair, idByClus, indivRR, vaccDay, immuneDay) 
+    })
 
 ## Simulate infections. Takes popH for initial simulation, or EVpopH for end trial vaccination version (requires startInf)
 simInfection <- function(parms, whichDo='pop', startInfectingDay = 0, ## startInf can be set to endTrialDay
-                         browse = F) 
+                         verbose=0) 
     within(parms, { 
-        if(browse) browser()
+        if(verbose>10) browser()
         tmp <- get(whichDo)
         tmpH <- get(paste0(whichDo,'H'))
         if(startInfectingDay==0) tmp$infectDay <- tmpH$infectDay <- Inf ## otherwise it's already got some infection data in it
@@ -228,12 +236,13 @@ simInfection <- function(parms, whichDo='pop', startInfectingDay = 0, ## startIn
 ## head(p1$pop[infectDay!=Inf, list(cluster, immuneDay, infectDay)],100)
 
 ## simulate whole trial and return with all parameters used
-simTrial <- function(parms=makeParms(), browse = F) {
-    if(browse) browser()
+simTrial <- function(parms=makeParms(), verbose=0) {
+    if(verbose>10) browser()
     parms <- makePop(parms) ## make population
     parms <- setHazs(parms) ## set hazards
     parms <- reordPop(parms) ## reorder vaccination sequence by incidence (if applicable)
     parms <- setVaccDays(parms) ## set vaccination days
+    parms <- setImmuneDays(parms) ## set vaccination days
     parms <- simInfection(parms) ## simulate infection
     return(parms)
 }
@@ -241,3 +250,4 @@ simTrial <- function(parms=makeParms(), browse = F) {
 ## simTrial(makeParms(small=T),F)
 
 subsArgs <- function(parms, fxn) parms[names(parms) %in% names(formals(fxn))] ## get parameters necessary for a fxn
+
