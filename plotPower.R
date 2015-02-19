@@ -22,101 +22,71 @@ baseMods <- c('Cox PH Frailty'
 pf$modLb <- pf$mod
 levels(pf$modLb) <- paste0(rep(c('', 'bootstrap over\n', 'permutation test over\n'),each=3), rep(baseMods,3))
 
-pdf('Figures/power SL propInTrial TU vs ord.pdf', w = 8, h = 5) ##, units = 'in', res = 200)
-for(modTmp in levels(pf$modLb)) {
-    thax <- element_text(colour = 'black', size = 8)
-    p.tmp <- ggplot(pf[modLb==modTmp], aes(vaccEff, vaccGoodNAR, colour=design, linetype=order)) + 
-        scale_x_continuous(labels = formatC, limits=c(0,1)) +  
-        ##scale_y_continuous(labels = formatC, limits=c(0,1), minor_breaks = seq(0,1,.05)) +
-        scale_y_log10(labels = formatC, limits=c(0.01,.9), breaks = c(.01,.025,.05,.1,.2,.5,.8)) +
-            theme(axis.text.x = thax, axis.text.y = thax, plot.title = element_text(vjust=1),
-                  axis.title.y = element_text(vjust = 1), axis.title.x = element_text(vjust = -.5)) +
-                      xlab('vaccine efficacy') + ylab('probability of rejecting null') + 
-                          scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
-                              geom_line(size=1) + facet_wrap(~propInTrial) + 
-                                  ggtitle('power by expected % of district-level cases in trial population') +
-                        geom_hline(yintercept=.025, color='black', linetype='dotted')
-    print(p.tmp)
-    grid.text(modTmp,x=unit(.85,"npc"),y=unit(0.85,"npc"), gp=gpar(fontsize=10))
-}
-graphics.off()
-
-
-pdf('Figures/ SL propInTrial TU vs ord.pdf', w = 8, h = 5) ##, units = 'in', res = 200)
-for(modTmp in levels(pf$modLb)) {
-    thax <- element_text(colour = 'black', size = 8)
-    p.tmp <- ggplot(pf[mod==modTmp], aes(vaccEff, vaccGoodNAR, colour=design, linetype=order)) + 
-        scale_x_continuous(labels = formatC, limits=c(0,1)) +  
-        ##scale_y_continuous(labels = formatC, limits=c(0,1), minor_breaks = seq(0,1,.05)) +
-        scale_y_log10(labels = formatC, limits=c(0.01,.9), breaks = c(.01,.025,.05,.1,.2,.5,.8)) +
-            theme(axis.text.x = thax, axis.text.y = thax, plot.title = element_text(vjust=1),
-                  axis.title.y = element_text(vjust = 1), axis.title.x = element_text(vjust = -.5),
-                  panel.margin = unit(2, "lines")) +
-                      xlab('vaccine efficacy') + ylab('probability of rejecting null') + 
-                          scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
-                              geom_line(size=1) + facet_wrap(~propInTrial) + 
-                                  ggtitle('power by expected % of district-level cases in trial population') +
-                        geom_hline(yintercept=.025, color='black', linetype='dotted')
-    print(p.tmp)
-    grid.text(modTmp,x=unit(.85,"npc"),y=unit(0.85,"npc"), gp=gpar(fontsize=10))
-}
-graphics.off()
-
-## Type 1 Error
-for(yvar in c('stopped','vaccGood','vaccBad')) {
-    pdf(paste0('Figures/FalsePos', yvar, ' SL propInTrial TU vs ord.pdf'), w = 8, h = 6) ##, units = 'in', res = 200)
-    ##jpeg('Figures/FalsePos SL propInTrial TU vs ord.jpg', w = 8, h = 6, units = 'in', res = 200)
-    par(lwd=2, mar = c(5,5,3,.5), mfrow = c(2,3), oma = c(1,1,1,0))
-    for(mm in 1:length(modtypes)) {
-        modTmp <- modtypes[mm]
-        subs <- pf[, mod==modTmp & !(delayUnit==0 & ord!='none') & 
-                       ((trial=='SWCT' & ord=='none') | trial %in% c('FRCT','RCT','CRCT')) 
-                       & vaccEff ==0 ]
-        powTmp <- pf[subs]
-        powTmp[,trial:=factor(trial)]
-        plot(0,0, type = 'n', xlab = '', ylab = '', xlim = c(0.03,.1), ylim = c(0,.2), bty = 'n', main = '', las = 1, xaxt='n')
-        axis(1, at = c(0,.03, .05, .1))
-        powTmp[,
-               {
-                   lty <- which(c('none','TU')==ord)
-                   if(delayUnit==0) lty <- 3
-                   lines(propInTrial, get(yvar), col = cols[tri==trial, col], lty = lty, type = 'b')
-               },
-               by = list(trial, ord, delayUnit > 0)]
-        abline(h=ifelse(yvar=='stopped',.05,.025), lty = 3)
-        title(main=paste0(modTmp), outer = F, line = 0)
+##################################################
+## Power
+labs <- c('','log')
+for(jj in 1:2) {
+    pdf(paste0('Figures/',labs[jj], 'power SL ALL.pdf'), w = 8, h = 5) ##, units = 'in', res = 200)
+    for(modTmp in levels(pf$modLb)) {
+        thax <- element_text(colour = 'black', size = 8)
+        p.tmp <- ggplot(pf[modLb==modTmp], aes(vaccEff, vaccGoodNAR, colour=design, linetype=order)) + 
+            scale_x_continuous(labels = formatC, limits=c(0,.9),  breaks = pf[,unique(vaccEff)], minor_breaks=NULL) +  
+                theme(axis.text.x = thax, axis.text.y = thax, plot.title = element_text(vjust=1),
+                      axis.title.y = element_text(vjust = 1), axis.title.x = element_text(vjust = -.5),
+                      panel.margin = unit(2, "lines")) +
+                          xlab('vaccine efficacy') + ylab('probability of rejecting null') + 
+                              scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
+                                  geom_line(size=1) + facet_wrap(~propInTrial) + 
+                                      ggtitle('power by expected % of district-level cases in trial population') +
+                                          geom_hline(yintercept=.025, color='black', linetype='dotted')
+        if(jj==1) p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,1), minor_breaks = seq(0,1,.05))
+        if(jj==2) p.tmp <- p.tmp + scale_y_log10(labels = formatC, limits=c(0.01,.9), breaks = c(.01,.025,.05,.1,.2,.5,.8))
+        print(p.tmp)
+        grid.text(modTmp,x=unit(.85,"npc"),y=unit(0.85,"npc"), gp=gpar(fontsize=10))
     }
-    plot.new()
-    legend('topleft', leg=cols[tri %in% powTmp[,levels(trial)],tri], col = cols[tri %in% powTmp[,levels(trial)],col], lwd = 2, bty = 'n')
-    legend('bottomleft', leg=c('random','highest risk first','simultaneous instant'), lty = 1:3, lwd = 2, bty = 'n', title = 'order of cluster vaccination')
-    mtext('Type I error rate', 2, -1, outer = T)
-    mtext(yvar, 3, -1, outer = T)
-    mtext('proportion of district-level cases in trial population', 1, -1, outer = T)
     graphics.off()
 }
 
-## cases by order
-maxCases <- 120
-jpeg('Figures/cases SL propInTrial TU vs ord.jpg', w = 8, h = 6, units = 'in', res = 200)
-par(lwd=2, mfrow = c(2,2), mar = c(3,3,3,.5), oma = c(1.5,1.5,1.5,0))
-for(ii in 1:length(pits)) {
-    pit <- pits[ii]
-    main <- paste0('proportion of district-level\n cases in trial = ', signif(pit,3))
-    plot(0,0, type = 'n', xlab = '', ylab = '', xlim = c(0,1), ylim = c(0,maxCases), bty = 'n', main = main, las = 1)
-    pf[mod==modtypes[1] & propInTrial==pit, {
-        lty <- which(c('none','TU')==ord)
-        if(delayUnit==0) lty <- 3
-        lines(vaccEff, totCase_stopActive, col = cols[tri==trial, col], lty = lty)
-    },
-           by = list(trial, ord, delayUnit > 0)]
-}
-plot.new()
-legend('topleft', leg=cols[tri %in% powTmp[,levels(trial)],tri], col = cols[tri %in% powTmp[,levels(trial)],col], lwd = 2, bty = 'n')
-legend('bottomleft', leg=c('random','highest risk first','simultaneous instant'), lty = 1:3, lwd = 2, bty = 'n', title = 'order of cluster vaccination')
-title(main='24 week power', outer = T)
-mtext('# cases in trial', 2, 0, outer = T)
-mtext('vaccine efficacy', 1, 0, outer = T)
+##################################################
+## Type I
+labs <- c('','log')
+jj <- 1
+for(jj in 1:2) {
+pdf(paste0('Figures/',labs[jj],'Type I SL.pdf'), w = 8, h = 8) ##, units = 'in', res = 200)
+thax <- element_text(colour = 'black', size = 8)
+p.tmp <- ggplot(pf[design %in% c('SWCT','FRCT') & vaccEff==0], aes(propInTrial, stoppedNAR, colour=design, linetype=order)) + 
+    scale_x_continuous(labels = formatC, limits=c(.03,.1), breaks = c(.03,.05,.1)) +  
+##    scale_y_continuous(labels = formatC, limits=c(0,.3)) + #, minor_breaks = seq(0,1,.05)) +
+    theme(axis.text.x = thax, axis.text.y = thax, plot.title = element_text(vjust=1),
+          axis.title.y = element_text(vjust = 1), axis.title.x = element_text(vjust = -.5),
+          panel.margin = unit(2, "lines")) +
+    xlab('% of distrinct-level cases in trial population') + ylab('Type I Error Rate') + 
+    scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
+    geom_line(size=1) + facet_wrap(~modLb) + 
+geom_hline(yintercept=.05, color='black', linetype='dotted', size = 1.2)
+if(jj==1) p.tmp <- p.tmp + scale_y_continuous(labels = formatC)#, limits=c(0,.3))
+if(jj==2) p.tmp <- p.tmp + scale_y_log10(labels = formatC, breaks = c(.01, .025, .05, .1, .2, .3, .4))#,  limits=c(.01,.3))
+print(p.tmp)
 graphics.off()
+}
+
+##################################################
+## Cases
+pdf(paste0('Figures/Cases SL ALL.pdf'), w = 8, h = 5) ##, units = 'in', res = 200)
+thax <- element_text(colour = 'black', size = 8)
+p.tmp <- ggplot(pf[modLb==modTmp], aes(vaccEff, caseTot, colour=design, linetype=order)) + 
+    scale_x_continuous(labels = formatC, limits=c(0,1), breaks = pf[,unique(vaccEff)],minor_breaks=NULL) +  
+    theme(axis.text.x = thax, axis.text.y = thax, plot.title = element_text(vjust=1),
+          axis.title.y = element_text(vjust = 1), axis.title.x = element_text(vjust = -.5)) +
+    xlab('vaccine efficacy') + ylab('# EVD cases') + 
+    scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
+    geom_line(size=1) + facet_wrap(~pit) + 
+    ggtitle('# of cases in trial by expected % of district-level cases in trial population') +
+    geom_hline(yintercept=.025, color='black', linetype='dotted')
+p.tmp <- p.tmp + scale_y_continuous(labels = formatC) #
+print(p.tmp)
+graphics.off()
+
 
 ####################################################################################################
 ## numsims
@@ -144,55 +114,3 @@ legend('bottomleft', leg=c('random','highest risk first','simultaneous instant')
 mtext('# simulations', 2, -1, outer = T)
 mtext('proportion of district-level cases in trial population', 1, -1, outer = T)
 graphics.off()
-
-jpeg('Figures/nsims SL propInTrial TU vs ord.jpg', w = 8, h = 6, units = 'in', res = 200)
-par(lwd=2, mfrow = c(2,2), mar = c(3,3,3,.5), oma = c(1.5,1.5,1.5,0))
-for(ii in 1:length(pits)) {
-    pit <- pits[ii]
-    main <- paste0('proportion of district-level\n cases in trial = ', signif(pit,3))
-    plot(0,0, type = 'n', xlab = '', ylab = '', xlim = c(0,1), ylim = c(0,1200), bty = 'n', main = main, las = 1)
-    pf[mod==modtypes[1] & propInTrial==pit, {
-        lty <- which(c('none','TU')==ord)
-        if(delayUnit==0) lty <- 3
-        lines(vaccEff, nsim, col = cols[tri==trial, col], lty = lty)
-    },
-           by = list(trial, ord, delayUnit > 0)]
-}
-plot.new()
-legend('topleft', leg=cols[tri %in% powTmp[,levels(trial)],tri], col = cols[tri %in% powTmp[,levels(trial)],col], lwd = 2, bty = 'n')
-legend('bottomleft', leg=c('random','highest risk first','simultaneous instant'), lty = 1:3, lwd = 2, bty = 'n', title = 'order of cluster vaccination')
-title(main='24 week power', outer = T)
-mtext('# cases in trial', 2, 0, outer = T)
-mtext('vaccine efficacy', 1, 0, outer = T)
-graphics.off()
-
-####################################################################################################
-## SWCT Type 1 Error
-for(yvar in c('stopped','vaccGood','vaccBad')) {
-    pdf(paste0('Figures/FalsePos', yvar, thing, ' SL propInTrial TU vs ord.pdf'), w = 8, h = 7) ##, units = 'in', res = 200)
-    ##jpeg('Figures/FalsePos SL propInTrial TU vs ord.jpg', w = 8, h = 6, units = 'in', res = 200)
-    par(lwd=2, mar = c(5,5,3,.5), mfrow = c(3,3), oma = c(1,1,1,0))
-    for(mm in 1:length(modtypes)) {
-        modTmp <- modtypes[mm]
-        subs <- pf[, mod==modTmp & !(delayUnit==0 & ord!='none') & 
-                       ((trial=='SWCT' & ord=='none') | trial %in% c('FRCT','RCT','CRCT')) 
-                       & vaccEff ==0 ]
-        powTmp <- pf[subs]
-        powTmp[,trial:=factor(trial)]
-        plot(0,0, type = 'n', xlab = '', ylab = '', xlim = c(0.03,.1), ylim = c(0,.2), bty = 'n', main = '', las = 1, xaxt='n')
-        axis(1, at = c(.03, .05, .1))
-        powTmp[,
-               {
-                   lty <- which(c('none','TU')==ord)
-                   if(delayUnit==0) lty <- 3
-                   lines(propInTrial, get(yvar), lty = lty, type = 'b')
-               },
-               by = list(trial, ord, delayUnit > 0)]
-        abline(h=ifelse(yvar=='stopped',.05,.025), lty = 3)
-        title(main=paste0(modTmp), outer = F, line = 0)
-    }
-    mtext('Type I error rate', 2, -1, outer = T)
-    mtext(yvar, 3, 0, outer = T)
-    mtext('proportion of district-level cases in trial population', 1, -1, outer = T)
-    graphics.off()
-}
