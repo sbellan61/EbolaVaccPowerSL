@@ -2,7 +2,10 @@ if(grepl('stevebe', Sys.info()['nodename'])) setwd('~/Documents/R Repos/EbolaVac
 if(grepl('stevebellan', Sys.info()['login'])) setwd('~/Documents/R Repos/EbolaVaccSim/')
 if(grepl('tacc', Sys.info()['nodename'])) setwd('/home1/02413/sbellan/VaccEbola/')
 library(RColorBrewer)
-load(file=file.path('BigResults','powFin.Rdata'))
+##load(file=file.path('BigResults','powFin.Rdata'))
+
+thing <- 'SLSimsSW'
+load(file=file.path('BigResults',paste0('powFin_',thing,'.Rdata')))
 
 head(powFin[,1:8,with=F],50)
 
@@ -78,7 +81,32 @@ for(yvar in c('stopped','vaccGood','vaccBad')) {
     graphics.off()
 }
 
-pdf(paste0('Figures/NSIMS', yvar, ' SL propInTrial TU vs ord.pdf'), w = 8, h = 6) ##, units = 'in', res = 200)
+## cases by order
+maxCases <- 120
+jpeg('Figures/cases SL propInTrial TU vs ord.jpg', w = 8, h = 6, units = 'in', res = 200)
+par(lwd=2, mfrow = c(2,2), mar = c(3,3,3,.5), oma = c(1.5,1.5,1.5,0))
+for(ii in 1:length(pits)) {
+    pit <- pits[ii]
+    main <- paste0('proportion of district-level\n cases in trial = ', signif(pit,3))
+    plot(0,0, type = 'n', xlab = '', ylab = '', xlim = c(0,1), ylim = c(0,maxCases), bty = 'n', main = main, las = 1)
+    powFin[mod==modtypes[1] & propInTrial==pit, {
+        lty <- which(c('none','TU')==ord)
+        if(delayUnit==0) lty <- 3
+        lines(vaccEff, totCase_stopActive, col = cols[tri==trial, col], lty = lty)
+    },
+           by = list(trial, ord, delayUnit > 0)]
+}
+plot.new()
+legend('topleft', leg=cols[tri %in% powTmp[,levels(trial)],tri], col = cols[tri %in% powTmp[,levels(trial)],col], lwd = 2, bty = 'n')
+legend('bottomleft', leg=c('random','highest risk first','simultaneous instant'), lty = 1:3, lwd = 2, bty = 'n', title = 'order of cluster vaccination')
+title(main='24 week power', outer = T)
+mtext('# cases in trial', 2, 0, outer = T)
+mtext('vaccine efficacy', 1, 0, outer = T)
+graphics.off()
+
+####################################################################################################
+## numsims
+pdf(paste0('Figures/NSIMS SL fp.pdf'), w = 8, h = 6) ##, units = 'in', res = 200)
 par(lwd=2, mar = c(5,5,3,.5), oma = c(1,1,1,0))
 layout(matrix(1:2,1,2), w = c(3,1))
 subs <- powFin[, mod==modtypes[1] & !(delayUnit==0 & ord!='none') & 
@@ -103,18 +131,16 @@ mtext('# simulations', 2, -1, outer = T)
 mtext('proportion of district-level cases in trial population', 1, -1, outer = T)
 graphics.off()
 
-## cases by order
-maxCases <- 120
-jpeg('Figures/cases SL propInTrial TU vs ord.jpg', w = 8, h = 6, units = 'in', res = 200)
+jpeg('Figures/nsims SL propInTrial TU vs ord.jpg', w = 8, h = 6, units = 'in', res = 200)
 par(lwd=2, mfrow = c(2,2), mar = c(3,3,3,.5), oma = c(1.5,1.5,1.5,0))
 for(ii in 1:length(pits)) {
     pit <- pits[ii]
     main <- paste0('proportion of district-level\n cases in trial = ', signif(pit,3))
-    plot(0,0, type = 'n', xlab = '', ylab = '', xlim = c(0,1), ylim = c(0,maxCases), bty = 'n', main = main, las = 1)
+    plot(0,0, type = 'n', xlab = '', ylab = '', xlim = c(0,1), ylim = c(0,1200), bty = 'n', main = main, las = 1)
     powFin[mod==modtypes[1] & propInTrial==pit, {
         lty <- which(c('none','TU')==ord)
         if(delayUnit==0) lty <- 3
-        lines(vaccEff, totCase_stopActive, col = cols[tri==trial, col], lty = lty)
+        lines(vaccEff, nsim, col = cols[tri==trial, col], lty = lty)
     },
            by = list(trial, ord, delayUnit > 0)]
 }
@@ -125,3 +151,34 @@ title(main='24 week power', outer = T)
 mtext('# cases in trial', 2, 0, outer = T)
 mtext('vaccine efficacy', 1, 0, outer = T)
 graphics.off()
+
+####################################################################################################
+## SWCT Type 1 Error
+for(yvar in c('stopped','vaccGood','vaccBad')) {
+    pdf(paste0('Figures/FalsePos', yvar, thing, ' SL propInTrial TU vs ord.pdf'), w = 8, h = 4) ##, units = 'in', res = 200)
+    ##jpeg('Figures/FalsePos SL propInTrial TU vs ord.jpg', w = 8, h = 6, units = 'in', res = 200)
+    par(lwd=2, mar = c(5,5,3,.5), mfrow = c(1,3), oma = c(1,1,1,0))
+    for(mm in 1:length(modtypes)) {
+        modTmp <- modtypes[mm]
+        subs <- powFin[, mod==modTmp & !(delayUnit==0 & ord!='none') & 
+                       ((trial=='SWCT' & ord=='none') | trial %in% c('FRCT','RCT','CRCT')) 
+                       & vaccEff ==0 ]
+        powTmp <- powFin[subs]
+        powTmp[,trial:=factor(trial)]
+        plot(0,0, type = 'n', xlab = '', ylab = '', xlim = c(0.03,.1), ylim = c(0,.2), bty = 'n', main = '', las = 1, xaxt='n')
+        axis(1, at = c(.03, .05, .1))
+        powTmp[,
+               {
+                   lty <- which(c('none','TU')==ord)
+                   if(delayUnit==0) lty <- 3
+                   lines(propInTrial, get(yvar), lty = lty, type = 'b')
+               },
+               by = list(trial, ord, delayUnit > 0)]
+        abline(h=ifelse(yvar=='stopped',.05,.025), lty = 3)
+        title(main=paste0(modTmp), outer = F, line = 0)
+    }
+    mtext('Type I error rate', 2, -1, outer = T)
+    mtext(yvar, 3, -1, outer = T)
+    mtext('proportion of district-level cases in trial population', 1, -1, outer = T)
+    graphics.off()
+}

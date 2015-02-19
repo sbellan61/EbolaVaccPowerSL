@@ -36,16 +36,22 @@ infBump <- function(parms, verbose = 0) {
     return(parmsE)
 }
 
-doRelabel <- function(parms, csd, bump=F, nboot=200, doFXN=doCoxME, verbose = 0, verbFreqRelab=10, minCases=10) {
+permP <- function(x,na.rm=T) min(mean(x>=x[1],na.rm=na.rm), mean(x<=x[1],na.rm=na.rm))
+
+modsToDo <- list('CoxME','GLMclus','GLMFclus','GLMMclusBy') #'GLMMclusFr')
+doRelabel <- function(parms, csd, bump=F, nboot=200, doMods=modsToDo, verbose = 0, verbFreqRelab=10, minCases=0) {
     if(verbose==3.45) browser()
     if(verbose>0) print('doing relabeled models')
-    modNm <- paste0('relab', sub('do','',as.character(substitute(doFXN))))
-    vee <- doFXN(csd, bump=bump, verbose=0)
-    effMean <- vee['mean']
+    doFXNs <- lapply(doMods, function(x) get(paste0('do',x)))
+    names(doFXNs) <- doMods
+    nmods <- length(doMods)
+    veePerm <- data.table(matrix(0,nboot,nmods))
+    setnames(veePerm, unlist(doMods))
+    ## First row in table is effect estimate from simulation, remainin nboot-1 are from permutations
+    for(ii in 1:nmods) set(veePerm, i=1L, j=ii, doFXNs[[ii]](parms=parms, csd=csd, bump=F, verbose=0)[1,'mean'])
     numCases <- csd[,sum(infectDay!=Inf)]
-    effEsts <- NULL
     if(numCases >= minCases) { #
-        for(bb in 1:nboot) {
+        for(bb in 2:nboot) {
             if(verbose>.5 & (bb %% verbFreqRelab == 0)) print(paste('on',bb,'of',nboot))
             ## randomly reorder the vaccination sequence of clusters, null is their order doesn't affect the
             ## effect size
@@ -61,8 +67,8 @@ doRelabel <- function(parms, csd, bump=F, nboot=200, doFXN=doCoxME, verbose = 0,
                     pnms <- colnames(popH)
                     popH <- merge(popH[,!'vaccDay',with=F], relabDT, by = 'cluster')
                     popH[, immuneDay := vaccDay + immunoDelay]
-                    popH[, vacc := day>= vaccDay]
-                    popH[, immune := day>= immuneDay]
+                    popH[, vacc := day >= vaccDay]
+                    popH[, immune := day >= immuneDay]
                     popH <- setcolorder(popH, pnms)
                     rm(relabDT, pnms) 
                 }) }
@@ -83,35 +89,34 @@ doRelabel <- function(parms, csd, bump=F, nboot=200, doFXN=doCoxME, verbose = 0,
                     popH <- setcolorder(popH, pnms)
                     rm(relabDT, pnms)
                 }) }
-            parmsB <- makeSurvDat(parmsB, whichDo='pop', br=T)
+            parmsB <- makeSurvDat(parmsB, whichDo='pop')
             parmsB <- makeGEEDat(parmsB, whichDo = 'popH', verbose=verbose)
             parmsB <- activeFXN(parmsB, whichDo = 'st')
             csdB <- censSurvDat(parmsB)
-            tmpEst <- doFXN(csdB, verbose = verbose)['mean']
-##          if(is.na(tmpEst)) browser()
-            effEsts <- c(effEsts, as.numeric(tmpEst))
+            for(ii in 1:nmods) set(veePerm, i=as.integer(bb), j=ii, doFXNs[[ii]](parms=parmsB, csd=csdB, bump=F, verbose=0)[1,'mean'])
         }
-        pval <- NA
-        effMean <- as.numeric(effMean)
-        pval <- min(mean(c(effEsts,effMean)>=effMean,na.rm=T), mean(c(effEsts,effMean)>=effMean,na.rm=T))
-        bootVee <- data.frame(mean=effMean, lci = NA, uci = NA, p = pval, mod=modNm, bump = NA, err=sum(is.na(effEsts)))
-        bootVee <- bumpAdjust(bootVee, csd, bump, nonpar=T)
-    }else{
-        bootVee <- data.frame(mean=effMean, lci = NA, uci = NA, p = NA, mod=modNm, bump = NA, err=NA)
+        bootVee <- data.frame(mean = as.numeric(veePerm[1]), lci = NA, uci = NA, p = apply(veePerm, 2, permP), 
+                              mod = paste0('relab',unlist(doMods)), bump = F, err = colSums(is.na(veePerm)))
+    }else{ ## not enough cases
+        bootVee <- data.frame(mean = as.numeric(veePerm[1]), lci = NA, uci = NA, p = NA,
+                              mod = paste0('relab',unlist(doMods)), bump = F, err = NA)
     }
     return(bootVee)
 }
 
-doBoot <- function(csd, nboot=200, bump=F, doFXN=doCoxME, verbose = 0, verbFreqBoot=10, minCases=10) {
+doBoot <- function(parms, csd, nboot=200, bump=F, doMods=modsToDo, verbose = 0, verbFreqBoot=10, minCases=0) {
     if(verbose==3.4) browser()
     if(verbose>0) print('bootstrapping')
-    modNm <- paste0('boot', sub('do','',as.character(substitute(doFXN))))
-    vee <- doFXN(csd, bump=bump, verbose=0)
-    effMean <- vee['mean']
-    effEsts <- as.numeric(NULL)
+    doFXNs <- lapply(doMods, function(x) get(paste0('do',x)))
+    names(doFXNs) <- doMods
+    nmods <- length(doMods)
+    veeBoot <- data.table(matrix(0,nboot,nmods))
+    setnames(veeBoot, unlist(doMods))
+    ## First row in table is effect estimate from simulation, remainin nboot-1 are from permutations
+    for(ii in 1:nmods) set(veeBoot, i=1L, j=ii, doFXNs[[ii]](parms=parms, csd=csd, bump=F, verbose=0)[1,'mean'])
     numCases <- csd[,sum(infectDay!=Inf)]
     if(numCases >= minCases) {
-        for(bb in 1:nboot) {
+        for(bb in 2:nboot) {
             if(verbose>.5 & (bb %% verbFreqBoot == 0)) print(paste('on',bb,'of',nboot))
             if(trial=='CRCT' & ord!='none')
                 bootby <- csd[,unique(pair)]    else    bootby <- csd[,unique(cluster)]
@@ -119,20 +124,31 @@ doBoot <- function(csd, nboot=200, bump=F, doFXN=doCoxME, verbose = 0, verbFreqB
             clsB <- clsB[order(clsB)]
             clsB <- table(factor(clsB, bootby))
             csdB <- copy(csd)
-            csdB$reps <- NA
-            if(trial=='CRCT' & ord!='none')
-                csdB[, reps := clsB[pair]] else csdB[, reps := clsB[cluster]] 
+            parmsB <- copy(parms)
+            parmsB$clusDat$reps <- csdB$reps <- NA
+            if(trial=='CRCT' & ord!='none') {
+                csdB[, reps := clsB[pair]] 
+                parmsB$clusDat[, reps := clsB[pair]] 
+            }else{ 
+                csdB[, reps := clsB[cluster]] 
+                parmsB$clusDat[, reps := clsB[cluster]] 
+            }
             csdB <- csdB[rep(1:length(reps), reps)]
-            tmpEst <- doFXN(csdB, verbose = 0)['mean']
-            effEsts <- c(effEsts, as.numeric(tmpEst))
+            parmsB$clusDat <- parmsB$clusDat[rep(1:length(reps), reps)]
+            for(ii in 1:nmods) set(veeBoot, i=as.integer(bb), j=ii, doFXNs[[ii]](parms=parmsB, csd=csdB, bump=F, verbose=0)[1,'mean'])
         }
-        lci <- quantile(effEsts, .025, na.rm=T)
-        uci <- quantile(effEsts, .975, na.rm=T)
-        if(is.na(effMean)) effMean <- median(effEsts,na.rm=T)
-        bootVee <- data.frame(mean=effMean, lci = lci, uci = uci, p = NA, mod=modNm, bump= NA, err=sum(is.na(lci)))
-        bootVee <- bumpAdjust(bootVee, csd, bump, nonpar=T)
+
+        bootVee <- data.frame(mean = as.numeric(veeBoot[1])
+                              , lci = apply(veeBoot[-1], 2, function(x) quantile(x,.025,na.rm=T)) ## [-1] exclude real estimate
+                              , uci = apply(veeBoot[-1], 2, function(x) quantile(x,.975,na.rm=T)) 
+                              , p = NA
+                              , mod = paste0('boot',unlist(doMods)), bump = F, err = colSums(is.na(veeBoot)))
     }else{
-        bootVee <- data.frame(mean=effMean, lci = NA, uci = NA, p = NA, mod=modNm, bump = NA, err=NA)
+        bootVee <- data.frame(mean = as.numeric(veeBoot[1])
+                              , lci = NA
+                              , uci = NA
+                              , p = NA
+                              , mod = paste0('boot',unlist(doMods)), bump = F, err = NA)
     }
     return(bootVee)
 }
@@ -158,7 +174,7 @@ bumpAdjust <- function(vee, csd, bump, nonpar=F) {
     return(vee)
 }
 
-doCoxME <- function(csd, bump = F, verbose=0) { ## take censored survival object and return vacc effectiveness estimates
+doCoxME <- function(parms, csd, bump = F, verbose=0) { ## take censored survival object and return vacc effectiveness estimates
     if(verbose==3.1) browser()
     if(verbose>0) print('fitting vanilla coxME')
     mod <- try(coxme(Surv(startDay, endDay, infected) ~ immuneGrp + (1|cluster), data = csd), silent=T)
@@ -168,51 +184,89 @@ doCoxME <- function(csd, bump = F, verbose=0) { ## take censored survival object
         vaccEffEst <- signif(c(vaccEffEst, pval), 3)
         if(is.na(vcov(mod)) | vcov(mod)==0) 
             vaccEffEst[2:4] <- NA ## if failing to converge on effect estimate (i.e. 0 variance in beta coefficient)
-        vaccEffEst <- data.frame(t(vaccEffEst), 'coxME', bump)
-        names(vaccEffEst) <- c('mean','lci','uci','p','mod', 'bump')
+        vaccEffEst <- data.frame(t(vaccEffEst), 'coxME', bump = bump, err = 0)
+        names(vaccEffEst) <- c('mean','lci','uci','p','mod', 'bump', 'err')
         vaccEffEst <- bumpAdjust(vaccEffEst, csd, bump)
     }else{
-        vaccEffEst <- data.frame(mean=NA, lci=NA, uci=NA, p=NA,  mod='coxME', bump = bump)
+        vaccEffEst <- data.frame(mean=NA, lci=NA, uci=NA, p=NA,  mod='coxME', bump = bump, err = 1)
     }
     return(vaccEffEst)
 }
 
 ## Cluster level data with one observation per time unit (not for RCTs bc two different covariates
 ## classes within cluster level, would need individual approach for that)
-doGEEclusAR1 <- function(clusDat, csd, bump=F, verbose=0) { 
+doGEEclusAR1 <- function(parms, csd, bump=F, verbose=0) { 
     if(verbose==3.6) browser()
     if(verbose>0) print('fitting GEEclusAR1')
     if(trial %in% c('SWCT','CRCT')) {
-        mod <- try(geeglm(cases ~ immuneGrp + day, offset = log(atRisk), id = cluster, data = clusDat, family = poisson, corstr = "ar1"), 
+        mod <- try(geeglm(cases ~ immuneGrp + day, offset = log(atRisk), id = cluster, data = parms$clusDat, 
+                          family = poisson, corstr = "ar1"), 
                    silent=T)
         if(!inherits(mod, 'try-error')) {
             vaccRes <- as.numeric(summary(mod)$coef['immuneGrp', c('Estimate','Std.err','Pr(>|W|)')])
             vaccEffEst <- c(1 - exp(vaccRes[1] + c(0, 1.96, -1.96) * vaccRes[2]), vaccRes[3])
             names(vaccEffEst) <- c('mean','lci','uci','p')
-            vaccEffEst <- data.frame(t(signif(vaccEffEst,3)),  mod='GEEClusAR1', bump=bump)
+            vaccEffEst <- data.frame(t(signif(vaccEffEst,3)),  mod='GEEClusAR1', bump=bump, err = 0)
             vaccEffEst <- bumpAdjust(vaccEffEst, csd, bump)
         }else{
-            vaccEffEst <- data.frame(mean=NA, lci=NA, uci=NA, p=NA,  mod='GEEClusAR1', bump = bump)
+            vaccEffEst <- data.frame(mean=NA, lci=NA, uci=NA, p=NA,  mod='GEEClusAR1', bump = bump, err = 1)
         }
     }else{
-        vaccEffEst <- data.frame(mean=NA, lci=NA, uci=NA, p=NA,  mod='GEEClusAR1', bump= bump)
+        vaccEffEst <- data.frame(mean=NA, lci=NA, uci=NA, p=NA,  mod='GEEClusAR1', bump= bump, err = NA)
     }
     return(vaccEffEst)
 }
 
-doGLMMclus <- function(clusDat, csd, bump=F, bayes=T, verbose=0) {
+doGLMMclusFr <- function(parms, csd, bump=F, verbose=0) doGLMMclus(parms, csd, bump, bayes=F, verbose) 
+doGLMMclusBy <- function(parms, csd, bump=F, verbose=0) doGLMMclus(parms, csd, bump, bayes=T, verbose) 
+doGLMMclus <- function(parms, csd, bump=F, bayes=T, verbose=0) {
     if(verbose==3.7) browser()
     if(verbose>0) print('fitting GLMMclus')
-    if(!bayes) mod <- try(glmer(cases ~ immuneGrp + day + (1|cluster) + offset(log(atRisk)), data = clusDat, family = poisson), silent = T)
-    if(bayes) mod <- try(bglmer(cases ~ immuneGrp + day + (1|cluster) + offset(log(atRisk)), data = clusDat, family = poisson), silent = T)
+    if(!bayes) mod <- try(glmer(cases ~ immuneGrp + day + (1|cluster) + offset(log(atRisk)), 
+                                data = parms$clusDat, family = poisson), silent = T)
+    if(bayes) mod <- try(bglmer(cases ~ immuneGrp + day + (1|cluster) + offset(log(atRisk)), 
+                                data = parms$clusDat, family = poisson), silent = T)
     if(!inherits(mod, 'try-error')) {
         vaccRes <- as.numeric(summary(mod)$coef['immuneGrp', c('Estimate','Std. Error','Pr(>|z|)')])
         vaccEffEst <- c(1 - exp(vaccRes[1] + c(0, 1.96, -1.96) * vaccRes[2]), vaccRes[3])
         names(vaccEffEst) <- c('mean','lci','uci','p')
-        vaccEffEst <- data.frame(t(signif(vaccEffEst,3)),  mod='GLMMClus', bump = bump)
+        vaccEffEst <- data.frame(t(signif(vaccEffEst,3)),  mod='GLMMclus', bump = bump, err = 0)
         vaccEffEst <- bumpAdjust(vaccEffEst, csd, bump)
     }else{
-        vaccEffEst <- data.frame(mean=NA, lci=NA, uci=NA, p=NA,  mod='GLMMClus', bump = NA)
+        vaccEffEst <- data.frame(mean=NA, lci=NA, uci=NA, p=NA,  mod='GLMMclus', bump = NA, err = 1)
+    }
+    return(vaccEffEst)
+}
+
+doGLMclus <- function(parms, csd, bump=F, verbose=0) {
+    if(verbose==3.75) browser()
+    if(verbose>0) print('fitting GLMclus')
+    mod <- try(glm(cases ~ immuneGrp + day + offset(log(atRisk)), data = parms$clusDat, family = poisson), silent = T)
+    if(!inherits(mod, 'try-error')) {
+        vaccRes <- as.numeric(summary(mod)$coef['immuneGrp', c('Estimate','Std. Error','Pr(>|z|)')])
+        vaccEffEst <- c(1 - exp(vaccRes[1] + c(0, 1.96, -1.96) * vaccRes[2]), vaccRes[3])
+        names(vaccEffEst) <- c('mean','lci','uci','p')
+        vaccEffEst <- data.frame(t(signif(vaccEffEst,3)),  mod='GLMclus', bump = bump, err = 0)
+        vaccEffEst <- bumpAdjust(vaccEffEst, csd, bump)
+    }else{
+        vaccEffEst <- data.frame(mean=NA, lci=NA, uci=NA, p=NA,  mod='GLMclus', bump = NA, err = 1)
+    }
+    return(vaccEffEst)
+}
+
+doGLMFclus <- function(parms, csd, bump=F, verbose=0) {
+    if(verbose==3.76) browser()
+    if(verbose>0) print('fitting GLMFclus')
+    mod <- try(glm(cases ~ immuneGrp + day + factor(cluster) + offset(log(atRisk)), 
+                   data = parms$clusDat, family = poisson), silent = T)
+    if(!inherits(mod, 'try-error')) {
+        vaccRes <- as.numeric(summary(mod)$coef['immuneGrp', c('Estimate','Std. Error','Pr(>|z|)')])
+        vaccEffEst <- c(1 - exp(vaccRes[1] + c(0, 1.96, -1.96) * vaccRes[2]), vaccRes[3])
+        names(vaccEffEst) <- c('mean','lci','uci','p')
+        vaccEffEst <- data.frame(t(signif(vaccEffEst,3)),  mod='GLMFclus', bump = bump, err = 0)
+        vaccEffEst <- bumpAdjust(vaccEffEst, csd, bump)
+    }else{
+        vaccEffEst <- data.frame(mean=NA, lci=NA, uci=NA, p=NA,  mod='GLMFclus', bump = NA, err = 1)
     }
     return(vaccEffEst)
 }

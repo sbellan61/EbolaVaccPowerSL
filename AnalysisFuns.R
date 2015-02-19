@@ -90,30 +90,6 @@ summTrial <- function(st) list(summarise(group_by(st, cluster), sum(infected))
                                , summarise(group_by(st, immuneGrp), sum(infected))
                                )
 
-compileStopInfo <- function(minDay, vaccEffEst, tmp, verbose=0) {
-    if(verbose==4) browser()
-    if(verbose>0) print(paste0('compiling stop info for ', vaccEffEst[1,'mod']))
-    out <- data.table(stopDay=minDay
-                      , mean = vaccEffEst[1,'mean'], lci = vaccEffEst[1,'lci'], uci = vaccEffEst[1,'uci'], p = vaccEffEst[1,'p']
-                      , mod = vaccEffEst[1,'mod'], bump = vaccEffEst[1,'bump']
-                      , caseCXimmGrpEnd = tmp[immuneGrp==0, sum(infected)]
-                      , caseVXimmGrpEnd = tmp[immuneGrp==1, sum(infected)]
-                      , hazCXimmGrpEnd = tmp[immuneGrp==0, sum(infected)/sum(perstime)]
-                      , hazVXimmGrpEnd = tmp[immuneGrp==1, sum(infected)/sum(perstime)]
-                      , ptRatioCVXimmGrpEnd = tmp[immuneGrp==0, sum(perstime)] / tmp[immuneGrp==1, sum(perstime)]
-                      )
-    out$stopped <- out[, (p<.025 & !is.na(p)) | ((lci > 0 & !is.na(lci)) | (uci < 0 & !is.na(uci)))]
-    out$vaccGood <- NA
-    out[stopped==T, vaccGood:= mean > 0]
-    out <- setcolorder(out, c("stopped", "vaccGood", "stopDay", "mean", "lci", "uci", "p",  'mod', 'bump'
-                              , "caseCXimmGrpEnd", "caseVXimmGrpEnd"
-                              , "hazCXimmGrpEnd", "hazVXimmGrpEnd"
-                              , "ptRatioCVXimmGrpEnd"
-                              ))
-    out <- as.data.frame(out)
-    return(out)
-}
-
 ## Check whether stopping point has been reached at intervals
 seqStop <- function(parms, start = parms$immunoDelayThink + 14, checkIncrement = 7, minCases = 15,
                     verbose = 0, fullSeq = F, maxDay = parms$maxInfectDay) {
@@ -152,8 +128,20 @@ testZeros <- function(parmsTmp) {
     return(0 %in% casesXgroup[,cases])
 }
 
+compileStopInfo <- function(minDay, tmp, verbose=0) {
+    if(verbose==4) browser()
+    out <- data.table(stopDay=minDay
+                      , caseCXimmGrpEnd = tmp[immuneGrp==0, sum(infected)]
+                      , caseVXimmGrpEnd = tmp[immuneGrp==1, sum(infected)]
+                      , hazCXimmGrpEnd = tmp[immuneGrp==0, sum(infected)/sum(perstime)]
+                      , hazVXimmGrpEnd = tmp[immuneGrp==1, sum(infected)/sum(perstime)]
+                      , ptRatioCVXimmGrpEnd = tmp[immuneGrp==0, sum(perstime)] / tmp[immuneGrp==1, sum(perstime)]
+                      )
+    out <- as.data.frame(out)
+    return(out)
+}
+
 getEndResults <- function(parms, bump = T, verbose = 0) {
-    if(verbose==2.9) browser()
     if(!testZeros(parms)) {
         parmsE <- parms
         parmsE$bump <- F
@@ -161,26 +149,34 @@ getEndResults <- function(parms, bump = T, verbose = 0) {
         parmsE <- infBump(parms, verbose=verbose)
         parmsE$bump <- T
     }
-    tmpCSD <- censSurvDat(parms, verbose=verbose)
-    tmpCSDE <- censSurvDat(parmsE, verbose=verbose)
+    tmpCSDE <- tmpCSD <- censSurvDat(parms, verbose=verbose)
+    if(testZeros(parms))  tmpCSDE <- censSurvDat(parmsE, verbose=verbose)
     within(parmsE, {
-        vaccEE_ME <- doCoxME(tmpCSDE, bump = bump, verbose=verbose)
+        if(verbose==2.9) browser()
+        vaccEE_ME <- doCoxME(parmsE, tmpCSDE, bump = bump, verbose=verbose)
         ## vaccEE_GEEclusAR1 <- doGEEclusAR1(clusDat, csd=tmpCSDE, bump = bump, verbose = verbose)
-        ## vaccEE_GLMMclus <- doGLMMclus(clusDat, csd=tmpCSDE, bump = bump, verbose = verbose)
-        vaccEE_MErelab <- doRelabel(parms, csd=tmpCSD, bump=F, nboot=nboot, doFXN = doCoxME, verbose = verbose)
-        vaccEE_MEboot <- doBoot(csd=tmpCSD, bump=F, nboot=nboot, doFXN = doCoxME, verbose = verbose)
+        ## vaccEE_GLMMclus <- doGLMMclus(parmsE,, csd=tmpCSDE, bump = bump, verbose = verbose)
+        vaccEE_GLMclus <- doGLMclus(parmsE, csd=tmpCSDE, bump = bump, verbose = verbose)
+        vaccEE_GLMFclus <- doGLMFclus(parmsE, csd=tmpCSDE, bump = bump, verbose = verbose)
+        vaccEE_MErelab <- doRelabel(parms, csd=tmpCSD, bump=F, nboot=nboot, verbFreqRelab=10, verbose = verbose)
+        vaccEE_MEboot <- doBoot(parms, csd=tmpCSD, bump=F, nboot=nboot, verbFreqBoot=10, verbose = verbose)
         vEEs <- list(vaccEE_ME
+                     ## , vaccEE_GLMMclus
+                     , vaccEE_GLMclus
+                     , vaccEE_GLMFclus
+                     ## , vaccEE_GEEclusAR1
                      , vaccEE_MEboot
                      , vaccEE_MErelab
-                     ## , vaccEE_GEEclusAR1
-                     ## , vaccEE_GLMMclus
                      )
-        stopFin <- rbindlist(lapply(vEEs, compileStopInfo, minDay = maxInfectDay, tmp = tmpCSD, verbose=verbose))
+        finMods <- rbindlist(vEEs)
+        finInfo <- compileStopInfo(tmp = tmpCSD, minDay=maxInfectDay,  verbose=verbose)
         rm(vaccEE_ME, vaccEE_MEboot, vaccEE_MErelab
            ## , vaccEE_GEEclusAR1
-           ## , vaccEE_GLMMclus
+           ## , vaccEE_GLMMclus 
+           , vaccEE_GLMFclus , vaccEE_GLMclus
+           , vEEs
            )
-        return(stopFin)
+        return(list(finInfo=finInfo, finMods=finMods))
     })
 }
 
@@ -189,7 +185,7 @@ simNtrials <- function(seed = 1, parms=makeParms(), N = 2, returnAll = F,
     set.seed(seed)
     caseXVaccRandGrpList <- caseXPT_ImmuneList <- weeklyAnsList <- list()
     length(caseXVaccRandGrpList) <- length(caseXPT_ImmuneList) <- length(weeklyAnsList) <- N
-    finPoint <- stopPoints <- data.frame(NULL)
+    finInfo <- finMods <- stopPoints <- data.frame(NULL)
     for(ss in 1:N) {
         if(verbose>0 & (ss %% verbFreq == 0)) print(paste('on',ss,'of',N))
         if(verbose>.5 & (ss %% 1 == 0)) print(paste('on',ss,'of',N))
@@ -203,8 +199,10 @@ simNtrials <- function(seed = 1, parms=makeParms(), N = 2, returnAll = F,
         res <- makeGEEDat(res, verbose=verbose)
         res <- activeFXN(res)
         res <- getEndResults(res, verbose=verbose)
-        finTmp <- data.frame(sim = ss, res$stopFin)
-        finPoint <- rbind(finPoint, finTmp)
+        finTmp <- data.frame(sim = ss, res$finMods)
+        finMods <- rbind(finMods, finTmp)
+        finITmp <- data.frame(sim = ss, res$finInfo)
+        finInfo <- rbind(finInfo, finITmp)
         if(doSeqStops) {
             res <- seqStop(res, verbose = 3)
             ## if(showSeqStops) {
@@ -245,7 +243,7 @@ simNtrials <- function(seed = 1, parms=makeParms(), N = 2, returnAll = F,
             , finPoint=finPoint
             ))
     if(!returnAll)
-        return(list(stopPoints=stopPoints, finPoint=finPoint))
+        return(list(stopPoints=stopPoints, finMods=finMods, finInfo=finInfo))
 }
 
 

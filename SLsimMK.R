@@ -3,19 +3,20 @@ if(grepl('stevebellan', Sys.info()['login'])) setwd('~/Documents/R Repos/EbolaVa
 if(grepl('tacc', Sys.info()['nodename'])) setwd('/home1/02413/sbellan/VaccEbola/')
 sapply(c('simFuns.R','AnalysisFuns.R','CoxFxns.R','EndTrialFuns.R'), source)
 
-batchdirnm <- file.path('BigResults','SLSimsSW')
+batchdirnm <- file.path('BigResults','SLSimsSWnoGLMM')
 routdirnm <- file.path(batchdirnm,'Routs')
 if(!file.exists(batchdirnm)) dir.create(batchdirnm)
 if(!file.exists(routdirnm)) dir.create(routdirnm)
 tnms <- c('SWCT')##,'RCT','FRCT','CRCT')
-numEach <- 12*14
+numEach <- 12*28
 
 ves <- c(0, seq(.4, .9, by = .1))
+pits <- c(.03, .05, .1)
 parmsMat <- as.data.table(expand.grid(
     seed =  1:numEach
     , trial = tnms
     , ord = c('none','TU')
-    , propInTrial = c(.03, .05, .1)
+    , propInTrial = pits
     , sdLogIndiv = makeParms()$sdLogIndiv
     , delayUnit = 7#c(0,7)
     , vaccEff = 0#ves
@@ -25,10 +26,9 @@ parmsMat$simNum <- 1:nrow(parmsMat)
 parmsMat$batchdirnm <- batchdirnm
 nmtmp <- 'simSL-3-'
 parmsMat$saveNm <- nmtmp
-parmsMat$nsims <- 30
+parmsMat$nsims <- 5
 parmsMat$reordLag <- 14
 parmsMat$nboot <- 200
-parmsMat[vaccEff==0, nsims :=nsims*3] ## should be fast without relabeling
 nrow(parmsMat)
 
 ## fls <- list.files(batchdirnm, pattern=nmtmp)
@@ -50,10 +50,11 @@ addParm <- function(x, parmsMat,ii) {
     return(x)
 }
 
-parmsMat[, length(nboot), vaccEff]
-for(ii in 1:length(ves)) {
-    parmsMatDo <- parmsMat[vaccEff==ves[ii]]
-    sink(paste0('SLsims',ves[ii],'.txt'))
+parmsMat[, length(nboot), propInTrial]
+for(ii in 1:length(pits)) {
+    parmsMatDo <- parmsMat[propInTrial==pits[ii]]
+    ## parmsMatDo <- parmsMat[vaccEff==ves[ii]]
+    sink(paste0('SLsims',pits[ii],'.txt'))
     for(ii in parmsMatDo$simNum) {
         cmd <- "R CMD BATCH '--no-restore --no-save --args"
         cmd <- addParm(cmd, parmsMatDo, ii)

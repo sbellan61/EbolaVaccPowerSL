@@ -5,7 +5,8 @@ library(RColorBrewer)
 ## Simulate SWCT vs RCT vs CRCT for SL
 sapply(c('simFuns.R','AnalysisFuns.R','CoxFxns.R','EndTrialFuns.R'), source)
 
-batchdirnm <- file.path('BigResults','SLSimsFPbump')
+thing <- 'SLSimsSW'
+batchdirnm <- file.path('BigResults',thing)
 fls <- list.files(batchdirnm, pattern='.Rdata', full.names = T)
 length(fls)
 
@@ -24,6 +25,7 @@ for(ii in 1:nbatch) {
     }
 }
 
+### CHECK STUFF HERE!!! CULD be roblem
 parmsDT <- rbindlist(parmsList)
 ## stopTrials <- merge(rbindlist(stopList), parmsDT, by = 'nbatch')
 finTrials <- merge(rbindlist(finList), parmsDT, by = c('nbatch'))
@@ -35,14 +37,14 @@ finTrials[mod=='bootCoxME' & !stopped, vaccGood := NA]
 finTrials[mod=='relabCoxME', stopped := p < .05]
 finTrials[mod=='relabCoxME' & stopped==T, vaccGood := p < .05 & mean > 0 ]
 finTrials[mod=='relabCoxME' & !stopped, vaccGood := NA]
-finTrials[is.na(stopped), stopped := F]
+finTrials[is.na(stopped), stopped := F] ## CAREFUL
 finTrials[is.na(vaccGood), stopped := F]
 finTrials$vaccBad <- finTrials[, !vaccGood]
 finTrials[is.na(vaccGood), vaccGood := F] ## fill in Falses for unstopped trials
 finTrials[is.na(vaccBad), vaccBad := F]
-save(finTrials, file=file.path('BigResults','SLSummFP.Rdata'))
+save(finTrials, file=file.path('BigResults', paste0(thing, '.Rdata')))
 
-load(file=file.path('BigResults','SLSummFP.Rdata'))
+load(file=file.path('BigResults',paste0(thing, '.Rdata')))
 
 powFin <- summarise(group_by(finTrials[sdLogIndiv==1], vaccEff, trial, propInTrial, ord, delayUnit, mod)
                     , nsim = length(stopped)
@@ -62,16 +64,9 @@ powFin[,trial:=factor(trial)]
 powFin <- powFin[!(mod=='GEEClusAR1' & trial %in% c('RCT','FRCT'))]
 pits <- powFin[,unique(propInTrial)]
 pits <- pits[order(pits)]
-save(powFin, file=file.path('BigResults','powFin.Rdata'))
+save(powFin, file=file.path('BigResults',paste0('powFin_',thing,'.Rdata'))
 
 ## to delete a range of jobs
 ## qdel echo `seq -f "%.0f" 2282389 2282404`
 
-batchdirnm <- file.path('BigResults','SLSimsFPbump','Routs')
-routs <- list.files(batchdirnm, pattern='.Rout', full.names = T)
-find.error <- function(fl, msg = 'Error') sum(grepl(msg, readLines(fl)))>0
-errs <- unlist(lapply(routs, find.error))
-rerr <- routs[errs]
-head(rerr)
-
-errs <- unlist(lapply(rerr, find.error), msg = 'Error in if (effMean > 0) pval <- 1 - pval')
+finTrials[is.na(p) & mod=='relabCoxME' ,c(2:4,6:9,12:13),with=F]
