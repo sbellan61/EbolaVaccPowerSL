@@ -85,7 +85,7 @@ pf <- data.table(powFin)
 
 pf <- pf[!(trial=='FRCT' & delayUnit==0) & !(ord=='TU' & delayUnit==0)] ## redundant
 
-save(pf, file=file.path('BigResults',paste0('powFin_',thing,'.Rdata')))
+save(pf, file=file.path('Results',paste0('powFin_',thing,'.Rdata')))
 
 ## to delete a range of jobs
 ## qdel echo `seq -f "%.0f" 2282389 2282404`

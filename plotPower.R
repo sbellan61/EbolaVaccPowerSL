@@ -6,9 +6,7 @@ library(RColorBrewer); library(data.table); library(ggplot2); library(dplyr); li
 
 thing <- 'SLSims5'
 load(file=file.path('Results',paste0('powFin_',thing,'.Rdata')))
-pf <- pF
-pf <- pf[!(trial=='FRCT' & delayUnit==0) & !(ord=='TU' & delayUnit==0)]
-pf[,vaccEff:=as.numeric(vaccEff)]
+
 pf[delayUnit==0, ord:='simultaneous instant']
 pf[vaccEff==.5 & trial=='RCT' & propInTrial==.03 & mod=='coxME']
 setnames(pf,c('ord','trial'),c('order','design'))
