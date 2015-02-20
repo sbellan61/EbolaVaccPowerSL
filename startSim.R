@@ -24,7 +24,7 @@ if(length(args)>0)  {## Then cycle through each element of the list and evaluate
 parmArgs <- subsArgs(as.list(environment()), makeParms)
 print(parmArgs)
 parms <- do.call(makeParms, parmArgs)
-saveFl <- file.path(batchdirnm, paste0(saveNm,formatC(simNum, width=6, flag="0"),'.Rdata'))
+saveFl <- file.path(batchdirnm, paste0(saveNm, sprintf("%06d", simNum),'.Rdata'))
 modsToDo <- list('CoxME','GLMclus','GLMFclus') ##,'GLMMclusBy') #'GLMMclusFr')
 
 system.time(sim <- simNtrials(seed=seed, parms=parms, N=nsims, flnm=saveFl, verbose = 1, verbFreq=10))
