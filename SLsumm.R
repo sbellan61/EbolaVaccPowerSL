@@ -82,7 +82,6 @@ front <- c('mod','vaccEff','stopped','stoppedNAR','vaccGood','vaccGoodNAR','cvr'
 'nsim','meanErr','propInTrial','vaccBad')
 setcolorder(powFin, c(front, setdiff(names(powFin), front)))
 pf <- data.table(powFin)
-
 pf <- pf[!(trial=='FRCT' & delayUnit==0) & !(ord=='TU' & delayUnit==0)] ## redundant
 
 save(pf, file=file.path('Results',paste0('powFin_',thing,'.Rdata')))
