@@ -79,7 +79,65 @@ graphics.off()
 thsb <- theme(axis.text.x = thax, axis.text.y = thax, plot.title = element_text(vjust=1),
           axis.title.y = element_text(vjust = 1), axis.title.x = element_text(vjust = -.5),
           axis.line = element_line(), axis.ticks = element_line(color='black'),
-          panel.margin = unit(1, "lines"), legend.key.height=unit(2,"line"))
+          panel.margin = unit(1, "lines"), legend.key.height=unit(2,"line")
+,legend.position = 'right'
+#              ,legend.justification=c(1,0), legend.position=c(1,0)
+)
+theme_set(theme_grey(base_size = 12))
+
+####################################################################################################
+## Figure 2 - Type I errors
+for(jj in 1:2) {
+thax <- element_text(colour = 'black', size = 8)
+subs <- pf[,design %in% c('SWT','RCT') & vaccEff==0 & mod %in% c('coxME','bootCoxME','relabCoxME')]
+subs <- subs & pf[,!(design=='RCT' & grepl('boot',mod))]
+p.tmp <- ggplot(pf[subs], 
+                aes(propInTrial, stoppedNAR, colour=design, linetype=order)) + thsb +
+    scale_x_continuous(labels = percent, limits=c(.03,.1), minor_breaks=NULL, breaks = c(.03,.05,.1)) +  
+    xlab('% of district-level cases in trial population') + ylab('Type I Error Rate') + 
+    scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
+    geom_hline(yintercept=.05, color='dark gray', size = 1) +
+    geom_line(size=1) + facet_wrap(~model, scales = "free_y")
+if(jj==1) p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,.15))
+if(jj==2) p.tmp <- p.tmp + scale_y_log10(labels = formatC, breaks = c(.01, .025, .05, .1, .25), limits = c(.01,.25), minor_breaks=NULL) 
+ggsave(paste0('Figures/Fig 2A -',labs[jj],'Type I SL.png'), p.tmp, w = 8.5, h = 3.5)
+}
+
+
+####################################################################################################
+## Figure 2B - Type I errors
+for(jj in 1:2) {
+thax <- element_text(colour = 'black', size = 8)
+subs <- pf[,design %in% c('SWT','RCT') & vaccEff==0 & mod %in% c('coxME','bootCoxME','relabCoxME')]
+subs <- subs & pf[,!(design=='RCT' & grepl('boot',mod))]
+p.tmp <- ggplot(pf[subs], 
+                aes(propInTrial, stoppedNAR, colour=model, linetype=order)) + thsb +
+    scale_x_continuous(labels = percent, limits=c(.03,.1), minor_breaks=NULL, breaks = c(.03,.05,.1)) +  
+    xlab('% of district-level cases in trial population') + ylab('Type I Error Rate') + 
+    scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
+    geom_hline(yintercept=.05, color='dark gray', size = 1) +
+    geom_line(size=1) + facet_wrap(~design, scales = "free_y")
+if(jj==1) p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,.15))
+if(jj==2) p.tmp <- p.tmp + scale_y_log10(labels = formatC, breaks = c(.01, .025, .05, .1, .25), limits = c(.01,.25), minor_breaks=NULL) 
+ggsave(paste0('Figures/Fig 2B -',labs[jj],'Type I SL.png'), p.tmp, w = 6.5, h = 3.5)
+}
+
+####################################################################################################
+## Figure 4 - Power
+subs <- pf[, (design == 'SWT' & mod=='relabCoxME') | (design %in% c('RCT','FRCT') & mod =='coxME')]
+for(jj in 1:2) {
+        thax <- element_text(colour = 'black', size = 8)
+        p.tmp <- ggplot(pf[subs], aes(vaccEff, vaccGoodNAR, colour=design, linetype=order)) + thsb +
+            scale_x_continuous(labels = formatC, limits=c(.5,.9),  breaks = pf[,unique(vaccEff)], minor_breaks=NULL) +  
+                          xlab('vaccine efficacy') + ylab('power to detect effective vaccine') + 
+                              scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
+                                  geom_line(size=1) + facet_wrap(~pit, scales = "free_y") + 
+                                      ggtitle('expected % of district-level cases in trial population')
+        if(jj==1) p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,1), breaks=seq(0,1,by=.1), minor_breaks = NULL) #seq(0,1,.05))
+        if(jj==2) p.tmp <- p.tmp + scale_y_log10(labels = formatC, limits=c(0.01,.9), breaks = c(.01,.025,.05,.1,.2,.5,.8))
+ggsave(paste0('Figures/Fig 4 -',labs[jj],'Power SL.png'), p.tmp, w = 8, h = 4)
+}
+
 
 ##################################################
 ## Cases
@@ -112,37 +170,5 @@ p.tmp <- p.tmp + scale_y_continuous(labels = formatC) #
 print(p.tmp)
 ggsave(paste0('Figures/numSims SL ALL.png'), p.tmp, w = 8, h = 3.5)
 
-####################################################################################################
-## Figure 2 - Type I errors
-for(jj in 1:2) {
-thax <- element_text(colour = 'black', size = 8)
-subs <- pf[,design %in% c('SWT','RCT') & vaccEff==0 & mod %in% c('coxME','bootCoxME','relabCoxME')]
-subs <- subs & pf[,!(design=='RCT' & grepl('boot',mod))]
-p.tmp <- ggplot(pf[subs], 
-                aes(propInTrial, stoppedNAR, colour=model, linetype=order)) + thsb +
-    scale_x_continuous(labels = percent, limits=c(.03,.1), minor_breaks=NULL, breaks = c(.03,.05,.1)) +  
-    xlab('% of district-level cases in trial population') + ylab('Type I Error Rate') + 
-    scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
-    geom_hline(yintercept=.05, color='dark gray', size = 1) +
-    geom_line(size=1) + facet_wrap(~design, scales = "free_y")
-if(jj==1) p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,.15))
-if(jj==2) p.tmp <- p.tmp + scale_y_log10(labels = formatC, breaks = c(.01, .025, .05, .1, .25), limits = c(.01,.25), minor_breaks=NULL) 
-ggsave(paste0('Figures/Fig 2 -',labs[jj],'Type I SL.png'), p.tmp, w = 6.5, h = 3.5)
-}
-
-####################################################################################################
-## Figure 4 - Power
-subs <- pf[, (design == 'SWT' & mod=='relabCoxME') | (design %in% c('RCT','FRCT') & mod =='coxME')]
-for(jj in 1:2) {
-        thax <- element_text(colour = 'black', size = 8)
-        p.tmp <- ggplot(pf[subs], aes(vaccEff, vaccGoodNAR, colour=design, linetype=order)) + thsb +
-            scale_x_continuous(labels = formatC, limits=c(.5,.9),  breaks = pf[,unique(vaccEff)], minor_breaks=NULL) +  
-                          xlab('vaccine efficacy') + ylab('probability of rejecting null\n that vaccine is ineffective') + 
-                              scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
-                                  geom_line(size=1) + facet_wrap(~pit, scales = "free_y") + 
-                                      ggtitle('power by expected % of district-level cases in trial population') +
-                                          geom_hline(yintercept=.025, color='black', linetype='dotted')
-        if(jj==1) p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,1), minor_breaks = seq(0,1,.05))
-        if(jj==2) p.tmp <- p.tmp + scale_y_log10(labels = formatC, limits=c(0.01,.9), breaks = c(.01,.025,.05,.1,.2,.5,.8))
-ggsave(paste0('Figures/Fig 4 -',labs[jj],'Power SL.png'), p.tmp, w = 8, h = 4)
-}
+subs <- pf[,vaccEff==0 & (delayUnit==0 | (trial=='SWCT')) & mod =='coxME']
+pf[subs, list(caseTot,caseC,caseV,pit,trial,delayUnit,vaccEff)]
