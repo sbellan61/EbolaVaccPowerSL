@@ -85,7 +85,7 @@ doProj <- function(src, forecast_date = tail(src$Date,1), censor_interval = 0, i
                 moreDays=moreDays, beforeDays=beforeDays, include_interval=include_interval, model = model))
 }
 
-forecast <- function(fit, main=NULL, nbsize = .9, doPlot = T) with(fit, {
+forecast <- function(fit, main=NULL, nbsize = .9, doPlot = T, xlim = NULL) with(fit, {
     ##    browser()
     startX <- startDate - beforeDays
     endX <- endDate + moreDays    
@@ -93,14 +93,16 @@ forecast <- function(fit, main=NULL, nbsize = .9, doPlot = T) with(fit, {
     src <- merge(src, srcProj, by = 'Date', all=T)
     src[, reg := reg[1]]
     src$proj <- src[, rnbinom(length(fit), mu = fit, size  = nbsize)]
+    if(is.null(xlim)) xlim <- c(startX,endX)
     if(doPlot) {
-        src[Date < endDate & Date > startX, plot(Date, cases, type = 'h', bty = 'n', las = 2, xaxt = 'n', xlim=c(startX,endX), xlab = '', lwd = 3)]
+        src[Date < endDate & Date > startX, plot(Date, cases, type = 'h', bty = 'n', las = 2, xaxt = 'n', xlim=xlim, xlab = '', lwd = 3)]
         axis.Date(1, at = seq.Date(startX, endX, by = 7), labels = F)
         axis.Date(1, at = seq.Date(startX, endX, by = 14), format = '%b-%d', las = 2)    
         rect(startDate, 0, endDate, par('usr')[4], col = rgb(0,.5,0,.3), border=NA)
         title(main)
+browser()
         src[Date > endDate, lines(Date, proj, type = 'h', lwd = 3, col = 'red')]
-        src[, lines(Date, fit, lty = 1, col = 'dodger blue', lwd = 2)]
+        src[Date > startDate, lines(Date, fit, lty = 1, col = 'dodger blue', lwd = 2)]
         rect(endDate, 0, endDate + moreDays, par('usr')[4], col = rgb(0.5,0,0,.3), border=NA)
         text(startDate+include_interval/2, par('usr')[4], 'fitting\n window', pos=1)
         text(endDate+moreDays/2, par('usr')[4], 'forecasting \nwindow', pos=1)

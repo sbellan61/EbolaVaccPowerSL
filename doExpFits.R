@@ -8,7 +8,7 @@ source('ExpFit.R'); require(data.table)
 ## allSL <- sl[,list(cases=sum(cases,na.rm=T)),Date]
 ## allSL <- allSL[,list(Date,cases)]
 
-regs <- levels(sl$reg); sl <- data.table(sl) ## some issue w/ what's stored in cleanSLData, perhaps?
+regs <- levels(sl$reg)
 
 ## Fit to current incidence trends
 include_interval <- 60 ## how many days back to include in exponential decay fit
@@ -22,7 +22,8 @@ nbsize <- .8
 par(lwd=1, 'ps' = 12, mar = c(5,3,1.5,.5),mfrow = c(4,4))
 regs <- sl[,unique(reg)]
 srcs <- NULL
-for(rr in regs) srcs[[rr]] <- forecast(fits[[rr]], main = rr, nbsize = nbsize)
+xlim <- as.Date(c('2014-09-15','2015-05-01'))
+for(rr in regs) srcs[[rr]] <- forecast(fits[[rr]], main = rr, nbsize = nbsize, xlim = xlim)
 graphics.off()
 srcProj <- rbindlist(srcs)
 
