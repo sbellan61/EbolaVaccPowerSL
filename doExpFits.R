@@ -16,6 +16,8 @@ minCases <- 30 ## if smaller than this then fit back to peak in subnational unit
 fits <- NULL
 for(rr in regs) fits[[rr]] <- doProj(sl[reg==rr], include_interval = include_interval, minCases = minCases)
 
+# sapply(fits, function(rr) rr$fit$par["nbsize"])
+
 ## Show fits and one simulated projection by subregion
 pdf('Figures/forecasted Paneled SL cleaned subnational data fromMax.pdf',  w = 10, h = 8)
 nbsize <- .8
