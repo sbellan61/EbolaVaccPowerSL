@@ -7,8 +7,8 @@ load(file='data/cleanSLData.Rdata')
 ## weird - what's going on w/ logit transform here?  understand we want to let fitting algo
 ## explore -/+ inf, but are only interested in decay rates on 0, +inf.  That's not what's actually
 ## happening w/ logit however
-param.xform <- function(x) c(x['rate_0'], decay_rate = as.numeric(inv.logit(x['logitdecay_rate'])))
-param.xform(c(rate_0=30, logitdecay_rate=logit(0.01)))
+param.xform <- function(x) c(x['rate_0'], decay_rate = as.numeric(exp(x['logdecay_rate'])), nbsize = as.numeric(exp(x['lognbsize'])))
+param.xform(c(rate_0=30, logdecay_rate=log(0.01), lognbsize=log(0.9)))
 
 ## analysis functions
 llgenerator <- function(ratefun, logprobfun) return(
@@ -27,7 +27,7 @@ pois_cases <- function(params, rates, cases) {
     return(out)
 }
 nbinom_cases <- function(params, rates, cases) {
-  out <- dnbinom(cases, size=.9, mu=rates, log=TRUE)
+  out <- dnbinom(cases, size=params["nbsize"], mu=rates, log=TRUE)
   trates <<- rates
   ## print(out)
   return(out)
@@ -52,14 +52,14 @@ expcurve <- function(optimresults, date_zero, params.xform = function(x) x) with
     })
 })
 
-params <- function(src, censor_interval, include_interval, param.guess = c(rate_0=30, logitdecay_rate=logit(0.01)), browse = F, ll = exp_nbinom_ll) {
+params <- function(src, censor_interval, include_interval, param.guess = c(rate_0=30, logdecay_rate=log(0.01), lognbsize=log(0.9)), browse = F, ll = exp_nbinom_ll) {
     if(browse) browser()
     end_date <- max(src$Date) - censor_interval
     start_date <- end_date - include_interval
     slice <- src[(start_date <= src$Date) & (src$Date <= end_date),] ## data.table doesn't work with shiny for some reason?
     slice$t <- as.numeric(slice$Date - min(slice$Date))
     if(sum(slice$int>1)>0) print('not always daily incidence')
-    res <- optim(param.guess, ll, gr=NULL, cases = slice$cases, times = slice$t, control=list(fnscale=-1, parscale=c(1,1/10)), hessian=TRUE)
+    res <- optim(param.guess, ll, gr=NULL, cases = slice$cases, times = slice$t, control=list(fnscale=-1, parscale=c(1,1/10,1/10)), hessian=TRUE)
     vcmat <- solve(-res$hessian)
     res$par <- param.xform(res$par)
     cis <- with(res,{
