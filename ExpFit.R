@@ -76,7 +76,7 @@ doProj <- function(src, forecast_date = tail(src$Date,1), censor_interval = 0, i
     # startX <- startDate - beforeDays
     ## minimum cases in last interval to fit exponential, otherwise increase to max # cases
     fromMax <- T #ifelse(src[Date > max(Date)-include_interval, sum(cases)] < minCases, T, F)
-    if(fromMax) startDate <- src[which.max(cases), Date]
+    if(fromMax) startDate <- src[length(cases) + 1 - which.max(rev(cases)), Date]
     include_interval <- endDate-startDate
     fit_ref <- params(src, censor_interval, include_interval, ll = ll)
     fit_ref$par['decay_rate'] <- max(fit_ref$par['decay_rate'], minDecayRate)
