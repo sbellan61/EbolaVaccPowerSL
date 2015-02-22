@@ -16,13 +16,14 @@ regs <- levels(sl$reg)
 include_interval <- 60 ## how many days back to include in exponential decay fit
 minCases <- 30 ## if smaller than this then fit back to peak in subnational unit
 fits <- NULL
-for(rr in regs) fits[[rr]] <- doProj(sl[reg==rr], include_interval = include_interval, minCases = minCases, ll='exp_pois_ll', verbose=19)
+for(rr in regs) fits[[rr]] <- doProj(sl[reg==rr], include_interval = include_interval, minCases = minCases, ll='exp_nbinom_ll', verbose=19)
 
 # sapply(fits, function(rr) rr$fit$par["nbsize"])
 
 ## Show fits and one simulated projection by subregion
-pdf('Figures/forecasted Paneled SL cleaned subnational data fromMax.pdf',  w = 10, h = 8)
-nbsize <- .8
+##pdf('Figures/forecasted Paneled SL cleaned subnational data fromMax.pdf',  w = 10, h = 8)
+jpeg('Figures/forecasted Paneled SL cleaned subnational data fromMax.jpg',  w = 10, h = 8, units='in',res=200)
+nbsize <- 1.2 ## NULL
 par(lwd=1, 'ps' = 12, mar = c(5,3,1.5,.5),mfrow = c(4,4))
 regs <- sl[,unique(reg)]
 srcs <- NULL

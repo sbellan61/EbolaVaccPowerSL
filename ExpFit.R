@@ -11,8 +11,9 @@ param.xform <- function(x) c(x['rate_0'], decay_rate = as.numeric(exp(x['logdeca
 param.xform(c(rate_0=30, logdecay_rate=log(0.01), lognbsize=log(01.2)))
 
 ## analysis functions
-llgenerator <- function(ratefun, logprobfun) return(
+llgenerator <- function(ratefun, logprobfun, verbose=0) return(
     function(params, cases, times) {
+        if(verbose>24) browser()
         ps <- param.xform(params)
         ll <- sum(logprobfun(ps, ratefun(ps, times), cases))
         return(ll)
@@ -20,13 +21,15 @@ llgenerator <- function(ratefun, logprobfun) return(
     )
 exp_decay <- function(params, times) params["rate_0"]*exp(-params["decay_rate"]*times)
 
-pois_cases <- function(params, rates, cases) {
+pois_cases <- function(params, rates, cases, verbose=0) {
+    if(verbose>25) browser()
     out <- dpois(cases, lambda=rates, log=TRUE)
     trates <<- rates
     ## print(out)
     return(out)
 }
-nbinom_cases <- function(params, rates, cases) {
+nbinom_cases <- function(params, rates, cases, verbose=0) {
+    if(verbose>25) browser()
     out <- dnbinom(cases, size=params["nbsize"], mu=rates, log=TRUE)
     trates <<- rates
     ## print(out)
@@ -61,10 +64,13 @@ params <- function(src, censor_interval, include_interval,
     slice <- src[(start_date <= src$Date) & (src$Date <= end_date),] ## data.table doesn't work with shiny for some reason?
     slice$t <- as.numeric(slice$Date - min(slice$Date))
     if(sum(slice$int>1)>0) print('not always daily incidence')
-    if(ll=='exp_nbinom_ll') parscale=c(1,1/10,1/10)
     if(ll=='exp_pois_ll') parscale=c(1,1/10)
-    ll <- get(ll)
-    res <- optim(param.guess, ll, gr=NULL, cases = slice$cases, times = slice$t, control=list(fnscale=-1, parscale=parscale), hessian=TRUE)
+    if(ll=='exp_nbinom_ll') {
+        parscale=c(1,1/10,1/10)
+        param.guess <- c(rate_0=30, logdecay_rate=log(0.01), lognbsize = lognbsize)
+    }
+    llfxn <- get(ll)
+    res <- optim(param.guess, llfxn, gr=NULL, cases = slice$cases, times = slice$t, control=list(fnscale=-1, parscale=parscale), hessian=TRUE)
     vcmat <- solve(-res$hessian)
     res$par <- param.xform(res$par)
     cis <- with(res,{
@@ -75,7 +81,7 @@ params <- function(src, censor_interval, include_interval,
 }
 
 doProj <- function(src, forecast_date = as.Date('2015-12-31'), censor_interval = 0, include_interval = 30, minCases = 15, 
-                   beforeDays = 30, moreDays = 90, minDecayRate = .01, ll = exp_nbinom_ll, model = expcurve,
+                   beforeDays = 30, moreDays = 90, minDecayRate = .01, ll = 'exp_nbinom_ll', model = expcurve,
                    verbose=0) {
     if(verbose>20) browser()
     endDate <- max(src$Date) - censor_interval
@@ -83,7 +89,7 @@ doProj <- function(src, forecast_date = as.Date('2015-12-31'), censor_interval =
     fromMax <- T
     if(fromMax) startDate <- src[length(cases) + 1 - which.max(rev(cases)), Date]
     include_interval <- endDate-startDate
-    fit_ref <- params(src, censor_interval, include_interval, ll = ll)
+    fit_ref <- params(src, censor_interval, include_interval, ll = ll, verbose=verbose)
     fit_ref$par['decay_rate'] <- max(fit_ref$par['decay_rate'], minDecayRate)
     srcProj <- data.table(Date = seq(min(src$Date), forecast_date, by='day'))
     maxDataDate <- max(src$Date)
@@ -91,12 +97,12 @@ doProj <- function(src, forecast_date = as.Date('2015-12-31'), censor_interval =
     src[Date < maxDataDate & is.na(cases), cases:=0] ## fill in dates with missing values for plotting
     src[, reg := reg[1]]
     src$days <- as.numeric(src$Date)
-    src$fit <- model(fit_ref, date_zero = src$days[1])(src$days)
+    src$fit <- model(fit_ref, date_zero = src[Date==startDate, days])(src$days)
     return(list(fit = fit_ref, src = src[,list(Date,reg, cases,fit)], startDate = startDate, endDate = endDate,
                 moreDays=moreDays, beforeDays=beforeDays, include_interval=include_interval, model = model))
 }
 
-forecast <- function(fit, main=NULL, nbsize = 1.2, doPlot = T, xlim = NULL, verbose=0) with(fit, {
+forecast <- function(fit, main=NULL, nbsize = NULL, doPlot = T, xlim = NULL, verbose=0) with(fit, {
     if(verbose>20) browser()
     if(!is.null(xlim)) {
         startX <- xlim[1]
@@ -106,11 +112,15 @@ forecast <- function(fit, main=NULL, nbsize = 1.2, doPlot = T, xlim = NULL, verb
         endX <- endDate + moreDays    
         xlim <- c(startX, endX)
     }
+    if(is.null(nbsize)) nbsize <- fit$par$nbsize ## if not specified in arguments
     src$proj <- src[, rnbinom(length(fit), mu = fit, size  = nbsize)]
     if(doPlot) {
         src[Date < endDate & Date > startX, plot(Date, cases, type = 'h', bty = 'n', las = 2, xaxt = 'n', xlim=xlim, xlab = '', lwd = 3)]
-        axis.Date(1, at = seq.Date(startX, endX, by = 7), labels = F)
-        axis.Date(1, at = seq.Date(startX, endX, by = 14), format = '%b-%d', las = 2)    
+        rgDates <- seq.Date(startX, endX, by = 1)
+        seqDates <- rgDates[format(rgDates, '%d') %in% c('01')]
+        seqDatesTk <- rgDates[format(rgDates, '%d') %in% c('01','15')]
+        axis.Date(1, at = seqDatesTk, labels = F)
+        axis.Date(1, at = seqDates, format = '%b-%d', las = 2)    
         rect(startDate, 0, endDate, par('usr')[4], col = rgb(0,.5,0,.3), border=NA)
         title(main)
         src[Date > endDate, lines(Date, proj, type = 'h', lwd = 3, col = 'red')]
