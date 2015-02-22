@@ -6,8 +6,7 @@ monthToDays <- 1/30
 trialTypes <- c('RCT','FRCT','SWCT','CRCT')
 makeParms <- function(
     trial='RCT'
-    , trialStartDate = 0 ## days since Feb 1, 2015
-    
+    , trialStartDate = '2015-02-01' ## converted to date below    
     , numClus=20, clusSize=300
     , delayUnit = 7 ## logistically imposed interval in between each new cluster receiving vaccination
     , ord = 'none' ## order clusters' receipt of vaccination ('none', by baseline visit 'BL', by time-updated 'TU' last interval incidence)
@@ -29,11 +28,13 @@ makeParms <- function(
     , instVaccDelay = 7 ## delay til instant vacc of everyone after trial ends in trials where delayUnit=0 otherwise
     , small=F ## do a small trial for illustration
     , nboot = 200 ## bootstrap samples
+    , verbose = 0
     ){
     if(small) {
         numClus <- 4
         clusSize <- 4
     }
+    trialStartDate <- as.Date(trialStartDate)
     if(maxInfectDay < delayUnit*numClus) stop('maxInfectDay too short. Need enough time to rollout vaccines to all clusters')
     if(trial=='FRCT') delayUnit <- delayUnit/2 ## rolling out vaccines as quickly as you would if you were vaccinating whole clusters
     return(as.list(environment()))
@@ -50,11 +51,12 @@ makePop <- function(parms=makeParms()) within(parms, {
 
 ## Set cluster- and individual-level hazards, with cluster means changing over time and individual
 ## RR around cluster mean constant
-setHazs <- function(parms=makePop(), verbose=0) within(parms, {
+setHazs <- function(parms=makePop()) within(parms, {
     if(verbose>10) browser()
     daySeq <- seq(-hazIntUnit*ceiling(reordLag/hazIntUnit),maxInfectDay,by=hazIntUnit)
     if(hazSL) {
-        hazT <- data.table(createHazTraj(fits, nbsize = nbsize, propInTrial = propInTrial, 
+        hazT <- data.table(createHazTraj(fits, trialStartDate = trialStartDate,
+                                         nbsize = nbsize, propInTrial = propInTrial, verbose=verbose,
                                          clusSize = clusSize, numClus = numClus, weeks = T))
         hazT <- hazT[day %in% daySeq]
         hazT[clusHaz==0, clusHaz := 10^-8] ## to stablize things
@@ -94,9 +96,9 @@ reParmRgamma <- function(n, mean, cv) {
     }
 }
 
-reordPop <- function(parms, verbose=0) { ## wrapper around other functions below
+reordPop <- function(parms) { ## wrapper around other functions below
     reordFXN <- get(paste0('reord',parms$trial))
-    parms <- reordFXN(parms, verbose=verbose)
+    parms <- reordFXN(parms)
     within(parms, { ## return parms
         if(verbose>10) browser()
         popH[, cluster:=clusIncRank[popH[, cluster]]]
@@ -112,7 +114,7 @@ reordPop <- function(parms, verbose=0) { ## wrapper around other functions below
     })
 }
 
-reordSWCT <- reordFRCT <- reordRCT <- function(parms, verbose=0) within(parms, {
+reordSWCT <- reordFRCT <- reordRCT <- function(parms) within(parms, {
     if(verbose>10) browser()
     if(ord=='none') { ## should already be random but do it agan for good measure (debugging randomziation)
         clusIncRank <- sample(1:numClus, numClus, replace = F)
@@ -134,7 +136,7 @@ reordSWCT <- reordFRCT <- reordRCT <- function(parms, verbose=0) within(parms, {
     }
 })
 
-reordCRCT <- function(parms, verbose=0) within(parms, {
+reordCRCT <- function(parms) within(parms, {
     if(verbose>10) browser()
     if(ord=='none') { ## should already be random but do it agan for good measure (debugging randomziation)
         clusIncRank <- sample(1:numClus, numClus, replace = F)
@@ -196,16 +198,15 @@ setCRCTvaccDays <- function(parms) within(parms, {
 ## p1 <- setVaccDays(p1)
 ## p1$popH[idByClus==1,list(cluster,clusHaz, day,vacc,immune)]
 setImmuneDays <- function(parms) within(parms, {
-        popH$immuneDay <- popH[,vaccDay] + immunoDelay ## vaccine refractory period
-        popH$vacc <- popH[, day>=vaccDay]
-        popH$immune <- popH[, day>=immuneDay]
-        ## reset pop to refrence data table after reordering and then assignment of vaccday stuff
-        pop <- select(popH[day==0], indiv, cluster, pair, idByClus, indivRR, vaccDay, immuneDay) 
-    })
+    popH$immuneDay <- popH[,vaccDay] + immunoDelay ## vaccine refractory period
+    popH$vacc <- popH[, day>=vaccDay]
+    popH$immune <- popH[, day>=immuneDay]
+    ## reset pop to refrence data table after reordering and then assignment of vaccday stuff
+    pop <- select(popH[day==0], indiv, cluster, pair, idByClus, indivRR, vaccDay, immuneDay) 
+})
 
 ## Simulate infections. Takes popH for initial simulation, or EVpopH for end trial vaccination version (requires startInf)
-simInfection <- function(parms, whichDo='pop', startInfectingDay = 0, ## startInf can be set to endTrialDay
-                         verbose=0) 
+simInfection <- function(parms, whichDo='pop', startInfectingDay = 0) ## startInf can be set to endTrialDay
     within(parms, { 
         if(verbose>10) browser()
         tmp <- get(whichDo)
@@ -236,8 +237,7 @@ simInfection <- function(parms, whichDo='pop', startInfectingDay = 0, ## startIn
 ## head(p1$pop[infectDay!=Inf, list(cluster, immuneDay, infectDay)],100)
 
 ## simulate whole trial and return with all parameters used
-simTrial <- function(parms=makeParms(), verbose=0) {
-    if(verbose>10) browser()
+simTrial <- function(parms=makeParms()) {
     parms <- makePop(parms) ## make population
     parms <- setHazs(parms) ## set hazards
     parms <- reordPop(parms) ## reorder vaccination sequence by incidence (if applicable)

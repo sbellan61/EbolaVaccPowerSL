@@ -132,12 +132,14 @@ forecast <- function(fit, main=NULL, nbsize = NULL, doPlot = T, xlim = NULL, ver
     return(src)
 })
 
-createHazTraj <- function(fits, nbsize = .8, propInTrial = .03, numClus = 20, clusSize = 300, weeks = T) {
+createHazTraj <- function(fits, nbsize = 1.2, trialStartDate = as.Date('2015-02-01'), xlim = as.Date(c('2014-09-15','2015-12-01')),
+                          propInTrial = .03, numClus = 20, clusSize = 300, weeks = T, verbose=0) {
     hazTList <- NULL
+    if(verbose>20) browser()
     for(cc in 1:numClus) {
         fit <- fits[[sample(regs, 1)]]
-        src <- forecast(fit, doPlot = F)
-        src$day <- src[, as.numeric(Date - Sys.Date())]
+        src <- forecast(fit, doPlot = F, nbsize = nbsize, xlim = xlim, verbose=verbose)
+        src$day <- src[, as.numeric(Date - trialStartDate)]
         lastDataDay <- src[max(which(!is.na(src$cases))), day]
         src[day < lastDataDay & is.na(cases), cases := 0] ## fill in over interval without reporting
         src$haz <- src$cases

@@ -25,7 +25,7 @@ makeSurvDat <- function(parms,  whichDo='pop', browse=F) within(parms, {
 }) ## careful with modifying parms, st depends on analysis a bit too (immunoDelayThink), so we can have different st for same popH
 
 ## Restructure for GEE/GLMM with weekly observations of each cluster.
-makeGEEDat <- function(parms, whichDo='popH', verbose=0) within(parms, {
+makeGEEDat <- function(parms, whichDo='popH') within(parms, {
     if(verbose ==1.5) browser()
     popHTmp <- get(whichDo)
     popHTmp$immuneDayThink <- popHTmp[,vaccDay] + immunoDelayThink ## vaccine refractory period ASSUMED in analysis
@@ -72,7 +72,7 @@ activeFXN <- function(parms, whichDo='st', browse=F) within(parms, {
 ## s1$st[idByClus%in%1:2, list(indiv, cluster, pair, idByClus,immuneDayThink, startDay,endDay)]
 
 ## Take a survival data from above function and censor it by a specified time in months
-censSurvDat <- function(parms, censorDay = parms$maxInfectDay+parms$hazIntUnit, whichDo = 'stActive', verbose=0) with(parms, {
+censSurvDat <- function(parms, censorDay = parms$maxInfectDay+parms$hazIntUnit, whichDo = 'stActive') with(parms, {
     if(verbose==2.7) browser()
     stTmp <- copy(get(whichDo))
     intervalNotStarted <- stTmp[,startDay] > censorDay
@@ -92,13 +92,13 @@ summTrial <- function(st) list(summarise(group_by(st, cluster), sum(infected))
 
 ## Check whether stopping point has been reached at intervals
 seqStop <- function(parms, start = parms$immunoDelayThink + 14, checkIncrement = 7, minCases = 15,
-                    verbose = 0, fullSeq = F, maxDay = parms$maxInfectDay) {
+                    fullSeq = F, maxDay = parms$maxInfectDay) {
     trialOngoing <- T
     checkDay <- start
     first <- T
     while(trialOngoing) {
-        if(verbose>1) browser()
-        if(verbose>0) print(checkDay)
+        if(parms$verbose>1) browser()
+        if(parms$verbose>0) print(checkDay)
         tmp <- censSurvDat(parms, checkDay)
         vaccEffEst <- try(doCoxPH(tmp), silent=T) ## converting midDay to days from months
         ## if cox model has enough info to converge check for stopping criteria
@@ -141,25 +141,25 @@ compileStopInfo <- function(minDay, tmp, verbose=0) {
     return(out)
 }
 
-getEndResults <- function(parms, bump = T, verbose = 0) {
+getEndResults <- function(parms, bump = T) {
     if(!testZeros(parms)) {
         parmsE <- parms
         parmsE$bump <- F
     }else{
-        parmsE <- infBump(parms, verbose=verbose)
+        parmsE <- infBump(parms)
         parmsE$bump <- T
     }
-    tmpCSDE <- tmpCSD <- censSurvDat(parms, verbose=verbose)
-    if(testZeros(parms))  tmpCSDE <- censSurvDat(parmsE, verbose=verbose)
+    tmpCSDE <- tmpCSD <- censSurvDat(parms)
+    if(testZeros(parms))  tmpCSDE <- censSurvDat(parmsE)
     within(parmsE, {
         if(verbose==2.9) browser()
-        vaccEE_ME <- doCoxME(parmsE, tmpCSDE, bump = bump, verbose=verbose)
-        ## vaccEE_GEEclusAR1 <- doGEEclusAR1(clusDat, csd=tmpCSDE, bump = bump, verbose = verbose)
-        ## vaccEE_GLMMclus <- doGLMMclus(parmsE,, csd=tmpCSDE, bump = bump, verbose = verbose)
-        vaccEE_GLMclus <- doGLMclus(parmsE, csd=tmpCSDE, bump = bump, verbose = verbose)
-        vaccEE_GLMFclus <- doGLMFclus(parmsE, csd=tmpCSDE, bump = bump, verbose = verbose)
-        vaccEE_MErelab <- doRelabel(parms, csd=tmpCSD, bump=F, nboot=nboot, verbFreqRelab=10, verbose = verbose)
-        vaccEE_MEboot <- doBoot(parms, csd=tmpCSD, bump=F, nboot=nboot, verbFreqBoot=10, verbose = verbose)
+        vaccEE_ME <- doCoxME(parmsE, tmpCSDE, bump = bump)
+        ## vaccEE_GEEclusAR1 <- doGEEclusAR1(clusDat, csd=tmpCSDE, bump = bump)
+        ## vaccEE_GLMMclus <- doGLMMclus(parmsE,, csd=tmpCSDE, bump = bump)
+        vaccEE_GLMclus <- doGLMclus(parmsE, csd=tmpCSDE, bump = bump)
+        vaccEE_GLMFclus <- doGLMFclus(parmsE, csd=tmpCSDE, bump = bump)
+        vaccEE_MErelab <- doRelabel(parms, csd=tmpCSD, bump=F, nboot=nboot, verbFreqRelab=10)
+        vaccEE_MEboot <- doBoot(parms, csd=tmpCSD, bump=F, nboot=nboot, verbFreqBoot=10)
         vEEs <- list(vaccEE_ME
                      ## , vaccEE_GLMMclus
                      , vaccEE_GLMclus
@@ -192,15 +192,15 @@ simNtrials <- function(seed = 1, parms=makeParms(), N = 2, returnAll = F,
         if(verbose==2) browser()
         res <- simTrial(parms)
         res <- makeSurvDat(res)
-        res <- makeGEEDat(res, verbose=verbose)
+        res <- makeGEEDat(res)
         res <- activeFXN(res)
-        res <- getEndResults(res, verbose=verbose)
+        res <- getEndResults(res)
         finTmp <- data.frame(sim = ss, res$finMods)
         finMods <- rbind(finMods, finTmp)
         finITmp <- data.frame(sim = ss, res$finInfo)
         finInfo <- rbind(finInfo, finITmp)
         if(doSeqStops) {
-            res <- seqStop(res, verbose = 3)
+            res <- seqStop(res)
             ## if(showSeqStops) {
             ##     resfull <- seqStop(res, fullSeq = T)
             ##     showSeqStop(resfull)
