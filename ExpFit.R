@@ -4,6 +4,9 @@
 library(boot); library(ggplot2)
 load(file='data/cleanSLData.Rdata')
 
+## weird - what's going on w/ logit transform here?  understand we want to let fitting algo
+## explore -/+ inf, but are only interested in decay rates on 0, +inf.  That's not what's actually
+## happening w/ logit however
 param.xform <- function(x) c(x['rate_0'], decay_rate = as.numeric(inv.logit(x['logitdecay_rate'])))
 param.xform(c(rate_0=30, logitdecay_rate=logit(0.01)))
 
@@ -23,7 +26,14 @@ pois_cases <- function(params, rates, cases) {
     ## print(out)
     return(out)
 }
+nbinom_cases <- function(params, rates, cases) {
+  out <- dnbinom(cases, size=.9, mu=rates, log=TRUE)
+  trates <<- rates
+  ## print(out)
+  return(out)
+}
 exp_pois_ll <- llgenerator(exp_decay, pois_cases)
+exp_nbinom_ll <- llgenerator(exp_decay, nbinom_cases)
 
 mod_exp_decay <- function(params, times) params["rate_0"]*exp(- (params["decay_rate"]*times)^params["shape_parameter"])
 mod_exp_pois_ll <- llgenerator(mod_exp_decay, pois_cases)
@@ -42,14 +52,14 @@ expcurve <- function(optimresults, date_zero, params.xform = function(x) x) with
     })
 })
 
-params <- function(src, censor_interval, include_interval, param.guess = c(rate_0=30, logitdecay_rate=logit(0.01)), browse = F) {
+params <- function(src, censor_interval, include_interval, param.guess = c(rate_0=30, logitdecay_rate=logit(0.01)), browse = F, ll = exp_nbinom_ll) {
     if(browse) browser()
     end_date <- max(src$Date) - censor_interval
     start_date <- end_date - include_interval
     slice <- src[(start_date <= src$Date) & (src$Date <= end_date),] ## data.table doesn't work with shiny for some reason?
     slice$t <- as.numeric(slice$Date - min(slice$Date))
     if(sum(slice$int>1)>0) print('not always daily incidence')
-    res <- optim(param.guess, exp_pois_ll, gr=NULL, cases = slice$cases, times = slice$t, control=list(fnscale=-1, parscale=c(1,1/10)), hessian=TRUE)
+    res <- optim(param.guess, ll, gr=NULL, cases = slice$cases, times = slice$t, control=list(fnscale=-1, parscale=c(1,1/10)), hessian=TRUE)
     vcmat <- solve(-res$hessian)
     res$par <- param.xform(res$par)
     cis <- with(res,{
@@ -60,19 +70,19 @@ params <- function(src, censor_interval, include_interval, param.guess = c(rate_
 }
 
 doProj <- function(src, forecast_date = tail(src$Date,1), censor_interval = 0, include_interval = 30, minCases = 15, 
-                      beforeDays = 30, moreDays = 90, minDecayRate = .01) {
+                      beforeDays = 30, moreDays = 90, minDecayRate = .01, ll = exp_nbinom_ll, model = expcurve) {
     endDate <- max(src$Date) - censor_interval
-    startDate <- endDate - include_interval
-    startX <- startDate - beforeDays
+    # startDate <- endDate - include_interval
+    # startX <- startDate - beforeDays
     ## minimum cases in last interval to fit exponential, otherwise increase to max # cases
-    fromMax <- ifelse(src[Date > max(Date)-include_interval, sum(cases)] < minCases, T, F)
+    fromMax <- T #ifelse(src[Date > max(Date)-include_interval, sum(cases)] < minCases, T, F)
     if(fromMax) startDate <- src[which.max(cases), Date]
     include_interval <- endDate-startDate
-    fit_ref <- params(src, censor_interval, include_interval)
+    fit_ref <- params(src, censor_interval, include_interval, ll = ll)
     fit_ref$par['decay_rate'] <- max(fit_ref$par['decay_rate'], minDecayRate)
-    src$fit <- expcurve(fit_ref, date_zero = as.numeric(startDate))(as.numeric(src$Date))
+    src$fit <- model(fit_ref, date_zero = as.numeric(startDate))(as.numeric(src$Date))
     return(list(fit = fit_ref, src = src[,list(Date,reg, cases,fit)], startDate = startDate, endDate = endDate,
-                moreDays=moreDays, beforeDays=beforeDays, include_interval=include_interval))
+                moreDays=moreDays, beforeDays=beforeDays, include_interval=include_interval, model = model))
 }
 
 forecast <- function(fit, main=NULL, nbsize = .9, doPlot = T) with(fit, {
@@ -82,7 +92,6 @@ forecast <- function(fit, main=NULL, nbsize = .9, doPlot = T) with(fit, {
     srcProj <- data.table(Date = seq.Date(startX, endDate + 52*7, by = 1))
     src <- merge(src, srcProj, by = 'Date', all=T)
     src[, reg := reg[1]]
-    src$fit <- expcurve(fit, date_zero = as.numeric(startDate))(as.numeric(src$Date))
     src$proj <- src[, rnbinom(length(fit), mu = fit, size  = nbsize)]
     if(doPlot) {
         src[Date < endDate & Date > startX, plot(Date, cases, type = 'h', bty = 'n', las = 2, xaxt = 'n', xlim=c(startX,endX), xlab = '', lwd = 3)]

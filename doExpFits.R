@@ -3,12 +3,12 @@ if(grepl('stevebe', Sys.info()['nodename'])) setwd('~/Documents/R Repos/EbolaVac
 if(grepl('stevebellan', Sys.info()['login'])) setwd('~/Documents/R Repos/EbolaVaccSim/')
 if(grepl('tacc', Sys.info()['nodename'])) setwd('/home1/02413/sbellan/VaccEbola/')
 ## Simulate SWCT vs RCT vs CRCT for SL
-source('ExpFit.R')
+source('ExpFit.R'); require(data.table)
 
 ## allSL <- sl[,list(cases=sum(cases,na.rm=T)),Date]
 ## allSL <- allSL[,list(Date,cases)]
 
-regs <- sl[,unique(reg)]
+regs <- levels(sl$reg); sl <- data.table(sl) ## some issue w/ what's stored in cleanSLData, perhaps?
 
 ## Fit to current incidence trends
 include_interval <- 60 ## how many days back to include in exponential decay fit
