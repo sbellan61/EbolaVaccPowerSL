@@ -4,17 +4,19 @@ if(grepl('stevebellan', Sys.info()['login'])) setwd('~/Documents/R Repos/EbolaVa
 if(grepl('tacc', Sys.info()['nodename'])) setwd('/home1/02413/sbellan/VaccEbola/')
 ## Simulate SWCT vs RCT vs CRCT for SL
 source('ExpFit.R'); require(data.table)
+truncDate <- as.Date('2015-02-01')
+sl <- sl[Date < truncDate]
 
 ## allSL <- sl[,list(cases=sum(cases,na.rm=T)),Date]
 ## allSL <- allSL[,list(Date,cases)]
-
+ 
 regs <- levels(sl$reg)
 
 ## Fit to current incidence trends
 include_interval <- 60 ## how many days back to include in exponential decay fit
 minCases <- 30 ## if smaller than this then fit back to peak in subnational unit
 fits <- NULL
-for(rr in regs) fits[[rr]] <- doProj(sl[reg==rr], include_interval = include_interval, minCases = minCases)
+for(rr in regs) fits[[rr]] <- doProj(sl[reg==rr], include_interval = include_interval, minCases = minCases, ll='exp_pois_ll', verbose=19)
 
 # sapply(fits, function(rr) rr$fit$par["nbsize"])
 
@@ -25,7 +27,7 @@ par(lwd=1, 'ps' = 12, mar = c(5,3,1.5,.5),mfrow = c(4,4))
 regs <- sl[,unique(reg)]
 srcs <- NULL
 xlim <- as.Date(c('2014-09-15','2015-05-01'))
-for(rr in regs) srcs[[rr]] <- forecast(fits[[rr]], main = rr, nbsize = nbsize, xlim = xlim)
+for(rr in regs) srcs[[rr]] <- forecast(fits[[rr]], main = rr, nbsize = nbsize, xlim = xlim,verbose = 19)
 graphics.off()
 srcProj <- rbindlist(srcs)
 
