@@ -5,12 +5,12 @@ library(RColorBrewer)
 ## Simulate SWCT vs RCT vs CRCT for SL
 sapply(c('simFuns.R','AnalysisFuns.R','CoxFxns.R','EndTrialFuns.R'), source)
 
-thing <- 'SLSims5'
+thing <- 'SLSimsFinal'
 batchdirnm <- file.path('BigResults',thing)
 fls <- list.files(batchdirnm, pattern='.Rdata', full.names = T)
 length(fls)
 
-dparms <- c('trial','sdLogIndiv','vaccEff','doSL','propInTrial','nbsize','ord','reordLag','delayUnit')
+dparms <- c('trial','sdLogIndiv','vaccEff','doSL','propInTrial','nbsize','ord','reordLag','delayUnit','immunoDelay','trialStartDate')
 nbatch <- length(fls)
 finInfoList <- finModList <- stopList <- parmsList <- list(NULL)
 for(ii in 1:nbatch) {
@@ -56,7 +56,7 @@ save(finTrials, file=file.path('BigResults', paste0(thing, '.Rdata')))
 
 load(file=file.path('BigResults',paste0(thing, '.Rdata')))
 
-powFin <- summarise(group_by(finTrials, vaccEff, trial, propInTrial, ord, delayUnit, mod)
+powFin <- summarise(group_by(finTrials, vaccEff, trial, propInTrial, ord, delayUnit, mod, immunoDelay,trialStartDate)
                     , nsim = length(stopped)
                     , stopped = mean(stopped)
                     , vaccGood = mean(vaccGood)
@@ -98,8 +98,8 @@ pf[mod %in% c('coxME') & vaccEff>.5 &  ((trial=='SWCT' & ord=='none')| ( trial==
 list(trial, ord, mod, vaccGoodNAR,cvr, propInTrial,vaccEff)]
 
 ## Chosen models
-pf[mod %in% c('relabCoxME') & vaccEff>.5 &  (trial=='SWCT' & ord=='none'),
-list(trial, ord, delayUnit, mod, vaccGoodNAR, cvr,propInTrial,vaccEff)]
+pf[mod %in% c('relabCoxME') & vaccEff>.8 &  (trial=='SWCT' & ord=='none') & immunoDelay==21,
+list(trial, ord, delayUnit, mod, vaccGoodNAR, caseTot, cvr,propInTrial,vaccEff,nsim)]
 
-pf[mod %in% c('coxME') & vaccEff>.5 &  trial=='FRCT' & ord=='TU',
-list(trial, ord, mod, vaccGoodNAR,cvr, propInTrial,vaccEff)]
+pf[mod %in% c('coxME') & vaccEff>.8 &  trial=='RCT' & ord=='TU'  & immunoDelay==21,
+list(trial, ord, mod, vaccGoodNAR, caseTot, cvr, propInTrial,vaccEff)]

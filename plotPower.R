@@ -6,7 +6,7 @@ library(RColorBrewer); library(data.table); library(ggplot2); library(dplyr); li
 percent <- function(x) paste0(formatC(x*100), '%')
 labs <- c('','log')
 
-thing <- 'SLSims5'
+thing <- 'SLSimsFinal'
 load(file=file.path('Results',paste0('powFin_',thing,'.Rdata')))
 
 pf[delayUnit==0, ord:='simultaneous instant']

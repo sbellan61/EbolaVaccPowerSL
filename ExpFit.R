@@ -148,7 +148,7 @@ createHazTraj <- function(fits, nbsize = 1.2, trialStartDate = as.Date('2015-02-
         src[day > -60, list(day, haz)]
         if(weeks) {
             src$week <- src[, floor(day/7)]
-            src <- src[, list(haz = mean(haz, na.rm=T)), week] ## get mean daily hazard by week
+            src <- src[, list(haz = mean(haz, na.rm=T), Date = min(Date)), week] ## get mean daily hazard by week
         }
         src$cluster <- cc
         hazTList[[cc]] <- as.data.frame(src)
@@ -157,7 +157,7 @@ createHazTraj <- function(fits, nbsize = 1.2, trialStartDate = as.Date('2015-02-
     setnames(hazT, 'haz', 'clusHaz')
     hazT$day <- hazT[, week*7]
     hazT <- arrange(hazT, day, cluster)
-    return(hazT[, list(cluster, day, clusHaz)])
+    return(hazT[, list(cluster, day, Date, clusHaz)])
 }
 
 

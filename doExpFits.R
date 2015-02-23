@@ -4,8 +4,8 @@ if(grepl('stevebellan', Sys.info()['login'])) setwd('~/Documents/R Repos/EbolaVa
 if(grepl('tacc', Sys.info()['nodename'])) setwd('/home1/02413/sbellan/VaccEbola/')
 ## Simulate SWCT vs RCT vs CRCT for SL
 source('ExpFit.R'); require(data.table)
-truncDate <- as.Date('2015-02-01')
-sl <- sl[Date < truncDate]
+## truncDate <- as.Date('2015-02-09')
+## sl <- sl[Date < truncDate]
 xlim <- as.Date(c('2014-09-15','2015-05-01'))
  
 regs <- levels(sl$reg)
