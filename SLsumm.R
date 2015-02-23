@@ -5,7 +5,7 @@ library(RColorBrewer)
 ## Simulate SWCT vs RCT vs CRCT for SL
 sapply(c('simFuns.R','AnalysisFuns.R','CoxFxns.R','EndTrialFuns.R'), source)
 
-thing <- 'SLSimsFinal'
+thing <- 'initDateSens'
 batchdirnm <- file.path('BigResults',thing)
 fls <- list.files(batchdirnm, pattern='.Rdata', full.names = T)
 length(fls)
@@ -19,6 +19,7 @@ for(ii in 1:nbatch) {
     if(exists('sim')) rm(sim)
     load(ff)
     if(exists('sim')) {
+        sim$parms[['trialStartDate']] <- as.character(sim$parms[['trialStartDate']])
         parmsList[[ii]] <- data.frame(nbatch = ii, t(unlist(sim$parms[dparms])))
          tmpMod <- data.frame(nbatch = ii, sim$sim$finMods)
         finModList[[ii]] <- merge(tmpMod, sim$sim$finInfo, by = 'sim')
@@ -84,6 +85,7 @@ setcolorder(powFin, c(front, setdiff(names(powFin), front)))
 pf <- data.table(powFin)
 pf <- pf[!(trial=='FRCT' & delayUnit==0) & !(ord=='TU' & delayUnit==0)] ## redundant
 
+pf$trialStartDate <- as.Date(pf$trialStartDate)
 save(pf, file=file.path('Results',paste0('powFin_',thing,'.Rdata')))
 
 ## to delete a range of jobs
