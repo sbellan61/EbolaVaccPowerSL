@@ -9,9 +9,11 @@ labs <- c('','log')
 thing <- 'SLSimsFinal'
 load(file=file.path('Results',paste0('powFin_',thing,'.Rdata')))
 
-pf[delayUnit==0, ord:='simultaneous instant']
-pf[vaccEff==.5 & trial=='RCT' & propInTrial==.025 & mod=='coxME']
-setnames(pf,'ord','order')
+pf[mod=='coxME', mod:='CoxME']
+pf$mod <- factor(pf$mod, levels=unique(pf$mod))
+pf[vaccEff==.5 & trial=='RCT' & propInTrial==.025 & mod=='CoxME']
+pf$order <- pf$ord
+pf[delayUnit==0, order:='simultaneous instant']
 pf$design <- pf$trial
 levels(pf$design)[levels(pf$design) == 'SWCT'] <- 'SWT'
 levels(pf$order)[2] <- 'time-updated'
@@ -92,7 +94,7 @@ theme_set(theme_grey(base_size = 12))
 ## Figure 2 - Type I errors
 for(jj in 1:2) {
 thax <- element_text(colour = 'black', size = 8)
-subs <- pf[,design %in% c('SWT','RCT') & vaccEff==0 & mod %in% c('coxME','bootCoxME','relabCoxME') & immunoDelay==21]
+subs <- pf[,design %in% c('SWT','RCT') & vaccEff==0 & mod %in% c('CoxME','bootCoxME','relabCoxME') & immunoDelay==21]
 subs <- subs & pf[,!(design=='RCT' & grepl('boot',mod))]
 p.tmp <- ggplot(pf[subs], 
                 aes(propInTrial, stoppedNAR, colour=design, linetype=order)) + thsb +
@@ -110,7 +112,7 @@ ggsave(paste0('Figures/Fig 2A -',labs[jj],'Type I SL.png'), p.tmp, w = 8.5, h = 
 ## Figure 2B - Type I errors
 for(jj in 1:2) {
 thax <- element_text(colour = 'black', size = 8)
-subs <- pf[,design %in% c('SWT','RCT') & vaccEff==0 & mod %in% c('coxME','bootCoxME','relabCoxME') & immunoDelay==21]
+subs <- pf[,design %in% c('SWT','RCT') & vaccEff==0 & mod %in% c('CoxME','bootCoxME','relabCoxME') & immunoDelay==21]
 subs <- subs & pf[,!(design=='RCT' & grepl('boot',mod))]
 p.tmp <- ggplot(pf[subs], 
                 aes(propInTrial, stoppedNAR, colour=model, linetype=order)) + thsb +
@@ -126,7 +128,7 @@ ggsave(paste0('Figures/Fig 2B -',labs[jj],'Type I SL.png'), p.tmp, w = 6.5, h = 
 
 ####################################################################################################
 ## Figure 4 - Power
-subs <- pf[, immunoDelay==21 & ((design == 'SWT' & mod=='relabCoxME') | (design %in% c('RCT','FRCT') & mod =='coxME'))]
+subs <- pf[, immunoDelay==21 & ((design == 'SWT' & mod=='relabCoxME') | (design %in% c('RCT','FRCT') & mod =='CoxME'))]
 for(jj in 1:2) {
         thax <- element_text(colour = 'black', size = 8)
         p.tmp <- ggplot(pf[subs], aes(vaccEff, vaccGoodNAR, colour=design, linetype=order)) + thsb +
@@ -142,7 +144,7 @@ ggsave(paste0('Figures/Fig 4 -',labs[jj],'Power SL.png'), p.tmp, w = 9, h = 4)
 
 ####################################################################################################
 ## Figure 5 - Power by immunedelay
-subs <- pf[, propInTrial==.05 & vaccEff == .9 & ((design == 'SWT' & mod=='relabCoxME') | (design=='RCT' & order=='time-updated' & mod =='coxME'))]
+subs <- pf[, propInTrial==.05 & vaccEff == .9 & ((design == 'SWT' & mod=='relabCoxME') | (design=='RCT' & order=='time-updated' & mod =='CoxME'))]
         thax <- element_text(colour = 'black', size = 8)
         p.tmp <- ggplot(pf[subs], aes(immunoDelay, vaccGoodNAR, colour=design, linetype=order)) + thsb +
          #   scale_x_continuous(labels = formatC, limits=c(.5,.9),  breaks = pf[,unique(vaccEff)], minor_breaks=NULL) +  
@@ -153,9 +155,33 @@ subs <- pf[, propInTrial==.05 & vaccEff == .9 & ((design == 'SWT' & mod=='relabC
 ggsave(paste0('Figures/Fig 5 - Power by seroconversion delay SL.png'), p.tmp, w = 5, h = 4)
 
 
+####################################################################################################
+## Figure SX - Power by model
+pf$modClass <- 'parametric'
+pf[grepl('boot',mod), modClass:='bootstrap']
+pf[grepl('relab',mod), modClass:='permutation']
+pf$modClass <- factor(pf$modClass, levels = c("parametric", "bootstrap", "permutation"))
+pf$modRaw <- gsub('boot','',pf$mod)
+pf$modRaw <- factor(gsub('relab','',pf$modRaw))
+subs <- pf[, propInTrial==.05  & immunoDelay==21 & (design == 'SWT' | (design=='RCT' & order=='time-updated' & modClass!='bootstrap'))]
+subs <- subs & pf[,modRaw %in% c('CoxME','GLMFclus')]
+thax <- element_text(colour = 'black', size = 8)
+for(jj in 1:2) {
+p.tmp <- ggplot(pf[subs], aes(vaccEff, vaccGoodNAR, colour=modClass, linetype=modRaw)) +
+    thsb +
+    scale_x_continuous(labels = formatC, limits=c(0,1), breaks = pf[,unique(vaccEff)], minor_breaks=NULL) +  
+    xlab('vaccine efficacy') + ylab('probability of rejecting null \nthat vaccine is not effective') + 
+    scale_linetype_manual(values=1:3) +
+    geom_line(size=.9)  + facet_wrap(~design, scales = "free_y") #,nrow=1) + 
+#p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,1), breaks=seq(0,1,by=.1), minor_breaks = NULL) #seq(0,1,.05))
+if(jj==1) p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,1))
+if(jj==2) p.tmp <- p.tmp + scale_y_log10(labels = formatC, breaks = c(.01, .025, .05, .1, .25, .5, 1), limits = c(.01,1), minor_breaks=NULL) 
+ggsave(paste0('Figures/Fig SX', labs[jj], ' - Power by model delay SL.png'), p.tmp, w = 6, h = 4)
+}
+
 ##################################################
 ## Cases
-subs <- pf[, immunoDelay==21 & ((design == 'SWT' & mod=='relabCoxME') | (design %in% c('RCT','FRCT') & mod =='coxME'))]
+subs <- pf[, immunoDelay==21 & ((design == 'SWT' & mod=='relabCoxME') | (design %in% c('RCT','FRCT') & mod =='CoxME'))]
 thax <- element_text(colour = 'black', size = 8)
 p.tmp <- ggplot(pf[subs], aes(vaccEff, caseTot, colour=design, linetype=order)) + thsb + 
     scale_x_continuous(labels = formatC, limits=c(0,.9), breaks = pf[,unique(vaccEff)],minor_breaks=NULL) +  
@@ -184,5 +210,25 @@ p.tmp <- p.tmp + scale_y_continuous(labels = formatC) #
 print(p.tmp)
 ggsave(paste0('Figures/numSims SL ALL.png'), p.tmp, w = 8, h = 3.5)
 
-subs <- pf[,vaccEff==0 & (delayUnit==0 | (trial=='SWCT')) & mod =='coxME']
+subs <- pf[,vaccEff==0 & (delayUnit==0 | (trial=='SWCT')) & mod =='CoxME']
 pf[subs, list(caseTot,caseC,caseV,pit,trial,delayUnit,vaccEff)]
+
+####################################################################################################
+## abstract #'s and tables
+
+pf[mod %in% c('CoxME','relabCoxME') & vaccEff==0 & propInTrial==.1 & trial %in% c('SWCT')]#,'FRCT')]
+
+pf[mod %in% c('relabCoxME') & vaccEff>.5 &  ((trial=='SWCT' & ord=='none')| ( trial=='FRCT' & ord=='TU')),
+list(trial, ord, delayUnit, mod, vaccGoodNAR, propInTrial,vaccEff)]
+
+pf[mod %in% c('CoxME') & vaccEff>.5 &  ((trial=='SWCT' & ord=='none')| ( trial=='FRCT' & ord=='TU')),
+list(trial, ord, mod, vaccGoodNAR,cvr, propInTrial,vaccEff)]
+
+## Chosen models
+pf <- arrange(pf, immunoDelay, propInTrial, trial, mod)
+
+subs <- pf[, vaccEff>.8 & immunoDelay==21 & 
+           ((mod %in% c('CoxME','relabCoxME','bootCoxME','bootGLMFclus') &  (trial=='SWCT' & ord=='none') ) |
+           (mod %in% c('CoxME') & trial=='RCT' & ord=='TU' ))]
+pf[subs, list(trial, ord, delayUnit, mod, vaccGoodNAR, caseTot, cvr, biasNAR, propInTrial,vaccEff,nsim)]
+

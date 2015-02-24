@@ -90,18 +90,3 @@ save(pf, file=file.path('Results',paste0('powFin_',thing,'.Rdata')))
 
 ## to delete a range of jobs
 ## qdel echo `seq -f "%.0f" 2282389 2282404`
-
-pf[mod %in% c('coxME','relabCoxME') & vaccEff==0 & propInTrial==.1 & trial %in% c('SWCT')]#,'FRCT')]
-
-pf[mod %in% c('relabCoxME') & vaccEff>.5 &  ((trial=='SWCT' & ord=='none')| ( trial=='FRCT' & ord=='TU')),
-list(trial, ord, delayUnit, mod, vaccGoodNAR, propInTrial,vaccEff)]
-
-pf[mod %in% c('coxME') & vaccEff>.5 &  ((trial=='SWCT' & ord=='none')| ( trial=='FRCT' & ord=='TU')),
-list(trial, ord, mod, vaccGoodNAR,cvr, propInTrial,vaccEff)]
-
-## Chosen models
-pf[mod %in% c('relabCoxME') & vaccEff>.8 &  (trial=='SWCT' & ord=='none') & immunoDelay==21,
-list(trial, ord, delayUnit, mod, vaccGoodNAR, caseTot, cvr,propInTrial,vaccEff,nsim)]
-
-pf[mod %in% c('coxME') & vaccEff>.8 &  trial=='RCT' & ord=='TU'  & immunoDelay==21,
-list(trial, ord, mod, vaccGoodNAR, caseTot, cvr, propInTrial,vaccEff)]
