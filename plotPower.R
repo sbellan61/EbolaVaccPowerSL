@@ -9,11 +9,20 @@ labs <- c('','log')
 thing <- 'SLSimsFinal'
 load(file=file.path('Results',paste0('powFin_',thing,'.Rdata')))
 pf[vaccEff==.5 & trial=='RCT' & propInTrial==.025 & mod=='CoxME']
+gg_color_hue <- function(n) {
+  hues = seq(15, 375, length=n+1)
+  hcl(h=hues, l=65, c=100)[1:n]
+}
+group.colors <- c(RCT = "#333BFF", FRCT = "#CC6600", SWT ="#9633FF")
+group.colors[c(1,3,2)] <- gg_color_hue(3)
+group.colors['SWT'] <- 'orange'
+pf$design <- factor(pf$design, levels=levels(pf$design)[c(2,1,3)])
+pf[, biasNAR:=biasNAR/vaccEff]
 
 ##################################################
 ## Power
 for(jj in 1:2) {
-    pdf(paste0('Figures/',labs[jj], 'power SL ALL.pdf'), w = 8, h = 5) ##, units = 'in', res = 200)
+    pdf(paste0('Figures/',labs[jj], 'power SL ALL.pdf'), w = 8, h = 4) ##, units = 'in', res = 200)
     for(modTmp in levels(pf$model)) {
         subs <- pf[, model==modTmp & immunoDelay==21 & !(trial%in%c('FRCT','RCT') & grepl('boot',mod))]
         thax <- element_text(colour = 'black', size = 8)
@@ -21,14 +30,14 @@ for(jj in 1:2) {
             scale_x_continuous(labels = formatC, limits=c(0,.9),  breaks = pf[,unique(vaccEff)], minor_breaks=NULL) +  
                 theme(axis.text.x = thax, axis.text.y = thax, plot.title = element_text(vjust=1),
                       axis.title.y = element_text(vjust = 1), axis.title.x = element_text(vjust = -.5),
-                      panel.margin = unit(2, "lines")) +
+                      panel.margin = unit(2, "lines"))  + scale_color_manual(values=group.colors) + 
                           xlab('vaccine efficacy') + ylab('probability of rejecting null') + 
                               scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
-                                  geom_line(size=1) + facet_wrap(~pit) + 
+                                  geom_line(size=1) + facet_wrap(~pit, nrow=1) + 
                                       ggtitle('power by expected % of district-level cases in trial population') +
                                           geom_hline(yintercept=.025, color='black', linetype='dotted')
         if(jj==1) p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,1), minor_breaks = seq(0,1,.05))
-        if(jj==2) p.tmp <- p.tmp + scale_y_log10(labels = formatC, limits=c(0.01,.9), breaks = c(.01,.025,.05,.1,.2,.5,.8))
+        if(jj==2) p.tmp <- p.tmp + scale_y_log10(labels = formatC, limits=c(0.0005,.9), breaks = c(.01,.025,.05,.1,.2,.5,.8))
         print(p.tmp)
         grid.text(modTmp,x=unit(.85,"npc"),y=unit(0.85,"npc"), gp=gpar(fontsize=10))
     }
@@ -43,13 +52,13 @@ jj <- 1
 for(jj in 1:2) {
 pdf(paste0('Figures/',labs[jj],'Type I SL.pdf'), w = 8, h = 8) ##, units = 'in', res = 200)
 thax <- element_text(colour = 'black', size = 8)
-subs <- pf[,design %in% c('SWT','RCT') & vaccEff==0 & immunoDelay==21]
+subs <- pf[,design %in% c('SWT','RCT') & vaccEff==0 & immunoDelay==21 & !(design=='RCT' & grepl('boot',mod))]
 p.tmp <- ggplot(pf[subs], aes(propInTrial, stoppedNAR, colour=design, linetype=order)) + 
     scale_x_continuous(labels = percent, limits=c(.025,.1), breaks = c(.025,.05,.075,.1)) +  
 ##    scale_y_continuous(labels = formatC, limits=c(0,.3)) + #, minor_breaks = seq(0,1,.05)) +
     theme(axis.text.x = thax, axis.text.y = thax, plot.title = element_text(vjust=1),
           axis.title.y = element_text(vjust = 1), axis.title.x = element_text(vjust = -.5),
-          panel.margin = unit(2, "lines")) +
+          panel.margin = unit(2, "lines")) + scale_color_manual(values=group.colors) +
     xlab('% of distrinct-level cases in trial population') + ylab('Type I Error Rate') + 
     scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
     geom_line(size=1) + facet_wrap(~model) + 
@@ -83,9 +92,9 @@ p.tmp <- ggplot(pf[subs],
     xlab('% of district-level cases in trial population') + ylab('False Positive Rate') + 
     scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
     geom_hline(yintercept=.05, color='dark gray', size = 1) +
-    geom_line(size=1) + facet_wrap(~model, scales = "free_y")
-if(jj==1) p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,.15))
-if(jj==2) p.tmp <- p.tmp + scale_y_log10(labels = formatC, breaks = c(.01, .025, .05, .1, .25), limits = c(.01,.25), minor_breaks=NULL) 
+    geom_line(size=1) + facet_wrap(~model, scales = "free_y") + scale_color_manual(values=group.colors)
+if(jj==1) p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,.1))
+if(jj==2) p.tmp <- p.tmp + scale_y_log10(labels = formatC, breaks = c(.01, .025, .05, .1), limits = c(.005,.1), minor_breaks=NULL) 
 ggsave(paste0('Figures/Fig 2A -',labs[jj],'Type I SL.png'), p.tmp, w = 8.5, h = 3.5)
 }
 
@@ -101,9 +110,10 @@ p.tmp <- ggplot(pf[subs],
     xlab('% of district-level cases in trial population') + ylab('Type I Error Rate') + 
     scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
     geom_hline(yintercept=.05, color='dark gray', size = 1) +
-    geom_line(size=1) + facet_wrap(~design, scales = "free_y")
+    geom_line(size=1) + facet_wrap(~design, scales = "free_y") + 
+        scale_color_manual(values=group.colors)
 if(jj==1) p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,.15))
-if(jj==2) p.tmp <- p.tmp + scale_y_log10(labels = formatC, breaks = c(.01, .025, .05, .1, .25), limits = c(.01,.25), minor_breaks=NULL) 
+if(jj==2) p.tmp <- p.tmp + scale_y_log10(labels = formatC, breaks = c(.01, .025, .05, .1, .25), limits = c(.005,.25), minor_breaks=NULL) 
 ggsave(paste0('Figures/Fig 2B -',labs[jj],'Type I SL.png'), p.tmp, w = 6.5, h = 3.5)
 }
 
@@ -111,16 +121,17 @@ ggsave(paste0('Figures/Fig 2B -',labs[jj],'Type I SL.png'), p.tmp, w = 6.5, h = 
 ## Figure 4 - Power
 subs <- pf[, immunoDelay==21 & ((design == 'SWT' & mod=='relabCoxME') | (design %in% c('RCT','FRCT') & mod =='CoxME'))]
 for(jj in 1:2) {
-        thax <- element_text(colour = 'black', size = 8)
-        p.tmp <- ggplot(pf[subs], aes(vaccEff, vaccGoodNAR, colour=design, linetype=order)) + thsb +
-            scale_x_continuous(labels = formatC, limits=c(.5,.9),  breaks = pf[,unique(vaccEff)], minor_breaks=NULL) +  
-                          xlab('vaccine efficacy') + ylab('power to detect effective vaccine') + 
-                              scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
-                                  geom_line(size=1) + facet_wrap(~pit, scales = "free_y",nrow=1) + 
-                                      ggtitle('expected % of district-level cases in trial population')
-        if(jj==1) p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,1), breaks=seq(0,1,by=.1), minor_breaks = NULL) #seq(0,1,.05))
-        if(jj==2) p.tmp <- p.tmp + scale_y_log10(labels = formatC, limits=c(0.01,.9), breaks = c(.01,.025,.05,.1,.2,.5,.8))
-ggsave(paste0('Figures/Fig 4 -',labs[jj],'Power SL.png'), p.tmp, w = 9, h = 4)
+    thax <- element_text(colour = 'black', size = 8)
+    p.tmp <- ggplot(pf[subs], aes(vaccEff, vaccGoodNAR, colour=design, linetype=order)) + thsb +
+        scale_x_continuous(labels = formatC, limits=c(.5,.9),  breaks = pf[,unique(vaccEff)], minor_breaks=NULL) +  
+            xlab('vaccine efficacy') + ylab('power to detect effective vaccine') + 
+                scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
+                    geom_line(size=1) + facet_wrap(~pit, scales = "free_y",nrow=1) + 
+                        ggtitle('expected % of district-level cases in trial population') + 
+                            scale_color_manual(values=group.colors)
+    if(jj==1) p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,1), breaks=seq(0,1,by=.1), minor_breaks = NULL) #seq(0,1,.05))
+    if(jj==2) p.tmp <- p.tmp + scale_y_log10(labels = formatC, limits=c(0.01,.9), breaks = c(.01,.025,.05,.1,.2,.5,.8))
+    ggsave(paste0('Figures/Fig 4 -',labs[jj],'Power SL.png'), p.tmp, w = 9, h = 4)
 }
 
 ####################################################################################################
@@ -131,6 +142,7 @@ subs <- pf[, propInTrial==.05 & vaccEff == .9 & ((design == 'SWT' & mod=='relabC
          #   scale_x_continuous(labels = formatC, limits=c(.5,.9),  breaks = pf[,unique(vaccEff)], minor_breaks=NULL) +  
                           xlab('delay until protective efficacy') + ylab('power to detect effective vaccine') + 
                               scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
+scale_color_manual(values=group.colors) +
                                   geom_line(size=1)  #facet_wrap(~immunoDelay, scales = "free_y",nrow=1) + 
  p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,1), breaks=seq(0,1,by=.1), minor_breaks = NULL) #seq(0,1,.05))
 ggsave(paste0('Figures/Fig 5 - Power by seroconversion delay SL.png'), p.tmp, w = 5, h = 4)
@@ -152,11 +164,11 @@ p.tmp <- ggplot(pf[subs], aes(vaccEff, vaccGoodNAR, colour=modClass, linetype=mo
     thsb +
     scale_x_continuous(labels = formatC, limits=c(0,1), breaks = pf[,unique(vaccEff)], minor_breaks=NULL) +  
     xlab('vaccine efficacy') + ylab('probability of rejecting null \nthat vaccine is not effective') + 
-    scale_linetype_manual(values=1:3) +
+    scale_linetype_manual(values=1:3) + ## scale_color_manual(values=group.colors) +
     geom_line(size=.9)  + facet_wrap(~design, scales = "free_y") #,nrow=1) + 
 #p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,1), breaks=seq(0,1,by=.1), minor_breaks = NULL) #seq(0,1,.05))
 if(jj==1) p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,1))
-if(jj==2) p.tmp <- p.tmp + scale_y_log10(labels = formatC, breaks = c(.01, .025, .05, .1, .25, .5, 1), limits = c(.01,1), minor_breaks=NULL) 
+if(jj==2) p.tmp <- p.tmp + scale_y_log10(labels = formatC, breaks = c(.01, .025, .05, .1, .25, .5, 1), limits = c(.005,1), minor_breaks=NULL) 
 ggsave(paste0('Figures/Fig SX', labs[jj], ' - Power by model delay SL.png'), p.tmp, w = 6, h = 4)
 }
 
@@ -169,47 +181,39 @@ p.tmp <- ggplot(pf[subs], aes(vaccEff, caseTot, colour=design, linetype=order)) 
     xlab('vaccine efficacy') + ylab('# EVD cases') +
     scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
     geom_line(size=1) + facet_wrap(~pit, scale='free_y', nrow=1) + 
-    ggtitle('% of district-level cases in trial population') +
+    ggtitle('% of district-level cases in trial population')  + scale_color_manual(values=group.colors) +
     geom_hline(yintercept=.025, color='black', linetype='dotted')
 p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,120)) #
 print(p.tmp)
 ggsave(paste0('Figures/Cases SL ALL.png'), p.tmp, w = 9, h = 3.5)
-
-##################################################
-## check # of simulations run, not too many crashed
-thax <- element_text(colour = 'black', size = 8)
-p.tmp <- ggplot(pf[mod==modTmp], aes(vaccEff, nsim, colour=design, linetype=order)) + 
-    scale_x_continuous(labels = formatC, limits=c(0,1), breaks = pf[,unique(vaccEff)],minor_breaks=NULL) +  
-    theme(axis.text.x = thax, axis.text.y = thax, plot.title = element_text(vjust=1),
-          axis.title.y = element_text(vjust = 1), axis.title.x = element_text(vjust = -.5)) +
-    xlab('vaccine efficacy') + ylab('# simulations') + 
-    scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
-    geom_line(size=1) + facet_wrap(~pit) + 
-    ggtitle('% of district-level cases in trial population') +
-    geom_hline(yintercept=.025, color='black', linetype='dotted')
-p.tmp <- p.tmp + scale_y_continuous(labels = formatC) #
-print(p.tmp)
-ggsave(paste0('Figures/numSims SL ALL.png'), p.tmp, w = 8, h = 3.5)
 
 subs <- pf[,vaccEff==0 & (delayUnit==0 | (trial=='SWCT')) & mod =='CoxME']
 pf[subs, list(caseTot,caseC,caseV,pit,trial,delayUnit,vaccEff)]
 
 ####################################################################################################
 ## abstract #'s and tables
+pf <- arrange(pf, immunoDelay, trial, propInTrial, mod)
 
-pf[mod %in% c('CoxME','relabCoxME') & vaccEff==0 & propInTrial==.1 & trial %in% c('SWCT')]#,'FRCT')]
-
-pf[mod %in% c('relabCoxME') & vaccEff>.5 &  ((trial=='SWCT' & ord=='none')| ( trial=='FRCT' & ord=='TU')),
+pf[immunoDelay==21 & mod %in% c('relabCoxME') & vaccEff>.8 &  ((trial=='SWCT' & ord=='none')| ( trial=='RCT' & ord=='TU')),
 list(trial, ord, delayUnit, mod, vaccGoodNAR, propInTrial,vaccEff)]
 
 pf[mod %in% c('CoxME') & vaccEff>.5 &  ((trial=='SWCT' & ord=='none')| ( trial=='FRCT' & ord=='TU')),
 list(trial, ord, mod, vaccGoodNAR,cvr, propInTrial,vaccEff)]
 
 ## Chosen models
-pf <- arrange(pf, immunoDelay, propInTrial, trial, mod)
 
-subs <- pf[, vaccEff>.8 & immunoDelay==21 & 
-           ((mod %in% c('CoxME','relabCoxME','bootCoxME','bootGLMFclus') &  (trial=='SWCT' & ord=='none') ) |
+
+subs <- pf[, vaccEff>.8 & immunoDelay==21 & #propInTrial == .05 & 
+           ((mod %in% c('CoxME','relabCoxME') &  (trial=='SWCT' & ord=='none') ) |
            (mod %in% c('CoxME') & trial=='RCT' & ord=='TU' ))]
-pf[subs, list(trial, ord, delayUnit, mod, vaccGoodNAR, caseTot, cvr, biasNAR, propInTrial,vaccEff,nsim)]
+tab1 <- pf[subs, list(trial, mod, pit, cvr, biasNAR)]
+tab1[, list(trial, cvr, biasNAR)]
+tab1[trial=='SWCT', cvr:= cvr[!is.na(cvr)], list(pit)]
+tab1 <- tab1[!(trial=='SWCT' & mod=='CoxME')]
+tab1[, c('cvr','biasNAR') := list(signif(cvr,2), signif(biasNAR,2))]
+tab1
+
+tab1 <- data.table(tab1[trial=='RCT',list(pit, cvr,biasNAR)], tab1[trial=='SWCT',list(cvr,biasNAR)])
+tab1
+write.csv(tab1, file='Results/biasCoverage.csv')
 
