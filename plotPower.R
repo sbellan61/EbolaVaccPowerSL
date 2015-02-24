@@ -8,26 +8,7 @@ labs <- c('','log')
 
 thing <- 'SLSimsFinal'
 load(file=file.path('Results',paste0('powFin_',thing,'.Rdata')))
-
-pf[mod=='coxME', mod:='CoxME']
-pf$mod <- factor(pf$mod, levels=unique(pf$mod))
 pf[vaccEff==.5 & trial=='RCT' & propInTrial==.025 & mod=='CoxME']
-pf$order <- pf$ord
-pf[delayUnit==0, order:='simultaneous instant']
-pf$design <- pf$trial
-levels(pf$design)[levels(pf$design) == 'SWCT'] <- 'SWT'
-levels(pf$order)[2] <- 'time-updated'
-pf[, immunoDelay:=as.numeric(levels(immunoDelay)[immunoDelay])]
-pf[, pit:=factor(paste0(propInTrial*100,'%'))]
-pf[, pit:=factor(pit, levels = c('2.5%','5%','7.5%','10%'), ordered = T)]
-## levels(pf$pit) <- c('2.5%','5%','7.5%','10%')
-
-baseMods <- c('Cox PH Frailty'
-              , 'Poisson GLM\n no cluster effects'
-              , 'Poisson GLM \nwith fixed effects by cluster')
-
-pf$model <- pf$mod
-levels(pf$model) <- paste0(rep(c('', 'bootstrap over\n', 'permutation test over\n'),each=3), rep(baseMods,3))
 
 ##################################################
 ## Power

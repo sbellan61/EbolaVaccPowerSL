@@ -39,7 +39,7 @@ finTrials$vaccEff <- as.numeric(finTrials$vaccEff)
 ## Simulations with less than 10 cases are considered to not have any power
 finTrials$tooSmall <- finTrials[, (caseCXimmGrpEnd + caseVXimmGrpEnd) < 10]
 finTrials[tooSmall, c('vaccGood','vaccBad','stopped') := F]
-finTrials[tooSmall, c('lci','uci','p') := c(-Inf,1,1)]
+finTrials[tooSmall, c('lci','uci','p') := list(-Inf,1,1)]
 ## Determine if stopped
 finTrials[grepl('boot',mod), stopped := lci > 0 | uci < 0]
 finTrials[grepl('relab',mod), stopped := p < .025]
@@ -95,16 +95,32 @@ powFin$meanXPHUNAR <- powFin[, 1 - RHxPHUNAR]
 powFin$biasNAR <- powFin[, meanXPHUNAR - vaccEff]
 powFin[vaccEff==.7, list(meanNAR,meanXPHUNAR,vaccEff, biasNAR)]
 
+## Formatting stuff
 front <- c('mod','vaccEff','stoppedNAR','vaccGoodNAR','cvrNAR','biasNAR',
 'nsim','meanErr','propInTrial','vaccBad','cvr','stopped','vaccGood')
 setcolorder(powFin, c(front, setdiff(names(powFin), front)))
 pf <- data.table(powFin)
 pf <- pf[!(trial=='FRCT' & delayUnit==0) & !(ord=='TU' & delayUnit==0)] ## redundant
 pf$trialStartDate <- as.Date(pf$trialStartDate)
+pf[mod=='coxME', mod:='CoxME']
+pf$mod <- factor(pf$mod, levels=unique(pf$mod))
+pf$order <- pf$ord
+pf[delayUnit==0, order:='simultaneous instant']
+pf$design <- pf$trial
+levels(pf$design)[levels(pf$design) == 'SWCT'] <- 'SWT'
+levels(pf$order)[2] <- 'time-updated'
+pf[, immunoDelay:=as.numeric(levels(immunoDelay)[immunoDelay])]
+pf[, pit:=factor(paste0(propInTrial*100,'%'))]
+pf[, pit:=factor(pit, levels = c('2.5%','5%','7.5%','10%'), ordered = T)]
+baseMods <- c('Cox PH Frailty'
+              , 'Poisson GLM\n no cluster effects'
+              , 'Poisson GLM \nwith fixed effects by cluster')
+pf$model <- pf$mod
+levels(pf$model) <- paste0(rep(c('', 'bootstrap over\n', 'permutation test over\n'),each=3), rep(baseMods,3))
 
 save(pf, file=file.path('Results',paste0('powFin_',thing,'.Rdata')))
 
 ## to delete a range of jobs
 ## qdel echo `seq -f "%.0f" 2282389 2282404`
 
-pf[1]
+
