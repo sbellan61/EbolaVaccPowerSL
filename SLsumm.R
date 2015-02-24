@@ -5,7 +5,7 @@ library(RColorBrewer)
 ## Simulate SWCT vs RCT vs CRCT for SL
 sapply(c('simFuns.R','AnalysisFuns.R','CoxFxns.R','EndTrialFuns.R'), source)
 
-thing <- 'initDateSens'
+thing <- 'SLSimsFinal'
 batchdirnm <- file.path('BigResults',thing)
 fls <- list.files(batchdirnm, pattern='.Rdata', full.names = T)
 length(fls)
@@ -42,6 +42,13 @@ finTrials[grepl('relab',mod), stopped := p < .025]
 finTrials[!grepl('boot',mod) & !grepl('relab',mod), stopped := p < .05]
 finTrials[, vaccGood := stopped==T &  mean > 0]
 finTrials[, vaccBad := stopped==T &  mean < 0]
+## Simulations with less than 10 cases are not viable for inference, and rejected from bias/coverage calculations
+tooSmall <- finTrials[, (caseCXimmGrpEnd + caseVXimmGrpEnd) < 10]
+finTrials[tooSmall, c('vaccGood','vaccBad','stopped') := F]
+finTrials[tooSmall, c('lci','uci','mean') := NA]
+finTrials$logRH <- finTrials[, log(1-mean)]
+finTrials$RH <- finTrials[, exp(RH)]
+finTrials[,list(vaccEff,mean,logRH,RH)]
 ## Coverage
 finTrials[, cvr := lci < vaccEff & uci > vaccEff]
 finTrials[is.na(cvr), cvr := F]
@@ -65,6 +72,8 @@ powFin <- summarise(group_by(finTrials, vaccEff, trial, propInTrial, ord, delayU
                     , cvrNAR = mean(cvr, na.rm=T)
                     , bias = mean(bias)
                     , biasNAR = mean(bias, na.rm=T)
+                    , mean = mean(mean)
+                    , meanNAR = mean(mean, na.rm=T)
                     , vaccBad = mean(vaccBad)
                     , stoppedNAR = mean(stopped,na.rm=T)
                     , vaccGoodNAR = mean(vaccGood,na.rm=T)
@@ -84,9 +93,11 @@ front <- c('mod','vaccEff','stopped','stoppedNAR','vaccGood','vaccGoodNAR','cvr'
 setcolorder(powFin, c(front, setdiff(names(powFin), front)))
 pf <- data.table(powFin)
 pf <- pf[!(trial=='FRCT' & delayUnit==0) & !(ord=='TU' & delayUnit==0)] ## redundant
-
 pf$trialStartDate <- as.Date(pf$trialStartDate)
+
 save(pf, file=file.path('Results',paste0('powFin_',thing,'.Rdata')))
 
 ## to delete a range of jobs
 ## qdel echo `seq -f "%.0f" 2282389 2282404`
+
+RH = mean

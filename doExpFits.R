@@ -19,6 +19,19 @@ for(rr in regs) fits[[rr]] <- doProj(sl[reg==rr], include_interval = include_int
 nbsizeS <- unlist(lapply(fits, function(rr) rr$fit$par["nbsize"]))
 mean(nbsizeS) ## 1.2
 
+## Show fits and one simulated projection by subregion (4 districts only)
+png('Figures/Fig 1 - forecasted district data.png',  w = 6.5, h = 3.5, units='in',res=200)
+nbsize <- 1.2 ## NULL
+par(lwd=1, 'ps' = 12, mar = c(1,3,2,.5),mfrow = c(2,2), oma = c(3,1.5,0,0))
+regs <- sl[,unique(reg)]
+srcs <- NULL
+regDo <- c('Kono','PortLoko', 'WesternAreaUrban', 'WesternAreaRural')
+labDo <- c('Kono','Port Loko', 'Western Area Urban', 'Western Area Rural')
+for(ri in 1:4) srcs[[regDo[ri]]] <- forecast(fits[[regDo[ri]]], main = labDo[ri], nbsize = nbsize, 
+                                             ylim = c(0,50), xlim = xlim, xticks = ri>2, verbose = 19)
+mtext('new cases', 2, 0, outer=T)
+graphics.off()
+
 ## Show fits and one simulated projection by subregion
 ##pdf('Figures/forecasted Paneled SL cleaned subnational data fromMax.pdf',  w = 10, h = 8)
 jpeg('Figures/forecasted Paneled SL cleaned subnational data fromMax.jpg',  w = 10, h = 8, units='in',res=200)
@@ -29,6 +42,7 @@ srcs <- NULL
 for(rr in regs) srcs[[rr]] <- forecast(fits[[rr]], main = rr, nbsize = nbsize, xlim = xlim,verbose = 19)
 graphics.off()
 srcProj <- rbindlist(srcs)
+
 
 ## Show simulated hazards from fits
 pdf('Figures/example hazT.pdf')

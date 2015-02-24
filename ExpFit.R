@@ -102,7 +102,7 @@ doProj <- function(src, forecast_date = as.Date('2015-12-31'), censor_interval =
                 moreDays=moreDays, beforeDays=beforeDays, include_interval=include_interval, model = model))
 }
 
-forecast <- function(fit, main=NULL, nbsize = NULL, doPlot = T, xlim = NULL, verbose=0) with(fit, {
+forecast <- function(fit, main=NULL, nbsize = NULL, doPlot = T, xticks = T,  ylim = NULL, xlim = NULL, verbose=0) with(fit, {
     if(verbose>20) browser()
     if(!is.null(xlim)) {
         startX <- xlim[1]
@@ -115,19 +115,20 @@ forecast <- function(fit, main=NULL, nbsize = NULL, doPlot = T, xlim = NULL, ver
     if(is.null(nbsize)) nbsize <- fit$par$nbsize ## if not specified in arguments
     src$proj <- src[, rnbinom(length(fit), mu = fit, size  = nbsize)]
     if(doPlot) {
-        src[Date < endDate & Date > startX, plot(Date, cases, type = 'h', bty = 'n', las = 2, xaxt = 'n', xlim=xlim, xlab = '', lwd = 3)]
+        src[Date < endDate & Date > startX, plot(Date, cases, type = 'h', bty = 'n', las = 2, xaxt = 'n', 
+                                                 xlim=xlim, ylim=ylim, xlab = '', lwd = 3)]
         rgDates <- seq.Date(startX, endX, by = 1)
         seqDates <- rgDates[format(rgDates, '%d') %in% c('01')]
         seqDatesTk <- rgDates[format(rgDates, '%d') %in% c('01','15')]
         axis.Date(1, at = seqDatesTk, labels = F)
-        axis.Date(1, at = seqDates, format = '%b-%d', las = 2)    
+        if(xticks) axis.Date(1, at = seqDates, format = '%b-%d', las = 2)    
         rect(startDate, 0, endDate, par('usr')[4], col = rgb(0,.5,0,.3), border=NA)
         title(main)
         src[Date > endDate, lines(Date, proj, type = 'h', lwd = 3, col = 'red')]
         src[Date > startDate, lines(Date, fit, lty = 1, col = 'dodger blue', lwd = 2)]
         rect(endDate, 0, endDate + moreDays, par('usr')[4], col = rgb(0.5,0,0,.3), border=NA)
-        text(startDate+include_interval/2, par('usr')[4], 'fitting\n window', pos=1)
-        text(endDate+moreDays/2, par('usr')[4], 'forecasting \nwindow', pos=1)
+        text(startDate+include_interval/2, par('usr')[4], 'fitting', pos=1)
+        text(endDate+moreDays/2, par('usr')[4], 'forecasting', pos=1)
     }
     return(src)
 })
