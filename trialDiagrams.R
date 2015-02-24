@@ -12,10 +12,14 @@ dim(haz) <- NULL
 
 dat <- data.table(
   week=rep(seq(1,weeks), times = cats),
-  cluster_id = as.factor(rep(seq(1,cats), each = weeks)),
+  cluster_id = rep(seq(1,cats), each = weeks),
   hazHomogeneous = haz
 )
+
+dat[ week > (cluster_id+1), status := "vaccinated"]
+dat[is.na(status), status := "unvaccinated"]
+
 p <- ggplot(dat) + theme_bw() +
   aes(xmin = week-1+spacing, xmax = week-spacing, 
-      ymin = as.numeric(cluster_id)-1+spacing, ymax = as.numeric(cluster_id) - spacing, fill=hazHomogeneous) +
-  geom_rect()
+      ymin = cluster_id-1+spacing, ymax = cluster_id - spacing, fill = hazHomogeneous, alpha=status) +
+  geom_rect() + scale_alpha_discrete(range=c(1,.7)) + scale_fill_continuous(low="blue", high="red")
