@@ -22,13 +22,14 @@ mean(nbsizeS) ## 1.2
 ## Show fits and one simulated projection by subregion (4 districts only)
 png('Figures/Fig 1 - forecasted district data.png',  w = 6.5, h = 3.5, units='in',res=200)
 nbsize <- 1.2 ## NULL
-par(lwd=1, 'ps' = 12, mar = c(1,3,2,.5),mfrow = c(2,2), oma = c(3,1.5,0,0))
+par(lwd=1, 'ps' = 10, mar = c(1,3,2,.5),mfrow = c(2,2), oma = c(3,1.5,0,0))
 regs <- sl[,unique(reg)]
 srcs <- NULL
 regDo <- c('Kono','PortLoko', 'WesternAreaUrban', 'WesternAreaRural')
 labDo <- c('Kono','Port Loko', 'Western Area Urban', 'Western Area Rural')
-for(ri in 1:4) srcs[[regDo[ri]]] <- forecast(fits[[regDo[ri]]], main = labDo[ri], nbsize = nbsize, 
-                                             ylim = c(0,50), xlim = xlim, xticks = ri>2, verbose = 19)
+for(ri in 1:4) srcs[[regDo[ri]]] <- forecast(fits[[regDo[ri]]], main = labDo[ri], nbsize = nbsize
+##                                             ,ylim = c(0,50)
+                                             , xlim = xlim, xticks = ri>2, verbose = 19)
 mtext('new cases', 2, 0, outer=T)
 graphics.off()
 

@@ -36,25 +36,26 @@ finTrials[, length(lci), list(propInTrial, mod)]
 finTrials[mod=='coxME' & is.na(p), err:=1] ## sometimes cox returns NaNs, or partial NA's for certain values
 finTrials$vaccEff <- as.numeric(finTrials$vaccEff)
 
+## Simulations with less than 10 cases are considered to not have any power
+finTrials$tooSmall <- finTrials[, (caseCXimmGrpEnd + caseVXimmGrpEnd) < 10]
+finTrials[tooSmall, c('vaccGood','vaccBad','stopped') := F]
+finTrials[tooSmall, c('lci','uci','p') := c(-Inf,1,1)]
 ## Determine if stopped
 finTrials[grepl('boot',mod), stopped := lci > 0 | uci < 0]
 finTrials[grepl('relab',mod), stopped := p < .025]
 finTrials[!grepl('boot',mod) & !grepl('relab',mod), stopped := p < .05]
 finTrials[, vaccGood := stopped==T &  mean > 0]
 finTrials[, vaccBad := stopped==T &  mean < 0]
-## Simulations with less than 10 cases are not viable for inference, and rejected from bias/coverage calculations
-tooSmall <- finTrials[, (caseCXimmGrpEnd + caseVXimmGrpEnd) < 10]
-finTrials[tooSmall, c('vaccGood','vaccBad','stopped') := F]
-finTrials[tooSmall, c('lci','uci','mean') := NA]
-finTrials$logRH <- finTrials[, log(1-mean)]
-finTrials$RH <- finTrials[, exp(RH)]
-finTrials[,list(vaccEff,mean,logRH,RH)]
 ## Coverage
 finTrials[, cvr := lci < vaccEff & uci > vaccEff]
 finTrials[is.na(cvr), cvr := F]
 finTrials[grepl('relab',mod), cvr := NA] # no CI's for perm test
-## Bias
-finTrials[, bias := mean - vaccEff]
+## Bias, must be done on RH/(RH+1) scale to deal with Inf & 0 RH's
+finTrials$RH <- finTrials[, 1-mean]
+finTrials$PHU <- finTrials[, RH/(RH+1)] ## proportion of hazard unavoidable even with vaccination
+finTrials[RH==Inf, PHU:=1] ## otheriwse gives NaN for Inf/(Inf+1)
+finTrials[,list(vaccEff,mean,PHU)] ## NEED TO AVERAGE BIAS ON PHU scale 
+
 ## Reorder columns
 front <- c('mod','stopped','vaccGood','vaccBad')
 setcolorder(finTrials, c(front, setdiff(names(finTrials), front)))
@@ -70,14 +71,13 @@ powFin <- summarise(group_by(finTrials, vaccEff, trial, propInTrial, ord, delayU
                     , vaccGood = mean(vaccGood)
                     , cvr = mean(cvr)
                     , cvrNAR = mean(cvr, na.rm=T)
-                    , bias = mean(bias)
-                    , biasNAR = mean(bias, na.rm=T)
                     , mean = mean(mean)
                     , meanNAR = mean(mean, na.rm=T)
                     , vaccBad = mean(vaccBad)
                     , stoppedNAR = mean(stopped,na.rm=T)
                     , vaccGoodNAR = mean(vaccGood,na.rm=T)
                     , vaccBadNAR = mean(vaccBad,na.rm=T)
+                    , PHUNAR = mean(PHU, na.rm=T)
                     , meanErr = mean(err)
                     , meanBump = mean(bump)
                     , stopDay = mean(stopDay)
@@ -85,11 +85,18 @@ powFin <- summarise(group_by(finTrials, vaccEff, trial, propInTrial, ord, delayU
                     , caseC = mean(caseCXimmGrpEnd)
                     , caseV = mean(caseVXimmGrpEnd)
                     )
+
 powFin[,propInTrial:= as.numeric(levels(propInTrial)[propInTrial])]
 powFin[,delayUnit:= as.numeric(levels(delayUnit)[delayUnit])]
 powFin[,trial:=factor(trial)]
-front <- c('mod','vaccEff','stopped','stoppedNAR','vaccGood','vaccGoodNAR','cvr','cvrNAR','bias','biasNAR',
-'nsim','meanErr','propInTrial','vaccBad')
+## Get bias from means done on a PHU scale
+powFin$RHxPHUNAR <- powFin[, -PHUNAR/(PHUNAR-1)]
+powFin$meanXPHUNAR <- powFin[, 1 - RHxPHUNAR]
+powFin$biasNAR <- powFin[, meanXPHUNAR - vaccEff]
+powFin[vaccEff==.7, list(meanNAR,meanXPHUNAR,vaccEff, biasNAR)]
+
+front <- c('mod','vaccEff','stoppedNAR','vaccGoodNAR','cvrNAR','biasNAR',
+'nsim','meanErr','propInTrial','vaccBad','cvr','stopped','vaccGood')
 setcolorder(powFin, c(front, setdiff(names(powFin), front)))
 pf <- data.table(powFin)
 pf <- pf[!(trial=='FRCT' & delayUnit==0) & !(ord=='TU' & delayUnit==0)] ## redundant
@@ -100,4 +107,4 @@ save(pf, file=file.path('Results',paste0('powFin_',thing,'.Rdata')))
 ## to delete a range of jobs
 ## qdel echo `seq -f "%.0f" 2282389 2282404`
 
-RH = mean
+pf[1]
