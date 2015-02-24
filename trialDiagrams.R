@@ -5,7 +5,7 @@ cats <- weeks - 2
 spacing <- 0.02
 
 initHaz <- (runif(cats)+0.5)*3
-declRate <- 0.01
+declRate <- 0.03
 steadyDecline <- c(1,cumprod(rep(1-declRate, weeks-1)))
 haz <- outer(steadyDecline, initHaz)
 dim(haz) <- NULL
@@ -22,4 +22,7 @@ dat[is.na(status), status := "unvaccinated"]
 p <- ggplot(dat) + theme_bw() +
   aes(xmin = week-1+spacing, xmax = week-spacing, 
       ymin = cluster_id-1+spacing, ymax = cluster_id - spacing, fill = hazHomogeneous, alpha=status) +
-  geom_rect() + scale_alpha_discrete(range=c(1,.7)) + scale_fill_continuous(low="blue", high="red")
+  geom_rect() + scale_alpha_discrete(range=c(1,.4)) + scale_fill_continuous(low="blue", high="red")
+p ## comparison plot
+
+## now need to get random sample of initHaz and decline rates
