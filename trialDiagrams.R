@@ -31,7 +31,7 @@ p <- ggplot(dat) + theme_bw() +
   aes(xmin = week-1+spacing, xmax = week-spacing, 
       ymin = cluster_id-1+spacing, ymax = cluster_id - spacing, fill = hazHomogeneous) +
   scale_fill_continuous(low="blue", high="red")
-p + scale_alpha_manual(values=c(0.5, 0.3, 1)) + geom_rect(aes(alpha=status))  ## comparison plot
+p + scale_alpha_manual(values=c(0.7, 0.4, 1)) + geom_rect(aes(alpha=status))  ## comparison plot
 
 dat.poly <- data.table(
   week = rep(dat$week, 3),
@@ -42,6 +42,9 @@ dat.poly <- data.table(
   status = rep(dat$status, 3)
 )
 
-p + scale_alpha_manual(values=c(0.5, 0.3)) + geom_polygon(data=dat.poly[status != "unvaccinated"], mapping = aes(group=interaction(cluster_id, week), x=x, y=y, alpha=status))
+p + scale_alpha_manual(values=c(0.7, 0.4)) +
+  geom_rect(data=dat[status == "unvaccinated"]) +
+  geom_rect(data=dat[status != "unvaccinated"], mapping = aes(ymax=cluster_id-0.5, alpha=status)) +
+  geom_rect(data=dat[status != "unvaccinated"], mapping = aes(ymin=cluster_id-0.5))
 ## now need to get random sample of initHaz and decline rates
 
