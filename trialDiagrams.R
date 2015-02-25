@@ -47,7 +47,11 @@ for (w in (1:cats)+2) {
 p <- ggplot(dat) +
   aes(x=week, y=cluster_id, xmin = as.numeric(week)-0.5+spacing, xmax = as.numeric(week)+0.5-spacing, 
       ymin = as.numeric(cluster_id)-0.5+spacing, ymax = as.numeric(cluster_id)+0.5 - spacing, fill = hazHeterogeneous) +
-  scale_fill_continuous(low="blue", high="red") +
+  scale_fill_continuous(low="blue", high="red", breaks=function(lims) {
+    lim <- as.numeric(lims)
+    del <- 0.05*(lim[2]-lim[1])
+    c(lim[1]+del, lim[2]-del)
+  }, labels=c("low","high")) +
   scale_x_discrete(limits=weekFact) +
   theme(
     axis.line = element_blank(),
@@ -68,6 +72,8 @@ p + scale_alpha_manual(values=c(0.7, 0.4)) +
   geom_rect(data=dat[status != "unvaccinated"], mapping = aes(ymax=as.numeric(cluster_id), alpha=status)) +
   geom_rect(data=dat[status != "unvaccinated"], mapping = aes(ymin=as.numeric(cluster_id))) +
   labs(title="RCT, heterogeneous hazard shapes")
+
+vaxorder <- dat[order_status != "unvaccinated", min(as.numeric(week)), by="cluster_id"]
 
 p + scale_alpha_manual(values=c(0.7, 0.4)) +
   geom_rect(data=dat[order_status == "unvaccinated"]) +
