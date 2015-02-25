@@ -9,7 +9,8 @@ weeks <- cats + 2 + eclipseT + addT
 weekFact <- factor(seq(1,weeks), levels=seq(1,weeks))
 catFact <- factor(seq(1,cats), levels=seq(1,cats))
 
-spacing <- 0.02
+yspacing <- 0.02
+xspacing <- 0
 
 initHaz <- (runif(cats)+0.5)*4
 declRate <- 0.03
@@ -52,8 +53,8 @@ vaxord$vaxorder <- factor(vaxord$vaxorder-min(vaxord$vaxorder)+1)
 dat <- merge(dat, vaxord, by="cluster_id")
 
 p <- ggplot(dat) +
-  aes(x=week, y=cluster_id, xmin = as.numeric(week)-0.5+spacing, xmax = as.numeric(week)+0.5-spacing, 
-      ymin = as.numeric(cluster_id)-0.5+spacing, ymax = as.numeric(cluster_id)+0.5 - spacing, fill = hazHeterogeneous) +
+  aes(x=week, y=cluster_id, xmin = as.numeric(week)-0.5+xspacing, xmax = as.numeric(week)+0.5-xspacing, 
+      ymin = as.numeric(cluster_id)-0.5+yspacing, ymax = as.numeric(cluster_id)+0.5 - yspacing, fill = hazHeterogeneous) +
   scale_fill_continuous(low="blue", high="red", breaks=function(lims) {
     lim <- as.numeric(lims)
     del <- 0.05*(lim[2]-lim[1])
@@ -81,7 +82,7 @@ p +
   geom_rect(data=dat[status != "unvaccinated"], mapping = aes(ymax=as.numeric(cluster_id), alpha=status)) +
   labs(title="RCT, heterogeneous hazard shapes")
 
-p + aes(y=vaxorder, ymin = as.numeric(vaxorder)-0.5+spacing, ymax = as.numeric(vaxorder)+0.5 - spacing) +
+p + aes(y=vaxorder, ymin = as.numeric(vaxorder)-0.5+yspacing, ymax = as.numeric(vaxorder)+0.5 - yspacing) +
   scale_y_discrete(labels = vaxord$cluster_id, name="cluster id") +
   geom_rect(data=dat[order_status == "unvaccinated"]) +
   geom_rect(data=dat[order_status != "unvaccinated"], mapping = aes(ymax=as.numeric(vaxorder), alpha=order_status)) +
