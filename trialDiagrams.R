@@ -6,8 +6,8 @@ addT <- 3
 
 weeks <- cats + 2 + eclipseT + addT
 
-weekFact <- factor(seq(1,weeks))
-catFact <- factor(seq(1,cats))
+weekFact <- factor(seq(1,weeks), levels=seq(1,weeks))
+catFact <- factor(seq(1,cats), levels=seq(1,cats))
 
 spacing <- 0.02
 
@@ -27,17 +27,28 @@ dat <- data.table(
   hazHeterogeneous = hazHe
 )
 
+states <- c("seroconversion lag","vaccinated", "unvaccinated")
 
-dat[ as.numeric(week) > (as.numeric(cluster_id)+1), status := "eclipse"]
-dat[ as.numeric(week) > (as.numeric(cluster_id)+1+eclipseT), status := "vaccinated"]
-dat[is.na(status), status := "unvaccinated"]
+dat[ as.numeric(week) > (as.numeric(cluster_id)+1), status := factor("seroconversion lag", levels=states)]
+dat[ as.numeric(week) > (as.numeric(cluster_id)+1+eclipseT), status := factor("vaccinated", levels=states)]
+dat[is.na(status), status := factor("unvaccinated", levels=states)]
 
-dat$status <- factor(dat$status, levels=c("eclipse","vaccinated", "unvaccinated"))
+dat$status <- factor(dat$status, levels=states)
+
+dat$order_status <- factor("unvaccinated", levels=states)
+
+for (w in (1:cats)+2) {
+  excludeclusters <- dat[(week == w) & (order_status != "unvaccinated"), ]$cluster_id
+  markcluster <- dat[(week == (w-2)) & !(cluster_id %in% excludeclusters) & (hazHeterogeneous == dat[(week == (w-2)) & !(cluster_id %in% excludeclusters), max(hazHeterogeneous)]),]$cluster_id
+  dat[(as.numeric(week) >= w) & cluster_id == markcluster, order_status := factor("seroconversion lag", levels=states)]
+  dat[(as.numeric(week) >= (w+eclipseT)) & cluster_id == markcluster, order_status := factor("vaccinated", levels=states)]
+}
 
 p <- ggplot(dat) +
   aes(x=week, y=cluster_id, xmin = as.numeric(week)-0.5+spacing, xmax = as.numeric(week)+0.5-spacing, 
       ymin = as.numeric(cluster_id)-0.5+spacing, ymax = as.numeric(cluster_id)+0.5 - spacing, fill = hazHeterogeneous) +
   scale_fill_continuous(low="blue", high="red") +
+  scale_x_discrete(limits=weekFact) +
   theme(
     axis.line = element_blank(),
     panel.grid.major = element_blank(),
@@ -45,13 +56,26 @@ p <- ggplot(dat) +
     panel.border = element_blank(),
     panel.background = element_blank()
   ) + labs(y="cluster id", fill="hazard")
+
 p + scale_alpha_manual(values=c(0.7, 0.4, 1)) + geom_rect(aes(alpha=status, fill=hazHomogeneous)) +
-  labs(title="SWT, homogeneous hazard shapes")  ## comparison plot
+  labs(title="SWT, homogeneous hazard shapes")
+
+p + scale_alpha_manual(values=c(0.7, 0.4, 1)) + geom_rect(aes(alpha=status)) +
+  labs(title="SWT, heterogeneous hazard shapes")
 
 p + scale_alpha_manual(values=c(0.7, 0.4)) +
   geom_rect(data=dat[status == "unvaccinated"]) +
   geom_rect(data=dat[status != "unvaccinated"], mapping = aes(ymax=as.numeric(cluster_id), alpha=status)) +
   geom_rect(data=dat[status != "unvaccinated"], mapping = aes(ymin=as.numeric(cluster_id))) +
-  labs(title="RCT, inhomogeneous hazard shapes")
+  labs(title="RCT, heterogeneous hazard shapes")
+
+p + scale_alpha_manual(values=c(0.7, 0.4)) +
+  geom_rect(data=dat[order_status == "unvaccinated"]) +
+  geom_rect(data=dat[order_status != "unvaccinated"], mapping = aes(ymax=as.numeric(cluster_id), alpha=order_status)) +
+  geom_rect(data=dat[order_status != "unvaccinated"], mapping = aes(ymin=as.numeric(cluster_id))) +
+  labs(title="RCT, heterogeneous hazard shapes, clusters ordered by hazard")
+
+## use hazard-based approach to vax clusters, re-order according to week of vaccination
+
 ## now need to get random sample of initHaz and decline rates
 
