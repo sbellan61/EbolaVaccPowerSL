@@ -19,66 +19,23 @@ group.colors['SWT'] <- 'orange'
 pf$design <- factor(pf$design, levels=levels(pf$design)[c(2,1,3)])
 pf[, biasNAR:=biasNAR/vaccEff]
 
-##################################################
-## Power
-for(jj in 1:2) {
-    pdf(paste0('Figures/',labs[jj], 'power SL ALL.pdf'), w = 8, h = 4) ##, units = 'in', res = 200)
-    for(modTmp in levels(pf$model)) {
-        subs <- pf[, model==modTmp & immunoDelay==21 & !(trial%in%c('FRCT','RCT') & grepl('boot',mod))]
-        thax <- element_text(colour = 'black', size = 8)
-        p.tmp <- ggplot(pf[subs], aes(vaccEff, vaccGoodNAR, colour=design, linetype=order)) + 
-            scale_x_continuous(labels = formatC, limits=c(0,.9),  breaks = pf[,unique(vaccEff)], minor_breaks=NULL) +  
-                theme(axis.text.x = thax, axis.text.y = thax, plot.title = element_text(vjust=1),
-                      axis.title.y = element_text(vjust = 1), axis.title.x = element_text(vjust = -.5),
-                      panel.margin = unit(2, "lines"))  + scale_color_manual(values=group.colors) + 
-                          xlab('vaccine efficacy') + ylab('probability of rejecting null') + 
-                              scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
-                                  geom_line(size=1) + facet_wrap(~pit, nrow=1) + 
-                                      ggtitle('power by expected % of district-level cases in trial population') +
-                                          geom_hline(yintercept=.025, color='black', linetype='dotted')
-        if(jj==1) p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,1), minor_breaks = seq(0,1,.05))
-        if(jj==2) p.tmp <- p.tmp + scale_y_log10(labels = formatC, limits=c(0.0005,.9), breaks = c(.01,.025,.05,.1,.2,.5,.8))
-        print(p.tmp)
-        grid.text(modTmp,x=unit(.85,"npc"),y=unit(0.85,"npc"), gp=gpar(fontsize=10))
-    }
-    graphics.off()
-}
-
-##################################################
-## Type I
-labs <- c('','log')
-jj <- 1
-
-for(jj in 1:2) {
-pdf(paste0('Figures/',labs[jj],'Type I SL.pdf'), w = 8, h = 8) ##, units = 'in', res = 200)
-thax <- element_text(colour = 'black', size = 8)
-subs <- pf[,design %in% c('SWT','RCT') & vaccEff==0 & immunoDelay==21 & !(design=='RCT' & grepl('boot',mod))]
-p.tmp <- ggplot(pf[subs], aes(propInTrial, stoppedNAR, colour=design, linetype=order)) + 
-    scale_x_continuous(labels = percent, limits=c(.025,.1), breaks = c(.025,.05,.075,.1)) +  
-##    scale_y_continuous(labels = formatC, limits=c(0,.3)) + #, minor_breaks = seq(0,1,.05)) +
-    theme(axis.text.x = thax, axis.text.y = thax, plot.title = element_text(vjust=1),
-          axis.title.y = element_text(vjust = 1), axis.title.x = element_text(vjust = -.5),
-          panel.margin = unit(2, "lines")) + scale_color_manual(values=group.colors) +
-    xlab('% of distrinct-level cases in trial population') + ylab('Type I Error Rate') + 
-    scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
-    geom_line(size=1) + facet_wrap(~model) + 
-geom_hline(yintercept=.05, color='black', linetype='dotted', size = 1.2)
-if(jj==1) p.tmp <- p.tmp + scale_y_continuous(labels = formatC)#, limits=c(0,.3))
-if(jj==2) p.tmp <- p.tmp + scale_y_log10(labels = formatC, breaks = c(.01, .025, .05, .1, .2, .3, .4))#,  limits=c(.01,.3))
-print(p.tmp)
-graphics.off()
-}
-
 ####################################################################################################
 ## them for ms
 thsb <- theme(axis.text.x = thax, axis.text.y = thax, plot.title = element_text(vjust=1),
-          axis.title.y = element_text(vjust = 1), axis.title.x = element_text(vjust = -.5),
-          axis.line = element_line(), axis.ticks = element_line(color='black'),
-          panel.margin = unit(1, "lines"), legend.key.height=unit(2,"line")
-,legend.position = 'right'
-#              ,legend.justification=c(1,0), legend.position=c(1,0)
-)
+              axis.title.y = element_text(vjust = 1), axis.title.x = element_text(vjust = -.5),
+              axis.line = element_line(), axis.ticks = element_line(color='black'),
+              panel.margin = unit(1, "lines"), legend.key.height=unit(2,"line")
+              , strip.background = element_rect(fill = NA)
+              ,legend.position = 'right'
+              , axis.line = element_blank()
+              ,panel.grid.major = element_blank()
+              , panel.grid.minor = element_blank()
+              ,panel.border = element_blank()
+              ,panel.background = element_blank()
+              ## ,legend.justification=c(1,0), legend.position=c(1,0)
+              )
 theme_set(theme_grey(base_size = 12))
+##thsb <- thsb + theme_bw()#
 
 ####################################################################################################
 ## Figure 2 - Type I errors
@@ -181,8 +138,7 @@ p.tmp <- ggplot(pf[subs], aes(vaccEff, caseTot, colour=design, linetype=order)) 
     xlab('vaccine efficacy') + ylab('# EVD cases') +
     scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
     geom_line(size=1) + facet_wrap(~pit, scale='free_y', nrow=1) + 
-    ggtitle('% of district-level cases in trial population')  + scale_color_manual(values=group.colors) +
-    geom_hline(yintercept=.025, color='black', linetype='dotted')
+    ggtitle('% of district-level cases in trial population')  + scale_color_manual(values=group.colors)
 p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,120)) #
 print(p.tmp)
 ggsave(paste0('Figures/Cases SL ALL.png'), p.tmp, w = 9, h = 3.5)
@@ -197,23 +153,80 @@ pf <- arrange(pf, immunoDelay, trial, propInTrial, mod)
 pf[immunoDelay==21 & mod %in% c('relabCoxME') & vaccEff>.8 &  ((trial=='SWCT' & ord=='none')| ( trial=='RCT' & ord=='TU')),
 list(trial, ord, delayUnit, mod, vaccGoodNAR, propInTrial,vaccEff)]
 
+pf[immunoDelay==21 & mod %in% c('CoxME') & vaccEff==0 &  ((trial=='SWCT' & ord=='none')| ( trial=='RCT' & ord=='TU')),
+list(trial, ord, delayUnit, mod, stoppedNAR, propInTrial,vaccEff)]
+
 pf[mod %in% c('CoxME') & vaccEff>.5 &  ((trial=='SWCT' & ord=='none')| ( trial=='FRCT' & ord=='TU')),
 list(trial, ord, mod, vaccGoodNAR,cvr, propInTrial,vaccEff)]
 
 ## Chosen models
 
 
-subs <- pf[, vaccEff>.8 & immunoDelay==21 & #propInTrial == .05 & 
+subs <- pf[, vaccEff %in% c(0,.9) & immunoDelay==21 & #propInTrial == .05 & 
            ((mod %in% c('CoxME','relabCoxME') &  (trial=='SWCT' & ord=='none') ) |
            (mod %in% c('CoxME') & trial=='RCT' & ord=='TU' ))]
-tab1 <- pf[subs, list(trial, mod, pit, cvr, biasNAR)]
+tab1 <- pf[subs, list(trial, mod, pit, cvr, biasNAR, vaccEff)]
+tab1
 tab1[, list(trial, cvr, biasNAR)]
-tab1[trial=='SWCT', cvr:= cvr[!is.na(cvr)], list(pit)]
+tab1[trial=='SWCT', cvr:= cvr[!is.na(cvr)], list(pit,vaccEff)]
 tab1 <- tab1[!(trial=='SWCT' & mod=='CoxME')]
 tab1[, c('cvr','biasNAR') := list(signif(cvr,2), signif(biasNAR,2))]
 tab1
 
+##dcast.data.table(tab1, trial + mod + pit ~ vaccEff, value.var=c('cvr','biasNAR'))
 tab1 <- data.table(tab1[trial=='RCT',list(pit, cvr,biasNAR)], tab1[trial=='SWCT',list(cvr,biasNAR)])
 tab1
 write.csv(tab1, file='Results/biasCoverage.csv')
 
+
+
+
+#################################################
+## Power
+for(jj in 1:2) {
+    pdf(paste0('Figures/',labs[jj], 'power SL ALL.pdf'), w = 8, h = 4) ##, units = 'in', res = 200)
+    for(modTmp in levels(pf$model)) {
+        subs <- pf[, model==modTmp & immunoDelay==21 & !(trial%in%c('FRCT','RCT') & grepl('boot',mod))]
+        thax <- element_text(colour = 'black', size = 8)
+        p.tmp <- ggplot(pf[subs], aes(vaccEff, vaccGoodNAR, colour=design, linetype=order)) + 
+            scale_x_continuous(labels = formatC, limits=c(0,.9),  breaks = pf[,unique(vaccEff)], minor_breaks=NULL) +  
+                theme(axis.text.x = thax, axis.text.y = thax, plot.title = element_text(vjust=1),
+                      axis.title.y = element_text(vjust = 1), axis.title.x = element_text(vjust = -.5),
+                      panel.margin = unit(2, "lines"))  + scale_color_manual(values=group.colors) + 
+                          xlab('vaccine efficacy') + ylab('probability of rejecting null') + 
+                              scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
+                                  geom_line(size=1) + facet_wrap(~pit, nrow=1) + 
+                                      ggtitle('power by expected % of district-level cases in trial population') +
+                                          geom_hline(yintercept=.025, color='black', linetype='dotted')
+        if(jj==1) p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,1), minor_breaks = seq(0,1,.05))
+        if(jj==2) p.tmp <- p.tmp + scale_y_log10(labels = formatC, limits=c(0.0005,.9), breaks = c(.01,.025,.05,.1,.2,.5,.8))
+        print(p.tmp)
+        grid.text(modTmp,x=unit(.85,"npc"),y=unit(0.85,"npc"), gp=gpar(fontsize=10))
+    }
+    graphics.off()
+}
+
+##################################################
+## Type I
+labs <- c('','log')
+jj <- 1
+
+for(jj in 1:2) {
+pdf(paste0('Figures/',labs[jj],'Type I SL.pdf'), w = 8, h = 8) ##, units = 'in', res = 200)
+thax <- element_text(colour = 'black', size = 8)
+subs <- pf[,design %in% c('SWT','RCT') & vaccEff==0 & immunoDelay==21 & !(design=='RCT' & grepl('boot',mod))]
+p.tmp <- ggplot(pf[subs], aes(propInTrial, stoppedNAR, colour=design, linetype=order)) + 
+    scale_x_continuous(labels = percent, limits=c(.025,.1), breaks = c(.025,.05,.075,.1)) +  
+##    scale_y_continuous(labels = formatC, limits=c(0,.3)) + #, minor_breaks = seq(0,1,.05)) +
+    theme(axis.text.x = thax, axis.text.y = thax, plot.title = element_text(vjust=1),
+          axis.title.y = element_text(vjust = 1), axis.title.x = element_text(vjust = -.5),
+          panel.margin = unit(2, "lines")) + scale_color_manual(values=group.colors) +
+    xlab('% of distrinct-level cases in trial population') + ylab('Type I Error Rate') + 
+    scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
+    geom_line(size=1) + facet_wrap(~model) + 
+geom_hline(yintercept=.05, color='black', linetype='dotted', size = 1.2)
+if(jj==1) p.tmp <- p.tmp + scale_y_continuous(labels = formatC)#, limits=c(0,.3))
+if(jj==2) p.tmp <- p.tmp + scale_y_log10(labels = formatC, breaks = c(.01, .025, .05, .1, .2, .3, .4))#,  limits=c(.01,.3))
+print(p.tmp)
+graphics.off()
+}
