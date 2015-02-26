@@ -8,8 +8,8 @@ addT <- 3
 ## weeks <- cats + 2 + eclipseT + addT
 weeks <- 24
 
-weekFact <- factor(seq(1,weeks), levels=seq(1,weeks))
-catFact <- factor(seq(1,cats), levels=seq(1,cats))
+weekFact <- factor(seq(1,weeks))
+catFact <- factor(LETTERS[seq(1,cats)])
 
 yspacing <- 0.02
 xspacing <- 0
@@ -27,26 +27,23 @@ dat <- data.table(
   week=rep(weekFact, times = cats),
   cluster_id = rep(catFact, each = weeks),
   hazHomogeneous = hazHo,
-  hazHeterogeneous = hazHe
+  hazHeterogeneous = hazHe,
+  status = factor("unvaccinated", levels=states),
+  order_status = factor("unvaccinated", levels=states)
 )
 
 states <- c("unvaccinated", "protective delay","vaccinated")
 
 stateFact <- factor(states, levels=states)
 
-dat[ as.numeric(week) > (as.numeric(cluster_id)+1), status := factor("protective delay", levels=states)]
-dat[ as.numeric(week) > (as.numeric(cluster_id)+1+eclipseT), status := factor("vaccinated", levels=states)]
-dat[is.na(status), status := factor("unvaccinated", levels=states)]
-
-dat$status <- factor(dat$status, levels=states)
-
-dat$order_status <- factor("unvaccinated", levels=states)
+dat[ as.numeric(week) > (as.numeric(cluster_id)+1), status := "protective delay"]
+dat[ as.numeric(week) > (as.numeric(cluster_id)+1+eclipseT), status := "vaccinated"]
 
 for (w in (1:cats)+2) {
   excludeclusters <- dat[(week == w) & (order_status != "unvaccinated"), ]$cluster_id
   markcluster <- dat[(week == (w-2)) & !(cluster_id %in% excludeclusters) & (hazHeterogeneous == dat[(week == (w-2)) & !(cluster_id %in% excludeclusters), max(hazHeterogeneous)]),]$cluster_id
-  dat[(as.numeric(week) >= w) & cluster_id == markcluster, order_status := factor("protective delay", levels=states)]
-  dat[(as.numeric(week) >= (w+eclipseT)) & cluster_id == markcluster, order_status := factor("vaccinated", levels=states)]
+  dat[(as.numeric(week) >= w) & cluster_id == markcluster, order_status := "protective delay"]
+  dat[(as.numeric(week) >= (w+eclipseT)) & cluster_id == markcluster, order_status := "vaccinated"]
 }
 
 vaxord <- dat[order_status != "unvaccinated", list(vaxorder = min(as.numeric(week))), by="cluster_id"]
@@ -102,9 +99,4 @@ RCTnone <- p +
 png('Figures/Fig 1 schematic.png', w = 3.5, h = 9, units='in', res = 200)
 grid_arrange_shared_legend(SWT, RCTtu, ncol = 1)
 graphics.off()
-
-
-## use hazard-based approach to vax clusters, re-order according to week of vaccination
-
-## now need to get random sample of initHaz and decline rates
 
