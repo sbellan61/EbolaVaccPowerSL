@@ -84,8 +84,7 @@ doProj <- function(src, forecast_date = as.Date('2015-12-31'), max_censor_interv
     ))
 }
 
-forecast <- function(fit, main=NULL, nbsize = NULL, doPlot = T, xticks = T,  ylim = NULL, xlim = NULL, verbose=0) with(fit, {
-    if(verbose>20) browser()
+forecast <- function(fit, main=NULL, nbsize = NULL, doPlot = T, xticks = T,  ylim = NULL, xlim = NULL, moreDays=90) with(fit, {
     if(!is.null(xlim)) {
         startX <- xlim[1]
         endX <- xlim[2] 
@@ -121,7 +120,7 @@ createHazTraj <- function(fits, nbsize = 1.2, trialStartDate = as.Date('2015-02-
     if(verbose>20) browser()
     for(cc in 1:numClus) {
         fit <- fits[[sample(regs, 1)]]
-        src <- forecast(fit, doPlot = F, nbsize = nbsize, xlim = xlim, verbose=verbose)
+        src <- forecast(fit, doPlot = F, nbsize = nbsize, xlim = xlim)
         src$day <- src[, as.numeric(Date - trialStartDate)]
         lastDataDay <- src[max(which(!is.na(src$cases))), day]
         src[day < lastDataDay & is.na(cases), cases := 0] ## fill in over interval without reporting
@@ -139,7 +138,7 @@ createHazTraj <- function(fits, nbsize = 1.2, trialStartDate = as.Date('2015-02-
     hazT <- rbindlist(hazTList)
     setnames(hazT, 'haz', 'clusHaz')
     hazT$day <- hazT[, week*7]
-    hazT <- arrange(hazT, day, cluster)
+    setkey(hazT, day, cluster)
     return(hazT[, list(cluster, day, Date, clusHaz)])
 }
 
