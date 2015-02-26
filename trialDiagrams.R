@@ -8,7 +8,7 @@ addT <- 3
 ## weeks <- cats + 2 + eclipseT + addT
 weeks <- 24
 
-weekFact <- factor(seq(1,weeks))
+weekFact <- seq(1,weeks)
 catFact <- factor(LETTERS[seq(1,cats)])
 
 yspacing <- 0.02
@@ -23,6 +23,8 @@ dim(hazHo) <- NULL
 hazHe <- sapply(initHaz, function(ih) ih*varyingDecline())
 dim(hazHe) <- NULL
 
+states <- c("unvaccinated", "protective delay","vaccinated")
+
 dat <- data.table(
   week=rep(weekFact, times = cats),
   cluster_id = rep(catFact, each = weeks),
@@ -32,44 +34,40 @@ dat <- data.table(
   order_status = factor("unvaccinated", levels=states)
 )
 
-states <- c("unvaccinated", "protective delay","vaccinated")
-
 stateFact <- factor(states, levels=states)
 
-dat[ as.numeric(week) > (as.numeric(cluster_id)+1), status := "protective delay"]
-dat[ as.numeric(week) > (as.numeric(cluster_id)+1+eclipseT), status := "vaccinated"]
+dat[ week > (as.numeric(cluster_id)+1), status := "protective delay"]
+dat[ week > (as.numeric(cluster_id)+1+eclipseT), status := "vaccinated"]
 
 for (w in (1:cats)+2) {
   excludeclusters <- dat[(week == w) & (order_status != "unvaccinated"), ]$cluster_id
   markcluster <- dat[(week == (w-2)) & !(cluster_id %in% excludeclusters) & (hazHeterogeneous == dat[(week == (w-2)) & !(cluster_id %in% excludeclusters), max(hazHeterogeneous)]),]$cluster_id
-  dat[(as.numeric(week) >= w) & cluster_id == markcluster, order_status := "protective delay"]
-  dat[(as.numeric(week) >= (w+eclipseT)) & cluster_id == markcluster, order_status := "vaccinated"]
+  dat[(week >= w) & cluster_id == markcluster, order_status := "protective delay"]
+  dat[(week >= (w+eclipseT)) & cluster_id == markcluster, order_status := "vaccinated"]
 }
 
-vaxord <- dat[order_status != "unvaccinated", list(vaxorder = min(as.numeric(week))), by="cluster_id"]
+vaxord <- dat[order_status != "unvaccinated", list(vaxorder = min(week)), by="cluster_id"]
 setkey(vaxord, "vaxorder")
 vaxord$vaxorder <- factor(vaxord$vaxorder-min(vaxord$vaxorder)+1)
 dat <- merge(dat, vaxord, by="cluster_id")
 
-labs <- 0:24
-labs[labs %% 4 !=0] <- ''
-
 p <- ggplot(dat) +
-  aes(x=week, y=cluster_id, xmin = as.numeric(week)-0.5+xspacing, xmax = as.numeric(week)+0.5-xspacing, 
+  aes(x=week, y=cluster_id, xmin = week-0.5+xspacing, xmax = week+0.5-xspacing, 
       ymin = as.numeric(cluster_id)-0.5+yspacing, ymax = as.numeric(cluster_id)+0.5 - yspacing, fill = hazHeterogeneous) +
   scale_fill_continuous(low="dodger blue", high="red", breaks=function(lims) {
     lim <- as.numeric(lims)
     del <- 0.05*(lim[2]-lim[1])
     c(lim[1]+del, lim[2]-del)
-  }, labels=c("low","high")) +
-  scale_x_discrete(limits=weekFact, breaks = 0:24, labels = labs) +
-  scale_alpha_manual(values = c(1, 0.7, 0.4), drop = F) +
+  }, labels=c("low","high"), name="infection hazard") +
+  scale_x_discrete(breaks=weekFact, labels={ temp <- weekFact; temp[temp %% 4 != 0] <- ''; temp }, name="trial week") +
+  scale_alpha_manual(values = c(1, 0.7, 0.4), drop = F, name="participant status") +
   theme(
     axis.line = element_blank(),
     panel.grid.major = element_blank(),
     panel.grid.minor = element_blank(),
     panel.border = element_blank(),
-    panel.background = element_blank()
+    panel.background = element_blank(),
+    axis.ticks.y = element_blank()
   ) + labs(y="cluster", fill="hazard") 
 
 
