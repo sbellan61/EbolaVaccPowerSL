@@ -4,34 +4,27 @@
 library(boot); library(ggplot2)
 load(file='data/cleanSLData.Rdata')
 
-## weird - what's going on w/ logit transform here?  understand we want to let fitting algo
-## explore -/+ inf, but are only interested in decay rates on 0, +inf.  That's not what's actually
-## happening w/ logit however
 param.xform <- function(x) c(x['rate_0'], decay_rate = as.numeric(exp(x['logdecay_rate'])), nbsize = as.numeric(exp(x['lognbsize'])))
-param.xform(c(rate_0=30, logdecay_rate=log(0.01), lognbsize=log(01.2)))
+param.xform(c(rate_0=30, logdecay_rate=log(0.01), lognbsize=log(1.2)))
 
 ## analysis functions
-llgenerator <- function(ratefun, logprobfun, verbose=0) return(
+llgenerator <- function(ratefun, logprobfun) return(
     function(params, cases, times) {
-        if(verbose>24) browser()
         ps <- param.xform(params)
         ll <- sum(logprobfun(ps, ratefun(ps, times), cases))
         return(ll)
     }
-    )
+)
 exp_decay <- function(params, times) params["rate_0"]*exp(-params["decay_rate"]*times)
 
-pois_cases <- function(params, rates, cases, verbose=0) {
-    if(verbose>25) browser()
+pois_cases <- function(params, rates, cases) {
     out <- dpois(cases, lambda=rates, log=TRUE)
-    trates <<- rates
-    ## print(out)
+    ## trates <<- rates
     return(out)
 }
-nbinom_cases <- function(params, rates, cases, verbose=0) {
-    if(verbose>25) browser()
+nbinom_cases <- function(params, rates, cases) {
     out <- dnbinom(cases, size=params["nbsize"], mu=rates, log=TRUE)
-    trates <<- rates
+    ## trates <<- rates
     ## print(out)
     return(out)
 }
@@ -55,12 +48,10 @@ expcurve <- function(optimresults, date_zero, params.xform = function(x) x) with
     })
 })
 
-params <- function(src, censor_interval, include_interval, 
+params <- function(src, start_date, end_date, 
                    param.guess = c(rate_0=30, logdecay_rate=log(0.01)), verbose = 0,
                    lognbsize=log(01.2), ll = 'exp_nbinom_ll') {
     if(verbose>22) browser()
-    end_date <- max(src$Date) - censor_interval
-    start_date <- end_date - include_interval
     slice <- src[(start_date <= src$Date) & (src$Date <= end_date),] ## data.table doesn't work with shiny for some reason?
     slice$t <- as.numeric(slice$Date - min(slice$Date))
     if(sum(slice$int>1)>0) print('not always daily incidence')
@@ -80,26 +71,28 @@ params <- function(src, censor_interval, include_interval,
     list(t0 = start_date, par=res$par, cis=cis)
 }
 
-doProj <- function(src, forecast_date = as.Date('2015-12-31'), censor_interval = 0, include_interval = 30, minCases = 15, 
-                   beforeDays = 30, moreDays = 90, minDecayRate = .01, ll = 'exp_nbinom_ll', model = expcurve,
+doProj <- function(src, forecast_date = as.Date('2015-12-31'), max_censor_interval = 14, 
+                   minDecayRate = .01, ll = 'exp_nbinom_ll', model = expcurve,
                    verbose=0) {
     if(verbose>20) browser()
-    endDate <- max(src$Date) - censor_interval
-    ## minimum cases in last interval to fit exponential, otherwise increase to max # cases
-    fromMax <- T
-    if(fromMax) startDate <- src[length(cases) + 1 - which.max(rev(cases)), Date]
+    endDate <- max(src$Date)
+    maxcases <- src[Date <= (endDate - max_censor_interval), max(cases)]
+    startDate <- src[cases == maxcases, max(Date)]
     include_interval <- endDate-startDate
-    fit_ref <- params(src, censor_interval, include_interval, ll = ll, verbose=verbose)
-    fit_ref$par['decay_rate'] <- max(fit_ref$par['decay_rate'], minDecayRate)
-    srcProj <- data.table(Date = seq(min(src$Date), forecast_date, by='day'))
+    fit_ref <- params(src, startDate, endDate, ll = ll, verbose=verbose)
+    fit_ref$par['decay_rate'] <- max(fit_ref$par['decay_rate'], minDecayRate) 
     maxDataDate <- max(src$Date)
-    src <- merge(src, srcProj, by = 'Date', all=T)
+    ## fill in dates from the beginning of data to end of forecast
+    src <- merge(src, data.table(Date = seq(min(src$Date), forecast_date, by='day')), by = 'Date', all=T)
     src[Date < maxDataDate & is.na(cases), cases:=0] ## fill in dates with missing values for plotting
     src[, reg := reg[1]]
     src$days <- as.numeric(src$Date)
     src$fit <- model(fit_ref, date_zero = src[Date==startDate, days])(src$days)
-    return(list(fit = fit_ref, src = src[,list(Date,reg, cases,fit)], startDate = startDate, endDate = endDate,
-                moreDays=moreDays, beforeDays=beforeDays, include_interval=include_interval, model = model))
+    return(list(
+      fit = fit_ref, src = src[,list(Date,reg, cases,fit)],
+      startDate = startDate, endDate = endDate, include_interval=include_interval,
+      model = model
+    ))
 }
 
 forecast <- function(fit, main=NULL, nbsize = NULL, doPlot = T, xticks = T,  ylim = NULL, xlim = NULL, verbose=0) with(fit, {
