@@ -161,4 +161,7 @@ createHazTraj <- function(fits, nbsize = 1.2, trialStartDate = as.Date('2015-02-
     return(hazT[, list(cluster, day, Date, clusHaz)])
 }
 
-
+makeTransparent<-function(someColor, alpha=150) {
+    newColor<-col2rgb(someColor)
+    apply(newColor, 2, function(curcoldata){rgb(red=curcoldata[1], green=curcoldata[2],
+                                                blue=curcoldata[3],alpha=alpha, maxColorValue=255)})}

@@ -44,16 +44,53 @@ for(rr in regs) srcs[[rr]] <- forecast(fits[[rr]], main = rr, nbsize = nbsize, x
 graphics.off()
 srcProj <- rbindlist(srcs)
 
-
+ 
 ## Show simulated hazards from fits
-pdf('Figures/example hazT.pdf')
-for(jj in 1:10) {
-    par(mar=c(5,5,2,.5), 'ps'=12, mgp = c(4,1,0))
-    plot(0,0, type = 'n', xlab = 'weeks', ylab = 'hazard per person-month', main='', bty = 'n', las = 1,
-         xlim = c(-5, 35), ylim = c(0,.02))
-    ht <- createHazTraj(fits, numClus = 20, trialStartDate = as.Date('2015-02-01')) ## start date works, can test here
-    ht[, lines(day/7,clusHaz*30, col = rainbow(20)[cluster], type = 'l', lwd = 2), cluster]
-}
+##pdf('Figures/example hazT.pdf', w = 6.5, h = 4)
+png('Figures/example hazT.png', w = 6.5, h = 4, units='in', res = 200)
+##for(jj in 1:10) {
+set.seed(8)
+par(mar=c(5,5,2,.5), 'ps'=12, mgp = c(4,1,0), mfrow = c(1,2))
+ht <- createHazTraj(fits, numClus = 20, trialStartDate = as.Date('2015-02-01')) ## start date works, can test here
+xlim <- ht[day>=-30 & day < 150, range(Date)]
+plot(xlim,c(0,0), type = 'n', xlab = '', ylab = 'hazard per person-month', main='', bty = 'n', las = 2,
+     xlim = as.Date(xlim), ylim = c(0,.03), axes = F)
+yticks <- seq(0,.03,by=.005)
+axis(2, yticks, las = 2)
+mnth <- seq.Date(as.Date('2015-01-01'),as.Date('2015-07-01'), by ='month')
+axis.Date(1, at = mnth,  format = '%b-%d', las = 2)
+ht[, lines(Date,clusHaz*30, col = rainbow(20)[cluster], type = 'l', lwd = 2), cluster]
+##}
+title('A. Cluster-level hazards')
+########## individual heterogneiety
+par(mar=c(5,2,2,.5))
+plot(xlim,c(0,0), type = 'n', xlab = '', ylab = 'hazard per person-month', main='', bty = 'n', las = 2,
+     xlim = as.Date(xlim), ylim = c(0,.03), axes=F)
+mnth <- seq.Date(as.Date('2015-01-01'),as.Date('2015-07-01'), by ='month')
+axis.Date(1, at = mnth,  format = '%b-%d', las = 2)
+axis(2, yticks, lab = NA)
+nrand <- 2
+clsh <- 2
+rand <- data.table(indiv = 1:nrand, rf = qlnorm(c(.25,.75)), cluster = clsh)
+htshow <- ht[cluster==clsh]
+htshow <- merge(htshow, rand, by = 'cluster', allow.cartesian=T)
+htshow[, indivHaz := clusHaz* rf]
+coltr <- makeTransparent(rainbow(20)[clsh])
+polygon(htshow[indiv==1,c(Date,rev(Date))], c(htshow[indiv==1, indivHaz*30], rev(htshow[indiv==2, indivHaz*30])), 
+        col = coltr , border = NA)
+ht[cluster==clsh, lines(Date,clusHaz*30, col = rainbow(20)[cluster], type = 'l', lwd = 2)]
+## xlim <- c(.05, 20)
+## xx <- exp(pretty(log(xlim), 1000))
+## yy <- dnorm(log(xx), 0,  1)
+## plot(xx,yy, type = 'h', xlab = 'risk factor', ylab='', main='', 
+##      bty = 'n', xlim = xlim, log='x',ylim = c(0,.6), axes=F)
+## ##labs <- c(expression(10^-3), expression(10^-2), expression(10^-1), expression(10^0),expression(10^1), expression(10^2), expression(10^3))
+## axis(1, at = c(.1,.5,1,2,10), las = 2)#, lab = c(expression(1/10),expression(1/2),1,2,10), las = 1)
+title('B. Individual-level variation \naround cluster mean')
 graphics.off()
 
 save(fits, regs, file = 'data/createHT.Rdata')
+
+yy <- dlnorm(xx, meanlog=0, sdlog=1)
+plot(log(xx),yy, type = 'h', xlab = 'risk factor', ylab = '', bty = 'n', yaxt='n')
+title(ylab='density', line = 0)
