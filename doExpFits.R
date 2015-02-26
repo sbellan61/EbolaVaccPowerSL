@@ -13,7 +13,7 @@ regs <- levels(sl$reg)
 ## Fit to current incidence trends
 
 fits <- NULL
-for(rr in regs) fits[[rr]] <- doProj(sl[reg==rr], ll='exp_nbinom_ll', verbose=19)
+for(rr in regs) fits[[rr]] <- doProj(sl[reg==rr], ll='exp_nbinom_ll')
 
 nbsizeS <- unlist(lapply(fits, function(rr) rr$fit$par["nbsize"]))
 mean(nbsizeS) ## 1.2
