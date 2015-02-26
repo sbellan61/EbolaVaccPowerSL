@@ -11,10 +11,9 @@ xlim <- as.Date(c('2014-09-15','2015-05-01'))
 regs <- levels(sl$reg)
 
 ## Fit to current incidence trends
-include_interval <- 60 ## how many days back to include in exponential decay fit
-minCases <- 30 ## if smaller than this then fit back to peak in subnational unit
+
 fits <- NULL
-for(rr in regs) fits[[rr]] <- doProj(sl[reg==rr], include_interval = include_interval, minCases = minCases, ll='exp_nbinom_ll', verbose=19)
+for(rr in regs) fits[[rr]] <- doProj(sl[reg==rr], ll='exp_nbinom_ll', verbose=19)
 
 nbsizeS <- unlist(lapply(fits, function(rr) rr$fit$par["nbsize"]))
 mean(nbsizeS) ## 1.2
