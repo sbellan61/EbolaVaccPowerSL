@@ -116,4 +116,3 @@ FRCT
 # png('Figures/Fig 1 schematic.png', w = 3.5, h = 9, units='in', res = 200)
 # grid_arrange_shared_legend(SWT, RCTtu, ncol = 1)
 # graphics.off()
-
