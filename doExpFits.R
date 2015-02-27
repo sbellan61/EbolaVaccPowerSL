@@ -11,10 +11,9 @@ xlim <- as.Date(c('2014-09-15','2015-05-01'))
 regs <- levels(sl$reg)
 
 ## Fit to current incidence trends
-include_interval <- 60 ## how many days back to include in exponential decay fit
-minCases <- 30 ## if smaller than this then fit back to peak in subnational unit
+
 fits <- NULL
-for(rr in regs) fits[[rr]] <- doProj(sl[reg==rr], include_interval = include_interval, minCases = minCases, ll='exp_nbinom_ll', verbose=19)
+for(rr in regs) fits[[rr]] <- doProj(sl[reg==rr], ll='exp_nbinom_ll')
 
 nbsizeS <- unlist(lapply(fits, function(rr) rr$fit$par["nbsize"]))
 mean(nbsizeS) ## 1.2
@@ -29,7 +28,7 @@ regDo <- c('Kono','PortLoko', 'WesternAreaUrban', 'WesternAreaRural')
 labDo <- c('Kono','Port Loko', 'Western Area Urban', 'Western Area Rural')
 for(ri in 1:4) srcs[[regDo[ri]]] <- forecast(fits[[regDo[ri]]], main = labDo[ri], nbsize = nbsize
 ##                                             ,ylim = c(0,50)
-                                             , xlim = xlim, xticks = ri>2, verbose = 19)
+                                             , xlim = xlim, xticks = ri>2)
 mtext('new cases', 2, 0, outer=T)
 graphics.off()
 
@@ -40,7 +39,7 @@ nbsize <- 1.2 ## NULL
 par(lwd=1, 'ps' = 12, mar = c(5,3,1.5,.5),mfrow = c(4,4))
 regs <- sl[,unique(reg)]
 srcs <- NULL
-for(rr in regs) srcs[[rr]] <- forecast(fits[[rr]], main = rr, nbsize = nbsize, xlim = xlim,verbose = 19)
+for(rr in regs) srcs[[rr]] <- forecast(fits[[rr]], main = rr, nbsize = nbsize, xlim = xlim)
 graphics.off()
 srcProj <- rbindlist(srcs)
 
@@ -89,8 +88,8 @@ ht[cluster==clsh, lines(Date,clusHaz*30, col = rainbow(20)[cluster], type = 'l',
 title('B. Individual-level variation \naround cluster mean')
 graphics.off()
 
-save(fits, regs, file = 'data/createHT.Rdata')
+save(fits, regs, ht, file = 'data/createHT.Rdata')
 
-yy <- dlnorm(xx, meanlog=0, sdlog=1)
-plot(log(xx),yy, type = 'h', xlab = 'risk factor', ylab = '', bty = 'n', yaxt='n')
-title(ylab='density', line = 0)
+#yy <- dlnorm(xx, meanlog=0, sdlog=1)
+#plot(log(xx),yy, type = 'h', xlab = 'risk factor', ylab = '', bty = 'n', yaxt='n')
+#title(ylab='density', line = 0)
