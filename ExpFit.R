@@ -100,9 +100,9 @@ forecast <- function(fit, main=NULL, nbsize = NULL, doPlot = T, xticks = T,  yli
                                                  xlim=xlim, ylim=ylim, xlab = '', lwd = 3)]
         rgDates <- seq.Date(startX, endX, by = 1)
         seqDates <- rgDates[format(rgDates, '%d') %in% c('01')]
-        seqDatesTk <- rgDates[format(rgDates, '%d') %in% c('01','15')]
-        axis.Date(1, at = seqDatesTk, labels = F)
-        if(xticks) axis.Date(1, at = seqDates, format = '%b-%d', las = 2)    
+        seqDatesMid <- rgDates[format(rgDates, '%d') %in% c('15')]
+        axis.Date(1, at = seqDatesMid, labels = NA)
+        if(xticks) axis.Date(1, at = seqDates, format = '%b', las = 2, tck=0)
         rect(startDate, 0, endDate, par('usr')[4], col = rgb(0,.5,0,.3), border=NA)
         title(main)
         src[Date > endDate, lines(Date, proj, type = 'h', lwd = 3, col = 'red')]
