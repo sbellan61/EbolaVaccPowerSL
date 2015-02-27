@@ -20,7 +20,9 @@ nbsizeS <- unlist(lapply(fits, function(rr) rr$fit$par["nbsize"]))
 mean(nbsizeS) ## 1.2
 
 ## Show fits and one simulated projection by subregion (4 districts only)
-png('Figures/Fig 1 - forecasted district data.png',  w = 6.5, h = 3.5, units='in',res=200)
+for(ii in 1:2) {
+if(ii==2) png('Figures/Fig 1 - forecasted district data.png',  w = 6.5, h = 3.5, units='in',res=200)
+if(ii==1) pdf('Figures/Fig 1 - forecasted district data.pdf',  w = 6.5, h = 3.5)
 nbsize <- 1.2 ## NULL
 par(lwd=1, 'ps' = 10, mar = c(1,3,2,.5),mfrow = c(2,2), oma = c(3,1.5,0,0))
 regs <- sl[,unique(reg)]
@@ -32,6 +34,7 @@ for(ri in 1:4) srcs[[regDo[ri]]] <- forecast(fits[[regDo[ri]]], main = labDo[ri]
                                              , xlim = xlim, xticks = ri>2, verbose = 19)
 mtext('new cases', 2, 0, outer=T)
 graphics.off()
+}
 
 ## Show fits and one simulated projection by subregion
 ##pdf('Figures/forecasted Paneled SL cleaned subnational data fromMax.pdf',  w = 10, h = 8)
@@ -46,8 +49,9 @@ srcProj <- rbindlist(srcs)
 
  
 ## Show simulated hazards from fits
-##pdf('Figures/example hazT.pdf', w = 6.5, h = 4)
+for(ii in 1:2) {
 png('Figures/example hazT.png', w = 6.5, h = 4, units='in', res = 200)
+pdf('Figures/example hazT.pdf', w = 6.5, h = 4)
 ##for(jj in 1:10) {
 set.seed(8)
 par(mar=c(3,1,2,.5), 'ps'=12, mgp = c(4,1,0), mfrow = c(1,2), oma = c(0,4,0,0))
@@ -90,7 +94,7 @@ ht[cluster==clsh, lines(Date,clusHaz*30, col = rainbow(20)[cluster], type = 'l',
 title('(B)') ##. Individual-level variation \naround cluster mean')
 mtext('hazard per person-month', 2, 3, outer = T, at = .6)
 graphics.off()
-
+}
 save(fits, regs, file = 'data/createHT.Rdata')
 
 yy <- dlnorm(xx, meanlog=0, sdlog=1)
