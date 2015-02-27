@@ -24,7 +24,7 @@ for(ii in 1:2) {
 if(ii==2) png('Figures/Fig 1 - forecasted district data.png',  w = 6.5, h = 3.5, units='in',res=200)
 if(ii==1) pdf('Figures/Fig 1 - forecasted district data.pdf',  w = 6.5, h = 3.5)
 nbsize <- 1.2 ## NULL
-par(lwd=1, 'ps' = 10, mar = c(1,3,2,.5),mfrow = c(2,2), oma = c(3,1.5,0,0))
+par(lwd=1, 'ps' = 10, mar = c(1,3,2,.5),mfrow = c(2,2), oma = c(2,1.5,0,0))
 regs <- sl[,unique(reg)]
 srcs <- NULL
 regDo <- c('Kono','PortLoko', 'WesternAreaUrban', 'WesternAreaRural')
