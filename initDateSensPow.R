@@ -8,7 +8,7 @@ labs <- c('','log')
 
 thing <- 'initDateSens'
 load(file=file.path('Results',paste0('powFin_',thing,'.Rdata')))
-pf[vaccEff==.5 & trial=='RCT' & propInTrial==.025 & mod=='CoxME']
+#pf[vaccEff==.5 & trial=='RCT' & propInTrial==.025 & mod=='CoxME']
 gg_color_hue <- function(n) {
   hues = seq(15, 375, length=n+1)
   hcl(h=hues, l=65, c=100)[1:n]
@@ -40,19 +40,21 @@ theme_set(theme_grey(base_size = 12))
 ####################################################################################################
 ## Figure 4 - Power
 subs <- pf[, immunoDelay==21 & ((design == 'SWT' & mod=='relabCoxME') | (design == 'RCT' & order=='time-updated' & mod =='CoxME'))]
-        thax <- element_text(colour = 'black', size = 8)
-        p.tmp <- ggplot(pf[subs], aes(trialStartDate, vaccGoodNAR, colour=design, linetype=order)) + thsb +
-            scale_x_date(labels = date_format("%b-%d"), breaks = pf[,unique(trialStartDate)], minor_breaks=NULL) +  
-                          xlab('trial start date') + ylab('power') + 
-                              scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
- theme(axis.text.x = element_text(angle=90)) + scale_color_manual(values=group.colors) +
-     geom_segment(aes(x = as.Date('2015-02-18'), y =1, xend = as.Date('2015-02-18'), yend = .77), 
-                  color='black',arrow = arrow(length = unit(0.2, "cm"))) +
-     geom_segment(aes(x = as.Date('2015-03-18'), y =.7, xend = as.Date('2015-03-18'), yend = .5), 
-                  color='black',arrow = arrow(length = unit(0.2, "cm"))) +
-                                  geom_line(size=1) #+ facet_wrap(~pit, scales = "free_y",nrow=1) + 
+thax <- element_text(colour = 'black', size = 8)
+p.tmp <- ggplot(pf[subs]) +
+  aes(x=trialStartDate, y=vaccGoodNAR, colour=design, linetype=order) + 
+  thsb + theme(axis.text.x = element_text(angle=90)) +
+  scale_x_date(labels = date_format("%b-%d"), breaks = pf[,unique(trialStartDate)], minor_breaks=NULL) +
+  scale_y_continuous(labels = formatC, limits=c(0,1), breaks=seq(0,1,by=.1), minor_breaks = NULL) +  
+  xlab('trial start date') + ylab('power') + 
+  geom_rect(aes(xmin=as.Date('2015-02-18'), xmax = as.Date('2015-03-18'), ymin=0, ymax=1), fill = "lightgrey", color=NA) +
+  geom_line(size=1) + #+ facet_wrap(~pit, scales = "free_y",nrow=1) + 
+  scale_color_manual(values=group.colors) +
+  scale_linetype_discrete(guide=F)# breaks=group.colors,
+p.tmp
+                                  
 #                                      ggtitle('expected % of district-level cases in trial population')
-p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,1), breaks=seq(0,1,by=.1), minor_breaks = NULL) #seq(0,1,.05))
+
 ggsave(paste0('Figures/Fig 6 - Power by start date SL.png'), p.tmp, w = 5, h = 3)
 
 
