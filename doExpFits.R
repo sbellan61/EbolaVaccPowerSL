@@ -90,6 +90,6 @@ graphics.off()
 
 save(fits, regs, ht, file = 'data/createHT.Rdata')
 
-yy <- dlnorm(xx, meanlog=0, sdlog=1)
-plot(log(xx),yy, type = 'h', xlab = 'risk factor', ylab = '', bty = 'n', yaxt='n')
-title(ylab='density', line = 0)
+#yy <- dlnorm(xx, meanlog=0, sdlog=1)
+#plot(log(xx),yy, type = 'h', xlab = 'risk factor', ylab = '', bty = 'n', yaxt='n')
+#title(ylab='density', line = 0)
