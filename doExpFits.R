@@ -49,7 +49,7 @@ srcProj <- rbindlist(srcs)
 png('Figures/example hazT.png', w = 6.5, h = 4, units='in', res = 200)
 ##for(jj in 1:10) {
 set.seed(8)
-par(mar=c(5,5,2,.5), 'ps'=12, mgp = c(4,1,0), mfrow = c(1,2))
+par(mar=c(3,1,2,.5), 'ps'=12, mgp = c(4,1,0), mfrow = c(1,2), oma = c(0,4,0,0))
 ht <- createHazTraj(fits, numClus = 20, trialStartDate = as.Date('2015-02-01')) ## start date works, can test here
 xlim <- ht[day>=-30 & day < 150, range(Date)]
 plot(xlim,c(0,0), type = 'n', xlab = '', ylab = 'hazard per person-month', main='', bty = 'n', las = 2,
@@ -57,17 +57,18 @@ plot(xlim,c(0,0), type = 'n', xlab = '', ylab = 'hazard per person-month', main=
 yticks <- seq(0,.03,by=.005)
 axis(2, yticks, las = 2)
 mnth <- seq.Date(as.Date('2015-01-01'),as.Date('2015-07-01'), by ='month')
-axis.Date(1, at = mnth,  format = '%b-%d', las = 2)
+mnth.mids <- seq.Date(as.Date('2015-01-15'),as.Date('2015-07-15'), by ='month')
+axis.Date(1, at = mnth,  format = '%b-%d', label = NA)
+axis.Date(1, at = mnth.mids,  format = '%b', las = 2, tck=0)
 ht[, lines(Date,clusHaz*30, col = rainbow(20)[cluster], type = 'l', lwd = 2), cluster]
 ##}
-title('A. Cluster-level hazards')
+title('(A)')##. Cluster-level hazards')
 ########## individual heterogneiety
-par(mar=c(5,2,2,.5))
-plot(xlim,c(0,0), type = 'n', xlab = '', ylab = 'hazard per person-month', main='', bty = 'n', las = 2,
+plot(xlim,c(0,0), type = 'n', xlab = '', ylab = '', main='', bty = 'n', las = 2,
      xlim = as.Date(xlim), ylim = c(0,.03), axes=F)
-mnth <- seq.Date(as.Date('2015-01-01'),as.Date('2015-07-01'), by ='month')
-axis.Date(1, at = mnth,  format = '%b-%d', las = 2)
 axis(2, yticks, lab = NA)
+axis.Date(1, at = mnth,  format = '%b-%d', label = NA)
+axis.Date(1, at = mnth.mids,  format = '%b', las = 2, tck=0)
 nrand <- 2
 clsh <- 2
 rand <- data.table(indiv = 1:nrand, rf = qlnorm(c(.25,.75)), cluster = clsh)
@@ -85,7 +86,8 @@ ht[cluster==clsh, lines(Date,clusHaz*30, col = rainbow(20)[cluster], type = 'l',
 ##      bty = 'n', xlim = xlim, log='x',ylim = c(0,.6), axes=F)
 ## ##labs <- c(expression(10^-3), expression(10^-2), expression(10^-1), expression(10^0),expression(10^1), expression(10^2), expression(10^3))
 ## axis(1, at = c(.1,.5,1,2,10), las = 2)#, lab = c(expression(1/10),expression(1/2),1,2,10), las = 1)
-title('B. Individual-level variation \naround cluster mean')
+title('(B)') ##. Individual-level variation \naround cluster mean')
+mtext('hazard per person-month', 2, 3, outer = T, at = .6)
 graphics.off()
 
 save(fits, regs, ht, file = 'data/createHT.Rdata')

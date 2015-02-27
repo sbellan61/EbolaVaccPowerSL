@@ -1,7 +1,7 @@
 require(ggplot2); require(data.table); require(gridExtra)
 source('multiplot.R')
 
-cats <- 20
+cats <- length(unique(ht$cluster))
 eclipseT <- 3
 addT <- 3
 
