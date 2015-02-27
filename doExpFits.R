@@ -49,8 +49,8 @@ srcProj <- rbindlist(srcs)
  
 ## Show simulated hazards from fits
 for(ii in 1:2) {
-png('Figures/example hazT.png', w = 6.5, h = 4, units='in', res = 200)
-pdf('Figures/example hazT.pdf', w = 6.5, h = 4)
+  if(ii==2) png('Figures/example hazT.png', w = 6.5, h = 4, units='in', res = 200)
+  if(ii==1) pdf('Figures/example hazT.pdf', w = 6.5, h = 4)
 ##for(jj in 1:10) {
 set.seed(8)
 par(mar=c(3,1,2,.5), 'ps'=12, mgp = c(4,1,0), mfrow = c(1,2), oma = c(0,4,0,0))
@@ -93,13 +93,8 @@ ht[cluster==clsh, lines(Date,clusHaz*30, col = rainbow(20)[cluster], type = 'l',
 title('(B)') ##. Individual-level variation \naround cluster mean')
 mtext('hazard per person-month', 2, 3, outer = T, at = .6)
 graphics.off()
-<<<<<<< HEAD
-
-save(fits, regs, ht, file = 'data/createHT.Rdata')
-=======
 }
-save(fits, regs, file = 'data/createHT.Rdata')
->>>>>>> sb-fig-tweaks
+save(fits, regs, ht, file = 'data/createHT.Rdata')
 
 #yy <- dlnorm(xx, meanlog=0, sdlog=1)
 #plot(log(xx),yy, type = 'h', xlab = 'risk factor', ylab = '', bty = 'n', yaxt='n')
