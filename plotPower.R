@@ -18,6 +18,8 @@ group.colors[c(1,3,2)] <- gg_color_hue(3)
 group.colors['SWT'] <- 'orange'
 pf$design <- factor(pf$design, levels=levels(pf$design)[c(2,1,3)])
 pf[, biasNAR:=biasNAR/vaccEff]
+levels(pf$order)[1] <- 'random'
+
 
 ####################################################################################################
 ## them for ms
@@ -53,6 +55,7 @@ p.tmp <- ggplot(pf[subs],
 if(jj==1) p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,.1))
 if(jj==2) p.tmp <- p.tmp + scale_y_log10(labels = formatC, breaks = c(.01, .025, .05, .1), limits = c(.005,.1), minor_breaks=NULL) 
 ggsave(paste0('Figures/Fig 2A -',labs[jj],'Type I SL.png'), p.tmp, w = 8.5, h = 3.5)
+ggsave(paste0('Figures/Fig 2A -',labs[jj],'Type I SL.pdf'), p.tmp, w = 8.5, h = 3.5)
 }
 
 ####################################################################################################
@@ -72,6 +75,7 @@ p.tmp <- ggplot(pf[subs],
 if(jj==1) p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,.15))
 if(jj==2) p.tmp <- p.tmp + scale_y_log10(labels = formatC, breaks = c(.01, .025, .05, .1, .25), limits = c(.005,.25), minor_breaks=NULL) 
 ggsave(paste0('Figures/Fig 2B -',labs[jj],'Type I SL.png'), p.tmp, w = 6.5, h = 3.5)
+ggsave(paste0('Figures/Fig 2B -',labs[jj],'Type I SL.pdf'), p.tmp, w = 6.5, h = 3.5)
 }
 
 ####################################################################################################
@@ -89,6 +93,7 @@ for(jj in 1:2) {
     if(jj==1) p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,1), breaks=seq(0,1,by=.1), minor_breaks = NULL) #seq(0,1,.05))
     if(jj==2) p.tmp <- p.tmp + scale_y_log10(labels = formatC, limits=c(0.01,.9), breaks = c(.01,.025,.05,.1,.2,.5,.8))
     ggsave(paste0('Figures/Fig 4 -',labs[jj],'Power SL.png'), p.tmp, w = 9, h = 4)
+    ggsave(paste0('Figures/Fig 4 -',labs[jj],'Power SL.pdf'), p.tmp, w = 9, h = 4)
 }
 
 ####################################################################################################
@@ -103,6 +108,7 @@ scale_color_manual(values=group.colors) +
                                   geom_line(size=1)  #facet_wrap(~immunoDelay, scales = "free_y",nrow=1) + 
  p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,1), breaks=seq(0,1,by=.1), minor_breaks = NULL) #seq(0,1,.05))
 ggsave(paste0('Figures/Fig 5 - Power by seroconversion delay SL.png'), p.tmp, w = 5, h = 4)
+ggsave(paste0('Figures/Fig 5 - Power by seroconversion delay SL.pdf'), p.tmp, w = 5, h = 4)
 
 
 ####################################################################################################
@@ -127,6 +133,7 @@ p.tmp <- ggplot(pf[subs], aes(vaccEff, vaccGoodNAR, colour=modClass, linetype=mo
 if(jj==1) p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,1))
 if(jj==2) p.tmp <- p.tmp + scale_y_log10(labels = formatC, breaks = c(.01, .025, .05, .1, .25, .5, 1), limits = c(.005,1), minor_breaks=NULL) 
 ggsave(paste0('Figures/Fig SX', labs[jj], ' - Power by model delay SL.png'), p.tmp, w = 6, h = 4)
+ggsave(paste0('Figures/Fig SX', labs[jj], ' - Power by model delay SL.pdf'), p.tmp, w = 6, h = 4)
 }
 
 ##################################################
@@ -142,6 +149,7 @@ p.tmp <- ggplot(pf[subs], aes(vaccEff, caseTot, colour=design, linetype=order)) 
 p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,120)) #
 print(p.tmp)
 ggsave(paste0('Figures/Cases SL ALL.png'), p.tmp, w = 9, h = 3.5)
+ggsave(paste0('Figures/Cases SL ALL.pdf'), p.tmp, w = 9, h = 3.5)
 
 subs <- pf[,vaccEff==0 & (delayUnit==0 | (trial=='SWCT')) & mod =='CoxME']
 pf[subs, list(caseTot,caseC,caseV,pit,trial,delayUnit,vaccEff)]
@@ -150,20 +158,20 @@ pf[subs, list(caseTot,caseC,caseV,pit,trial,delayUnit,vaccEff)]
 ## abstract #'s and tables
 pf <- arrange(pf, immunoDelay, trial, propInTrial, mod)
 
-pf[immunoDelay==21 & mod %in% c('relabCoxME') & vaccEff>.8 &  ((trial=='SWCT' & ord=='none')| ( trial=='RCT' & ord=='TU')),
+pf[immunoDelay==21 & mod %in% c('relabCoxME') & vaccEff>.8 &  ((trial=='SWCT' & ord=='random')| ( trial=='RCT' & ord=='TU')),
 list(trial, ord, delayUnit, mod, vaccGoodNAR, propInTrial,vaccEff)]
 
-pf[immunoDelay==21 & mod %in% c('CoxME') & vaccEff==0 &  ((trial=='SWCT' & ord=='none')| ( trial=='RCT' & ord=='TU')),
+pf[immunoDelay==21 & mod %in% c('CoxME') & vaccEff==0 &  ((trial=='SWCT' & ord=='random')| ( trial=='RCT' & ord=='TU')),
 list(trial, ord, delayUnit, mod, stoppedNAR, propInTrial,vaccEff)]
 
-pf[mod %in% c('CoxME') & vaccEff>.5 &  ((trial=='SWCT' & ord=='none')| ( trial=='FRCT' & ord=='TU')),
+pf[mod %in% c('CoxME') & vaccEff>.5 &  ((trial=='SWCT' & ord=='random')| ( trial=='FRCT' & ord=='TU')),
 list(trial, ord, mod, vaccGoodNAR,cvr, propInTrial,vaccEff)]
 
 ## Chosen models
 
 
 subs <- pf[, vaccEff %in% c(0,.9) & immunoDelay==21 & #propInTrial == .05 & 
-           ((mod %in% c('CoxME','relabCoxME') &  (trial=='SWCT' & ord=='none') ) |
+           ((mod %in% c('CoxME','relabCoxME') &  (trial=='SWCT' & ord=='random') ) |
            (mod %in% c('CoxME') & trial=='RCT' & ord=='TU' ))]
 tab1 <- pf[subs, list(trial, mod, pit, cvr, biasNAR, vaccEff)]
 tab1
