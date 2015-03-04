@@ -50,6 +50,19 @@ makePop <- function(parms=makeParms()) within(parms, {
                       )
 })
 
+## reparameterize a gamma by mean/var to simulate spatial variation in underlying hazards (change
+## later to something more reasonable or based on real data)
+reParmRgamma <- function(nn, mean, cv) {
+    if(cv > 0) {
+        var <- (cv*mean)^2 ## cv = sd/mean, so sd = cv*mean, so var = (cv*mean)^2
+        theta <- var/mean
+        k <- mean/theta
+        rgamma(nn, shape = k, scale = theta)
+    }else{ ## no variance
+        mean
+    }
+}
+
 ## Phenomenological Hazard Trajectories to explore exact cause of elevated Type I errors
 createHazTraj_Phenom <- function(parms) within(parms, {
     if(verbose>10) browser()
@@ -60,10 +73,9 @@ createHazTraj_Phenom <- function(parms) within(parms, {
     ## mean cluster hazard trajectory
     for(ii in 1:numClus) hazT[which(hazT[,cluster]==ii), clusHaz := baseClusHaz[ii]*dailyDecayRates[ii]^day]
     ## negative binomial variation around smooth declines
-    hazT[, clusHaz := reParmRgamma(length(clusHaz), mean = clusHaz, cv = cvClusTime)]
+    hazT[, clusHaz := reParmRgamma(nrow(hazT), mean = clusHaz, cv = cvClusTime)]
     rm(ii, cHind, baseClusHaz)
 })
-
 
 ## Hazard Trajectories from SL district-level incidence (calls fits peviously made)
 createHazTraj_SL <- function(parms) within(parms, {
@@ -104,19 +116,6 @@ setIndHaz <- function(parms=makePop()) within(parms, {
 })
 ## setHazs(makePop(makeParms(weeklyDecay=1, weeklyDecayVar=0)))$popH[cluster==1,]
 ## setHazs(makePop(makeParms(weeklyDecay=.9, weeklyDecayVar=0)))$popH[cluster==1,]
-
-## reparameterize a gamma by mean/var to simulate spatial variation in underlying hazards (change
-## later to something more reasonable or based on real data)
-reParmRgamma <- function(n, mean, cv) {
-    if(cv > 0) {
-        var <- (cv*mean)^2 ## cv = sd/mean, so sd = cv*mean, so var = (cv*mean)^2
-        theta <- var/mean
-        k <- mean/theta
-        rgamma(n, shape = k, scale = theta)
-    }else{ ## no variance
-        rep(mean, n)
-    }
-}
 
 reordPop <- function(parms) { ## wrapper around other functions below
     reordFXN <- get(paste0('reord',parms$trial))

@@ -17,27 +17,27 @@ plotHazT <- function(parms, flnm = NULL, browse=F, main='', ymax = NULL, ...) wi
     if(!is.null(flnm)) graphics.off()
 })
 
-p1 <- simTrial(makeParms('RCT',small=F, ord='none', delayUnit = 0, clusSize=300, propInTrial = .03, numClus = 20), br = F)
+p1 <- simTrial(makeParms('RCT',small=F, ord='none', delayUnit = 0, clusSize=300, hazType = 'SL', propInTrial = .03, numClus = 20))
+p2 <- simTrial(makeParms('RCT',small=F, ord='none', delayUnit = 0, clusSize=300, hazType = 'Phenom', weeklyDecay = .9, cvWeeklyDecay = .5, cvClus = 1.5, cvClusTime = 0.5, numClus = 20))
 
 jpeg('Figures/sim Sl hazards.jpg', w = 4.5, h = 4, units='in', res = 200)
 par('ps'=10, mgp = c(3,1,0), mar = c(5,4,2,.5))
-plotHazT(p1, main='simulated hazards based \non Sierra Leone forecast', ymax = .01)
+plotHazT(p1, main='simulated hazards based \non Sierra Leone forecast', ymax = .02)
 graphics.off()
 
-p2 <- simTrial(makeParms('RCT',small=F, ord='none', delayUnit = 0, clusSize=300, hazSL = F, weeklyDecay = .9, cvWeeklyDecay = 1, cvClus = 1.5, numClus = 20), br = F)
-plotHazT(p2, flnm='sim hazard trajectories' , main='mean cluster hazards from\n (weekly decay = .9, decayCV = .5, baselineCV=1.5)', ymax = .01)
-
-
-jpeg('Figures/sim hazards.jpg', w = 6.5, h = 4, units='in', res = 200)
-par(mfrow=c(1,2), 'ps'=10, mgp = c(3.5,1,0), mar = c(5,5,2,.5))
-plotHazT(p1, main='(A) simulated hazards based \non Sierra Leone forecasts', ymax = .01)
-plotHazT(p2, main='(B) simulated exponential \ndecay hazards', ymax = .01)
-dev.off()
+pdf('Figures/sim hazards.pdf', w = 6.5, h = 4) ## show 10 simulations
+for(ii in 1:10) {
+    p1 <- simTrial(makeParms('RCT',small=F, ord='none', delayUnit = 0, clusSize=300, hazType = 'SL', propInTrial = .03, numClus = 20))
+    p2 <- simTrial(makeParms('RCT',small=F, ord='none', delayUnit = 0, clusSize=300, hazType = 'Phenom', weeklyDecay = .9, cvWeeklyDecay = .5, cvClus = 1.8, cvClusTime = 0.5, numClus = 20))
+    ## png('Figures/sim hazards.png', w = 6.5, h = 4, units='in', res = 200)
+    par(mfrow=c(1,2), 'ps'=10, mgp = c(3.5,1,0), mar = c(5,5,2,.5))
+    plotHazT(p1, main='(A) simulated hazards based \non Sierra Leone forecasts', ymax = .02)
+    plotHazT(p2, main='(B) simulated exponential \ndecay hazards', ymax = .02)
+}
+graphics.off()
 
 plotTrialRollout <- function(parms, flnm = NULL, browse=F, main='', ...) with(parms, {
 })
-
-setClusHaz(within(parms, {hazType='Phenom'; verbose=15}))$hazT
 
 showSeqStop <- function(resfull, flnm= NULL, ...) {
     with(resfull, {
