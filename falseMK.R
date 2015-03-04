@@ -12,10 +12,15 @@ numEach <- 12*10
 
 p2 <- simTrial(makeParms('RCT',small=F, ord='none', delayUnit = 0, clusSize=300, hazType = 'Phenom', weeklyDecay = .9, cvWeeklyDecay = .5, cvClus = 1.5, cvClusTime = 0.5, numClus = 20))
 
-pits <- c(.025, .05, .075, .1)
+pits <- c(.075)
 parmsMat <- as.data.table(expand.grid(
     seed =  1:numEach
     , trial = tnms
+    , hazType = 'Phenom'
+    , weeklyDecay = .9
+    , cvWeeklyDecay = c(0, .5, 1)
+    , cvClusTime = c(0, .25, .5, 1)
+    , cvClus = 1.8
     , ord = c('none','TU')
     , propInTrial = pits
     , sdLogIndiv = makeParms()$sdLogIndiv
@@ -28,7 +33,7 @@ parmsMat <- parmsMat[!(delayUnit==0 & ord=='TU')] ## ordering is meaningless wit
 parmsMat <- parmsMat[ !(delayUnit==0 & trial=='FRCT')]  ## FRCT = RCT when delayUnit=0
 parmsMat$simNum <- 1:nrow(parmsMat)
 parmsMat$batchdirnm <- batchdirnm
-nmtmp <- 'simFP-'
+nmtmp <- 'simFP-pit75-'
 parmsMat$saveNm <- nmtmp
 parmsMat$nsims <- 17 ## 17*12 is ~ 2000 simulations each (2040 but we'll round)
 parmsMat$reordLag <- 14
@@ -56,32 +61,35 @@ addParm <- function(x, parmsMat,ii) {
     return(x)
 }
 
-parmsMat <- parmsMat[!(propInTrial!=.05 & immunoDelay!=21)]
+
 parmsMat[, length(nboot), propInTrial]
 parmsMat[, length(nboot), vaccEff]
+parmsMat[, length(nboot), list(trial,cvClusTime)]
+parmsMat[, length(nboot), list(trial)]
 parmsMat[, length(nboot), list(vaccEff,propInTrial)]
 parmsMat[, length(nboot), list(immunoDelay,vaccEff,propInTrial)]
+## parmsMatDo <- parmsMat
 jbs <- NULL
 immDs <- parmsMat[,unique(immunoDelay)]
 jn <- 0
-for(dd in 1:length(immDs)) {
-    for(vv in 1:length(ves)) {
-        for(pp in 1:length(pits)) {
-            parmsMatDo <- parmsMat[vaccEff==ves[vv] & propInTrial==pits[pp] & immunoDelay==immDs[dd]]
-            jn <- jn+1
-            jbs <- rbind(jbs, data.table(jn=jn, vaccEff=ves[vv], propInTrial=pits[pp], immunoDelay=immDs[dd]))
-            sink(paste0('SLsims',jn,'.txt'))
-            for(ii in parmsMatDo$simNum) {
-                cmd <- "R CMD BATCH '--no-restore --no-save --args"
-                cmd <- addParm(cmd, parmsMatDo, ii)
-                cmd <- paste0(cmd, " ' startSim.R ", file.path(batchdirnm,'Routs', paste0(nmtmp, sprintf("%06d", ii),'.Rout')), 
-                              sep='')
-                cat(cmd)               # add command
-                cat('\n')              # add new line
-            }
-            sink()
-        }
+## for(dd in 1:length(immDs)) {
+##     for(vv in 1:length(ves)) {
+##         for(pp in 1:length(pits)) {
+for(dd in 1:length(tnms)) {
+    parmsMatDo <- parmsMat[trial==tnms[dd]]
+    jn <- jn+1
+    jbs <- rbind(jbs, data.table(jn=jn, trial=tnms[dd]))
+    sink(paste0('FalsePosSim',jn,'.txt'))
+    for(ii in parmsMatDo$simNum) {
+        cmd <- "R CMD BATCH '--no-restore --no-save --args"
+        cmd <- addParm(cmd, parmsMatDo, ii)
+        cmd <- paste0(cmd, " ' startSim.R ", file.path(batchdirnm,'Routs', paste0(nmtmp, sprintf("%06d", ii),'.Rout')), 
+                      sep='')
+        cat(cmd)               # add command
+        cat('\n')              # add new line
     }
+    sink()
+    ##         }
+    ##     }
 }
-
 jbs

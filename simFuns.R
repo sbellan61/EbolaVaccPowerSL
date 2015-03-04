@@ -107,7 +107,7 @@ setIndHaz <- function(parms=makePop()) within(parms, {
     pop$indivRR <- rlnorm(numClus*clusSize, meanlog = 0, sdlog = sdLogIndiv)
     ## create popH which has weekly hazards for all individuals
     popH <- arrange(merge(pop, hazT, by='cluster', allow.cartesian=T),day)
-    popH[, indivHaz := clusHaz*indivRR]
+    popH$indivHaz <- popH[, clusHaz*indivRR]
     daySeq <- daySeq[daySeq>=0] ## don't do anything before zero, just stored hazard in popHearly for ordering
     daySeqLong <- seq(0,maxInfectDay+1000,by=hazIntUnit) ## to avoid problems later
     popHearly <- copy(popH)

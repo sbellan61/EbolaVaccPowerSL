@@ -12,11 +12,7 @@ if(length(args)>0)  { ## Then cycle through each element of the list and evaluat
         eval(parse(text=args[[i]]))
     }
 }else{
-    parmArgs <- list(trial='RCT', vaccEff = 0, weeklyDecay = 1, weeklyDecayVar = 0, varClus = 0, sdLogIndiv=0, small=F)
-    nsims <- 1
-    seed <- 1
-    simNum <- 99999
-    saveNm <- 'simFPX-'
+    seed=120;trial="SWCT";hazType="Phenom";weeklyDecay=0.9;cvWeeklyDecay=1;cvClusTime=1;cvClus=1.8;ord="none";propInTrial=0.075;sdLogIndiv=1;delayUnit=7;immunoDelay=21;vaccEff=0;simNum=5400;batchdirnm="BigResults/FalsePosFluct";saveNm="simFP-pit75-";nsims=1;reordLag=14;nboot=10;trialStartDate="2015-02-18";
 }
 
 ## seed=1;trial="RCT";ord="none";propInTrial=0.05;sdLogIndiv=1;delayUnit=0;immunoDelay=5;vaccEff=0.7;simNum=11641;batchdirnm="BigResults/SLSimsFinal";saveNm="simSL-";nsims=1;reordLag=14;nboot=20;trialStartDate="2015-02-18"
