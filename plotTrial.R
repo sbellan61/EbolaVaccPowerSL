@@ -37,6 +37,7 @@ dev.off()
 plotTrialRollout <- function(parms, flnm = NULL, browse=F, main='', ...) with(parms, {
 })
 
+setClusHaz(within(parms, {hazType='Phenom'; verbose=15}))$hazT
 
 showSeqStop <- function(resfull, flnm= NULL, ...) {
     with(resfull, {

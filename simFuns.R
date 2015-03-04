@@ -10,11 +10,12 @@ makeParms <- function(
     , numClus=20, clusSize=300
     , delayUnit = 7 ## logistically imposed interval in between each new cluster receiving vaccination
     , ord = 'none' ## order clusters' receipt of vaccination ('none', by baseline visit 'BL', by time-updated 'TU' last interval incidence)
-    , hazSL = T ## use hazards from SL
+    , hazType =  'SL' ## use hazards from "SL" or "Phenom"enologically driven hazards
     , nbsize = .8 ## for above
     , propInTrial = .03 ## for above
     , mu=.03 * yearToDays ## mean hazard in all participants at baseline
-    , cvClus=1 ##  variance in cluster-level hazards for gamma distribution 
+    , cvClus=1 ##  variance in cluster-level hazards for gamma distribution
+    , cvClusTime=1 ##  temporal fluctuation variance in cluster-level hazards around smooth trajectories for gamma distribution 
     , sdLogIndiv = 1 ## variance of lognormal distribution of individual RR within a hazard (constant over time, i.e. due to job)
     , vaccEff = .8
     , maxInfectDay = 7*24 ## end of trial (24 weeks default; 6 months)
@@ -49,26 +50,47 @@ makePop <- function(parms=makeParms()) within(parms, {
                       )
 })
 
-## Set cluster- and individual-level hazards, with cluster means changing over time and individual
-## RR around cluster mean constant
-setHazs <- function(parms=makePop()) within(parms, {
+## Phenomenological Hazard Trajectories to explore exact cause of elevated Type I errors
+createHazTraj_Phenom <- function(parms) within(parms, {
     if(verbose>10) browser()
-    daySeq <- seq(-hazIntUnit*ceiling(reordLag/hazIntUnit),maxInfectDay,by=hazIntUnit)
-    if(hazSL) {
-        hazT <- data.table(createHazTraj(fits, trialStartDate = trialStartDate,
+    baseClusHaz <- reParmRgamma(numClus, mean = mu, cv = cvClus) ## gamma distributed baseline hazards
+    dailyDecayRates <- inv.logit(rnorm(numClus, mean = logit(weeklyDecay^(1/7)), sd = cvWeeklyDecay*logit(weeklyDecay)))
+    hazT <- data.table(day = rep(daySeq, each = numClus), cluster = rep(1:numClus, length(daySeq)), clusHaz = 0)
+    cHind <- which(names(hazT)=='clusHaz')
+    ## mean cluster hazard trajectory
+    for(ii in 1:numClus) hazT[which(hazT[,cluster]==ii), clusHaz := baseClusHaz[ii]*dailyDecayRates[ii]^day]
+    ## negative binomial variation around smooth declines
+    hazT[, clusHaz := reParmRgamma(length(clusHaz), mean = clusHaz, cv = cvClusTime)]
+    rm(ii, cHind, baseClusHaz)
+})
+
+
+## Hazard Trajectories from SL district-level incidence (calls fits peviously made)
+createHazTraj_SL <- function(parms) within(parms, {
+        if(verbose>10) browser()
+        hazT <- data.table(createHazTrajFromSLProjection(fits, trialStartDate = trialStartDate,
                                          nbsize = nbsize, propInTrial = propInTrial, verbose=verbose,
                                          clusSize = clusSize, numClus = numClus, weeks = T))
         hazT <- hazT[day %in% daySeq]
         hazT[clusHaz==0, clusHaz := 10^-8] ## to stablize things
-    }else{ ## simulate hazards
-        baseClusHaz <- reParmRgamma(numClus, mean = mu, cv = cvClus) ## gamma distributed baseline hazards
-        dailyDecayRates <- inv.logit(rnorm(numClus, mean = logit(weeklyDecay^(1/7)), sd = cvWeeklyDecay*logit(weeklyDecay)))
-        hazT <- data.table(day = rep(daySeq, each = numClus), cluster = rep(1:numClus, length(daySeq)), clusHaz = 0)
-        cHind <- which(names(hazT)=='clusHaz')
-        ## mean cluster hazard trajectory
-        for(ii in 1:numClus) hazT[which(hazT[,cluster]==ii), clusHaz := baseClusHaz[ii]*dailyDecayRates[ii]^day]
-        rm(ii, cHind, baseClusHaz)
-    }
+        setcolorder(hazT, c('day','cluster','clusHaz','Date'))
+})
+
+setClusHaz <- function(parms) {
+    parms <- within(parms, { ## add daySeq
+        daySeq <- seq(-hazIntUnit*ceiling(reordLag/hazIntUnit),maxInfectDay,by=hazIntUnit) })
+    tempCHTfxn <- get(paste0('createHazTraj_', parms$hazType)) ## get chosen function
+    return(tempCHTfxn(parms))
+}
+## parms <- makePop()
+## setClusHaz(within(parms, {hazType='SL'}))$hazT
+## setClusHaz(within(parms, {hazType='Phenom'}))$hazT
+
+
+## Set cluster- and individual-level hazards, with cluster means changing over time and individual
+## RR around cluster mean constant
+setIndHaz <- function(parms=makePop()) within(parms, {
+    if(verbose>10) browser()
     ## give every individual a lognormally distributed relative risk
     pop$indivRR <- rlnorm(numClus*clusSize, meanlog = 0, sdlog = sdLogIndiv)
     ## create popH which has weekly hazards for all individuals
@@ -239,7 +261,8 @@ simInfection <- function(parms, whichDo='pop', startInfectingDay = 0) ## startIn
 ## simulate whole trial and return with all parameters used
 simTrial <- function(parms=makeParms()) {
     parms <- makePop(parms) ## make population
-    parms <- setHazs(parms) ## set hazards
+    parms <- setClusHaz(parms) ## set cluster-level hazards
+    parms <- setIndHaz(parms) ## set individual-level hazards
     parms <- reordPop(parms) ## reorder vaccination sequence by incidence (if applicable)
     parms <- setVaccDays(parms) ## set vaccination days
     parms <- setImmuneDays(parms) ## set vaccination days

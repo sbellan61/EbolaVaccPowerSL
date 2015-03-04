@@ -133,7 +133,7 @@ forecast <- function(fit, main=NULL, nbsize = NULL, doPlot = T, xticks = T,  yli
     return(src)
 })
 
-createHazTraj <- function(fits, nbsize = 1.2, trialStartDate = as.Date('2015-02-01'), xlim = as.Date(c('2014-09-15','2015-12-01')),
+createHazTrajFromSLProjection <- function(fits, nbsize = 1.2, trialStartDate = as.Date('2015-02-01'), xlim = as.Date(c('2014-09-15','2015-12-01')),
                           propInTrial = .03, numClus = 20, clusSize = 300, weeks = T, verbose=0) {
     hazTList <- NULL
     if(verbose>20) browser()

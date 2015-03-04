@@ -51,7 +51,7 @@ for(jj in 1:10) {
     par(mar=c(5,5,2,.5), 'ps'=12, mgp = c(4,1,0))
     plot(0,0, type = 'n', xlab = 'weeks', ylab = 'hazard per person-month', main='', bty = 'n', las = 1,
          xlim = c(-5, 35), ylim = c(0,.02))
-    ht <- createHazTraj(fits, numClus = 20, trialStartDate = as.Date('2015-02-01')) ## start date works, can test here
+    ht <- createHazTrajFromSLProjection(fits, numClus = 20, trialStartDate = as.Date('2015-02-01')) ## start date works, can test here
     ht[, lines(day/7,clusHaz*30, col = rainbow(20)[cluster], type = 'l', lwd = 2), cluster]
 }
 graphics.off()

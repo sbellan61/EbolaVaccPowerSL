@@ -6,7 +6,7 @@ sapply(c('simFuns.R','AnalysisFuns.R','CoxFxns.R','EndTrialFuns.R','ExpFit.R'), 
 
 args <- (commandArgs(TRUE)) ## load arguments from R CMD BATCH
 print(args)
-if(length(args)>0)  {## Then cycle through each element of the list and evaluate the expressions.
+if(length(args)>0)  { ## Then cycle through each element of the list and evaluate the expressions.
     print(paste0('loading in ', args, ' from R CMD BATCH'))
     for(i in 1:length(args)) {
         eval(parse(text=args[[i]]))
@@ -34,4 +34,3 @@ save(sim, file = saveFl)
 
 rm(list=ls(all=T))
 gc()
-
