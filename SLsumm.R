@@ -5,7 +5,7 @@ library(RColorBrewer)
 ## Simulate SWCT vs RCT vs CRCT for SL
 sapply(c('simFuns.R','AnalysisFuns.R','CoxFxns.R','EndTrialFuns.R'), source)
 
-thing <- 'initDateSens'
+thing <- 'FalsePosFluct'
 batchdirnm <- file.path('BigResults',thing)
 fls <- list.files(batchdirnm, pattern='.Rdata', full.names = T)
 length(fls)
@@ -38,8 +38,8 @@ finTrials$vaccEff <- as.numeric(finTrials$vaccEff)
 
 ## Simulations with less than 10 cases are considered to not have any power
 finTrials$tooSmall <- finTrials[, (caseCXimmGrpEnd + caseVXimmGrpEnd) < 10]
-finTrials[tooSmall, c('vaccGood','vaccBad','stopped') := F]
-finTrials[tooSmall, c('lci','uci','p') := list(-Inf,1,1)]
+finTrials[tooSmall==T, c('vaccGood','vaccBad','stopped') := F]
+finTrials[tooSmall==T, c('lci','uci','p') := list(-Inf,1,1)]
 ## Determine if stopped
 finTrials[grepl('boot',mod), stopped := lci > 0 | uci < 0]
 finTrials[grepl('relab',mod), stopped := p < .025]
