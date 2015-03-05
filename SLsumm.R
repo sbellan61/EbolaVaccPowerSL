@@ -1,7 +1,7 @@
 if(grepl('stevebe', Sys.info()['nodename'])) setwd('~/Documents/R Repos/EbolaVaccSim/')
 if(grepl('stevebellan', Sys.info()['login'])) setwd('~/Documents/R Repos/EbolaVaccSim/')
 if(grepl('tacc', Sys.info()['nodename'])) setwd('/home1/02413/sbellan/VaccEbola/')
-library(RColorBrewer)
+library(RColorBrewer); library(boot)
 ## Simulate SWCT vs RCT vs CRCT for SL
 sapply(c('simFuns.R','AnalysisFuns.R','CoxFxns.R','EndTrialFuns.R'), source)
 
@@ -10,7 +10,11 @@ batchdirnm <- file.path('BigResults',thing)
 fls <- list.files(batchdirnm, pattern='.Rdata', full.names = T)
 length(fls)
 
-dparms <- c('trial','sdLogIndiv','vaccEff','doSL','propInTrial','nbsize','ord','reordLag','delayUnit','immunoDelay','trialStartDate')
+p2 <- simTrial(makeParms('RCT',small=F, ord='none', delayUnit = 0, clusSize=300, hazType = 'Phenom', weeklyDecay = .9, cvWeeklyDecay = .5, cvClus = 1.5, cvClusTime = 0.5, numClus = 20))
+
+dparms <- c('trial','sdLogIndiv','vaccEff','doSL','propInTrial','nbsize','ord','reordLag','delayUnit','immunoDelay','trialStartDate'
+            , 'weeklyDecay', 'cvWeeklyDecay', 'cvClus', 'cvClusTime'
+            )
 nbatch <- length(fls)
 finInfoList <- finModList <- stopList <- parmsList <- list(NULL)
 for(ii in 1:nbatch) {
@@ -21,7 +25,7 @@ for(ii in 1:nbatch) {
     if(exists('sim')) {
         sim$parms[['trialStartDate']] <- as.character(sim$parms[['trialStartDate']])
         parmsList[[ii]] <- data.frame(nbatch = ii, t(unlist(sim$parms[dparms])))
-         tmpMod <- data.frame(nbatch = ii, sim$sim$finMods)
+        tmpMod <- data.frame(nbatch = ii, sim$sim$finMods)
         finModList[[ii]] <- merge(tmpMod, sim$sim$finInfo, by = 'sim')
     }
 }
