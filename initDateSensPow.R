@@ -13,9 +13,9 @@ gg_color_hue <- function(n) {
   hues = seq(15, 375, length=n+1)
   hcl(h=hues, l=65, c=100)[1:n]
 }
-group.colors <- c(RCT = "#333BFF", FRCT = "#CC6600", SWT ="#9633FF")
+group.colors <- c('risk-prioritized RCT' = "#333BFF", FRCT = "#CC6600", 'SWCT' ="#9633FF")
 group.colors[c(1,3,2)] <- gg_color_hue(3)
-group.colors['SWT'] <- 'orange'
+group.colors['SWCT'] <- 'orange'
 pf$design <- factor(pf$design, levels=levels(pf$design)[c(2,1,3)])
 pf[, biasNAR:=biasNAR/vaccEff]
 
@@ -24,7 +24,7 @@ pf[, biasNAR:=biasNAR/vaccEff]
 thsb <- theme(axis.text.x = thax, axis.text.y = thax, plot.title = element_text(vjust=1),
               axis.title.y = element_text(vjust = 1), axis.title.x = element_text(vjust = -.5),
               axis.line = element_line(), axis.ticks = element_line(color='black'),
-              panel.margin = unit(1, "lines"), legend.key.height=unit(2,"line")
+              panel.margin = unit(1, "lines"), legend.key.height=unit(1.3,"line")
               , strip.background = element_rect(fill = NA)
               ,legend.position = 'right'
               , axis.line = element_blank()
@@ -32,14 +32,20 @@ thsb <- theme(axis.text.x = thax, axis.text.y = thax, plot.title = element_text(
               , panel.grid.minor = element_blank()
               ,panel.border = element_blank()
               ,panel.background = element_blank()
-              ## ,legend.justification=c(1,0), legend.position=c(1,0)
+            , legend.background =  element_blank()
+            , legend.key =  element_blank()
+            , legend.key.width=unit(2,"line")
+            #,legend.justification=c(1,1), legend.position=c(1,1)
+             ,legend.position='top'
               )
 theme_set(theme_grey(base_size = 12))
 ##thsb <- thsb + theme_bw()#
 
+levels(pf$trial)
+levels(pf$design) <- c('risk-prioritized RCT', 'SWCT', 'FRCT')
 ####################################################################################################
 ## Figure 4 - Power
-subs <- pf[, immunoDelay==21 & ((design == 'SWT' & mod=='relabCoxME') | (design == 'RCT' & order=='time-updated' & mod =='CoxME'))]
+subs <- pf[, immunoDelay==21 & ((trial == 'SWCT' & mod=='relabCoxME') | (trial == 'RCT' & order=='time-updated' & mod =='CoxME'))]
 thax <- element_text(colour = 'black', size = 8)
 p.tmp <- ggplot(pf[subs]) +
   aes(x=trialStartDate, y=vaccGoodNAR, colour=design, linetype=order) + 
@@ -49,12 +55,12 @@ p.tmp <- ggplot(pf[subs]) +
   xlab('trial start date') + ylab('power') + 
   geom_rect(aes(xmin=as.Date('2015-02-18'), xmax = as.Date('2015-03-18'), ymin=0, ymax=1), fill = "lightgrey", color=NA) +
   geom_line(size=1) + #+ facet_wrap(~pit, scales = "free_y",nrow=1) + 
-  scale_color_manual(values=group.colors) +
+  scale_color_manual('', values=group.colors) +
+      guides(colour = guide_legend(override.aes = list(linetype=c(2,1)))) +
+          theme(legend.justification=c(2,1), legend.position=c(1,1.25)) +
   scale_linetype_discrete(guide=F)# breaks=group.colors,
 p.tmp
-                                  
-#                                      ggtitle('expected % of district-level cases in trial population')
-
+## ggtitle('expected % of district-level cases in trial population')
 ggsave(paste0('Figures/Fig 6 - Power by start date SL.png'), p.tmp, w = 5, h = 3)
 
 
