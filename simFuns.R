@@ -30,6 +30,7 @@ makeParms <- function(
     , small=F ## do a small trial for illustration
     , nboot = 200 ## bootstrap samples
     , verbose = 0
+    , dontReordForPlot = F
     ){
     if(small) {
         numClus <- 4
@@ -79,13 +80,13 @@ createHazTraj_Phenom <- function(parms) within(parms, {
 
 ## Hazard Trajectories from SL district-level incidence (calls fits peviously made)
 createHazTraj_SL <- function(parms) within(parms, {
-        if(verbose>10) browser()
-        hazT <- data.table(createHazTrajFromSLProjection(fits, trialStartDate = trialStartDate,
-                                         nbsize = nbsize, propInTrial = propInTrial, verbose=verbose,
-                                         clusSize = clusSize, numClus = numClus, weeks = T))
-        hazT <- hazT[day %in% daySeq]
-        hazT[clusHaz==0, clusHaz := 10^-8] ## to stablize things
-        setcolorder(hazT, c('day','cluster','clusHaz','Date'))
+    if(verbose>10) browser()
+    hazT <- data.table(createHazTrajFromSLProjection(fits, trialStartDate = trialStartDate,
+                                                     nbsize = nbsize, propInTrial = propInTrial, verbose=verbose,
+                                                     clusSize = clusSize, numClus = numClus, weeks = T))
+    hazT <- hazT[day %in% daySeq]
+    hazT[clusHaz==0, clusHaz := 10^-8] ## to stablize things
+    setcolorder(hazT, c('day','cluster','clusHaz','Date'))
 })
 
 setClusHaz <- function(parms) {
@@ -139,6 +140,7 @@ reordSWCT <- reordFRCT <- reordRCT <- function(parms) within(parms, {
     if(verbose>10) browser()
     if(ord=='none') { ## should already be random but do it agan for good measure (debugging randomziation)
         clusIncRank <- sample(1:numClus, numClus, replace = F)
+        if(dontReordForPlot) clusIncRank <- 1:20
     }
     if(ord=='BL') { ## if vaccinating highest incidence clusters first (i.e. *NOT* SW randomization of vaccination sequence)
         clusIncRank <- popH[idByClus==1 & day == 0,order(rev(order(clusHaz)))]
@@ -258,11 +260,12 @@ simInfection <- function(parms, whichDo='pop', startInfectingDay = 0) ## startIn
 ## head(p1$pop[infectDay!=Inf, list(cluster, immuneDay, infectDay)],100)
 
 ## simulate whole trial and return with all parameters used
-simTrial <- function(parms=makeParms()) {
+simTrial <- function(parms=makeParms(), seed = NULL) {
+    if(!is.null(seed)) set.seed(seed) ## for plotting comparisons between hazard trends w/ & w/o fluctuationrs
     parms <- makePop(parms) ## make population
     parms <- setClusHaz(parms) ## set cluster-level hazards
     parms <- setIndHaz(parms) ## set individual-level hazards
-    parms <- reordPop(parms) ## reorder vaccination sequence by incidence (if applicable)
+    parms <- reordPop(parms) ## reorder vaccination sequence by incidence (if applicable), doReord off for plotting only
     parms <- setVaccDays(parms) ## set vaccination days
     parms <- setImmuneDays(parms) ## set vaccination days
     parms <- simInfection(parms) ## simulate infection
