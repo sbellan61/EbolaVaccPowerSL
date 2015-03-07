@@ -15,14 +15,16 @@ gg_color_hue <- function(n) {
 }
 group.colors <- c(RCT = "#333BFF", FRCT = "#CC6600", SWT ="#9633FF")
 group.colors[c(1,3,2)] <- gg_color_hue(3)
-group.colors['SWT'] <- 'orange'
-pf$design <- factor(pf$design, levels=levels(pf$design)[c(2,1,3)])
+group.colors['SWCT'] <- 'orange'
+pf$trial <- factor(pf$trial, levels=levels(pf$trial)[c(2,1,3)])
 pf[, biasNAR:=biasNAR/vaccEff]
 levels(pf$order)[1] <- 'random'
+levels(pf$order)[2] <- 'risk-prioritized'
 
 
 ####################################################################################################
 ## them for ms
+thax <- element_text(colour = 'black', size = 8)
 thsb <- theme(axis.text.x = thax, axis.text.y = thax, plot.title = element_text(vjust=1),
               axis.title.y = element_text(vjust = 1), axis.title.x = element_text(vjust = -.5),
               axis.line = element_line(), axis.ticks = element_line(color='black'),
@@ -34,43 +36,48 @@ thsb <- theme(axis.text.x = thax, axis.text.y = thax, plot.title = element_text(
               , panel.grid.minor = element_blank()
               ,panel.border = element_blank()
               ,panel.background = element_blank()
+              , legend.background =  element_blank()
+              , legend.key =  element_blank()
+              , legend.key.width=unit(2,"line")
               ## ,legend.justification=c(1,0), legend.position=c(1,0)
               )
 theme_set(theme_grey(base_size = 12))
 ##thsb <- thsb + theme_bw()#
 
+pf$modLab2 <- pf$mod
+levels(pf$modLab2)[levels(pf$modLab2) %in% c('CoxME','bootCoxME','relabCoxME')] <- c('(A) CoxPH', '(B) Bootstrap', '(C) Permutation')
+
 ####################################################################################################
 ## Figure 2 - Type I errors
 for(jj in 1:2) {
-thax <- element_text(colour = 'black', size = 8)
-subs <- pf[,design %in% c('SWT','RCT') & vaccEff==0 & mod %in% c('CoxME','bootCoxME','relabCoxME') & immunoDelay==21]
-subs <- subs & pf[,!(design=='RCT' & grepl('boot',mod))]
-p.tmp <- ggplot(pf[subs], 
-                aes(propInTrial, stoppedNAR, colour=design, linetype=order)) + thsb +
-    scale_x_continuous(labels = percent, limits=c(.025,.1), minor_breaks=NULL, breaks = c(.025,.05,.075,.1)) +  
-    xlab('% of district-level cases in trial population') + ylab('False Positive Rate') + 
-    scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
-    geom_hline(yintercept=.05, color='dark gray', size = 1) +
-    geom_line(size=1) + facet_wrap(~model, scales = "free_y") + scale_color_manual(values=group.colors)
-if(jj==1) p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,.1))
-if(jj==2) p.tmp <- p.tmp + scale_y_log10(labels = formatC, breaks = c(.01, .025, .05, .1), limits = c(.005,.1), minor_breaks=NULL) 
-ggsave(paste0('Figures/Fig 2A -',labs[jj],'Type I SL.png'), p.tmp, w = 8.5, h = 3.5)
-ggsave(paste0('Figures/Fig 2A -',labs[jj],'Type I SL.pdf'), p.tmp, w = 8.5, h = 3.5)
+    subs <- pf[,trial %in% c('SWCT','RCT') & vaccEff==0 & mod %in% c('CoxME','bootCoxME','relabCoxME') & immunoDelay==21]
+    subs <- subs & pf[,!(trial=='RCT' & grepl('boot',mod))]
+    p.tmp <- ggplot(pf[subs], 
+                    aes(propInTrial, stoppedNAR, colour=trial, linetype=order)) + thsb +
+                        scale_x_continuous(labels = percent, limits=c(.025,.1), minor_breaks=NULL, breaks = c(.025,.05,.075,.1)) +  
+                            xlab('% of district-level cases in trial population') + ylab('False Positive Rate') + 
+                                scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
+                                    geom_hline(yintercept=.05, color='dark gray', size = 1) +
+                                        geom_line(size=1) + facet_wrap(~modLab2, scales = "free_y") + scale_color_manual(values=group.colors)
+    if(jj==1) p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,.1))
+    if(jj==2) p.tmp <- p.tmp + scale_y_log10(labels = formatC, breaks = c(.01, .025, .05, .1), limits = c(.005,.1), minor_breaks=NULL)
+    ggsave(paste0('Figures/Fig 2A -',labs[jj],'Type I SL.png'), p.tmp, w = 8.5, h = 3.5)
+    ggsave(paste0('Figures/Fig 2A -',labs[jj],'Type I SL.pdf'), p.tmp, w = 8.5, h = 3.5)
 }
 
 ####################################################################################################
 ## Figure 2B - Type I errors
 for(jj in 1:2) {
 thax <- element_text(colour = 'black', size = 8)
-subs <- pf[,design %in% c('SWT','RCT') & vaccEff==0 & mod %in% c('CoxME','bootCoxME','relabCoxME') & immunoDelay==21]
-subs <- subs & pf[,!(design=='RCT' & grepl('boot',mod))]
+subs <- pf[,trial %in% c('SWCT','RCT') & vaccEff==0 & mod %in% c('CoxME','bootCoxME','relabCoxME') & immunoDelay==21]
+subs <- subs & pf[,!(trial=='RCT' & grepl('boot',mod))]
 p.tmp <- ggplot(pf[subs], 
                 aes(propInTrial, stoppedNAR, colour=model, linetype=order)) + thsb +
     scale_x_continuous(labels = percent, limits=c(.025,.1), minor_breaks=NULL, breaks = c(.025,.05,.075,.1)) +  
     xlab('% of district-level cases in trial population') + ylab('Type I Error Rate') + 
     scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
     geom_hline(yintercept=.05, color='dark gray', size = 1) +
-    geom_line(size=1) + facet_wrap(~design, scales = "free_y") + 
+    geom_line(size=1) + facet_wrap(~trial, scales = "free_y") + 
         scale_color_manual(values=group.colors)
 if(jj==1) p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,.15))
 if(jj==2) p.tmp <- p.tmp + scale_y_log10(labels = formatC, breaks = c(.01, .025, .05, .1, .25), limits = c(.005,.25), minor_breaks=NULL) 
@@ -80,10 +87,10 @@ ggsave(paste0('Figures/Fig 2B -',labs[jj],'Type I SL.pdf'), p.tmp, w = 6.5, h = 
 
 ####################################################################################################
 ## Figure 4 - Power
-subs <- pf[, immunoDelay==21 & ((design == 'SWT' & mod=='relabCoxME') | (design %in% c('RCT','FRCT') & mod =='CoxME'))]
+subs <- pf[, immunoDelay==21 & ((trial == 'SWCT' & mod=='relabCoxME') | (trial %in% c('RCT','FRCT') & mod =='CoxME'))]
 for(jj in 1:2) {
     thax <- element_text(colour = 'black', size = 8)
-    p.tmp <- ggplot(pf[subs], aes(vaccEff, vaccGoodNAR, colour=design, linetype=order)) + thsb +
+    p.tmp <- ggplot(pf[subs], aes(vaccEff, vaccGoodNAR, colour=trial, linetype=order)) + thsb +
         scale_x_continuous(labels = formatC, limits=c(.5,.9),  breaks = pf[,unique(vaccEff)], minor_breaks=NULL) +  
             xlab('vaccine efficacy') + ylab('power to detect effective vaccine') + 
                 scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
@@ -98,9 +105,9 @@ for(jj in 1:2) {
 
 ####################################################################################################
 ## Figure 5 - Power by immunedelay
-subs <- pf[, propInTrial==.05 & vaccEff == .9 & ((design == 'SWT' & mod=='relabCoxME') | (design=='RCT' & order=='time-updated' & mod =='CoxME'))]
+subs <- pf[, propInTrial==.05 & vaccEff == .9 & ((trial == 'SWCT' & mod=='relabCoxME') | (trial=='RCT' & order=='risk-prioritized' & mod =='CoxME'))]
         thax <- element_text(colour = 'black', size = 8)
-        p.tmp <- ggplot(pf[subs], aes(immunoDelay, vaccGoodNAR, colour=design, linetype=order)) + thsb +
+        p.tmp <- ggplot(pf[subs], aes(immunoDelay, vaccGoodNAR, colour=trial, linetype=order)) + thsb +
          #   scale_x_continuous(labels = formatC, limits=c(.5,.9),  breaks = pf[,unique(vaccEff)], minor_breaks=NULL) +  
                           xlab('delay until protective efficacy') + ylab('power to detect effective vaccine') + 
                               scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
@@ -111,24 +118,27 @@ ggsave(paste0('Figures/Fig 5 - Power by seroconversion delay SL.png'), p.tmp, w 
 ggsave(paste0('Figures/Fig 5 - Power by seroconversion delay SL.pdf'), p.tmp, w = 5, h = 4)
 
 
+
 ####################################################################################################
 ## Figure SX - Power by model
-pf$modClass <- 'parametric'
-pf[grepl('boot',mod), modClass:='bootstrap']
-pf[grepl('relab',mod), modClass:='permutation']
-pf$modClass <- factor(pf$modClass, levels = c("parametric", "bootstrap", "permutation"))
-pf$modRaw <- gsub('boot','',pf$mod)
-pf$modRaw <- factor(gsub('relab','',pf$modRaw))
-subs <- pf[, propInTrial==.05  & immunoDelay==21 & (design == 'SWT' | (design=='RCT' & order=='time-updated' & modClass!='bootstrap'))]
-subs <- subs & pf[,modRaw %in% c('CoxME','GLMFclus')]
+pf$modelLab <- pf$model
+pf$class <- 'parametric'
+pf[grepl('boot',mod), class:='bootstrap']
+pf[grepl('relab',mod), class:='permutation']
+pf$class <- factor(pf$class, levels = c("parametric", "bootstrap", "permutation"))
+pf$model <- gsub('boot','',pf$mod)
+pf$model <- factor(gsub('relab','',pf$model))
+levels(pf$model)[1:2] <- c('CoxPH','Poisson regression')
+subs <- pf[, propInTrial==.05  & immunoDelay==21 & (trial == 'SWCT' | (trial=='RCT' & order=='risk-prioritized' & class!='bootstrap'))]
+subs <- subs & pf[,model %in% c('CoxPH','Poisson regression')]
 thax <- element_text(colour = 'black', size = 8)
 for(jj in 1:2) {
-p.tmp <- ggplot(pf[subs], aes(vaccEff, vaccGoodNAR, colour=modClass, linetype=modRaw)) +
+p.tmp <- ggplot(pf[subs], aes(vaccEff, vaccGoodNAR, colour=class, linetype=model)) +
     thsb +
     scale_x_continuous(labels = formatC, limits=c(0,1), breaks = pf[,unique(vaccEff)], minor_breaks=NULL) +  
     xlab('vaccine efficacy') + ylab('probability of rejecting null \nthat vaccine is not effective') + 
     scale_linetype_manual(values=1:3) + ## scale_color_manual(values=group.colors) +
-    geom_line(size=.9)  + facet_wrap(~design, scales = "free_y") #,nrow=1) + 
+    geom_line(size=.9)  + facet_wrap(~trial, scales = "free_y") #,nrow=1) + 
 #p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,1), breaks=seq(0,1,by=.1), minor_breaks = NULL) #seq(0,1,.05))
 if(jj==1) p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,1))
 if(jj==2) p.tmp <- p.tmp + scale_y_log10(labels = formatC, breaks = c(.01, .025, .05, .1, .25, .5, 1), limits = c(.005,1), minor_breaks=NULL) 
@@ -138,9 +148,9 @@ ggsave(paste0('Figures/Fig SX', labs[jj], ' - Power by model delay SL.pdf'), p.t
 
 ##################################################
 ## Cases
-subs <- pf[, immunoDelay==21 & ((design == 'SWT' & mod=='relabCoxME') | (design %in% c('RCT','FRCT') & mod =='CoxME'))]
+subs <- pf[, immunoDelay==21 & ((trial == 'SWCT' & mod=='relabCoxME') | (trial %in% c('RCT','FRCT') & mod =='CoxME'))]
 thax <- element_text(colour = 'black', size = 8)
-p.tmp <- ggplot(pf[subs], aes(vaccEff, caseTot, colour=design, linetype=order)) + thsb + 
+p.tmp <- ggplot(pf[subs], aes(vaccEff, caseTot, colour=trial, linetype=order)) + thsb + 
     scale_x_continuous(labels = formatC, limits=c(0,.9), breaks = pf[,unique(vaccEff)],minor_breaks=NULL) +  
     xlab('vaccine efficacy') + ylab('# EVD cases') +
     scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
@@ -196,7 +206,7 @@ for(jj in 1:2) {
     for(modTmp in levels(pf$model)) {
         subs <- pf[, model==modTmp & immunoDelay==21 & !(trial%in%c('FRCT','RCT') & grepl('boot',mod))]
         thax <- element_text(colour = 'black', size = 8)
-        p.tmp <- ggplot(pf[subs], aes(vaccEff, vaccGoodNAR, colour=design, linetype=order)) + 
+        p.tmp <- ggplot(pf[subs], aes(vaccEff, vaccGoodNAR, colour=trial, linetype=order)) + 
             scale_x_continuous(labels = formatC, limits=c(0,.9),  breaks = pf[,unique(vaccEff)], minor_breaks=NULL) +  
                 theme(axis.text.x = thax, axis.text.y = thax, plot.title = element_text(vjust=1),
                       axis.title.y = element_text(vjust = 1), axis.title.x = element_text(vjust = -.5),
@@ -222,8 +232,8 @@ jj <- 1
 for(jj in 1:2) {
 pdf(paste0('Figures/',labs[jj],'Type I SL.pdf'), w = 8, h = 8) ##, units = 'in', res = 200)
 thax <- element_text(colour = 'black', size = 8)
-subs <- pf[,design %in% c('SWT','RCT') & vaccEff==0 & immunoDelay==21 & !(design=='RCT' & grepl('boot',mod))]
-p.tmp <- ggplot(pf[subs], aes(propInTrial, stoppedNAR, colour=design, linetype=order)) + 
+subs <- pf[,trial %in% c('SWCT','RCT') & vaccEff==0 & immunoDelay==21 & !(trial=='RCT' & grepl('boot',mod))]
+p.tmp <- ggplot(pf[subs], aes(propInTrial, stoppedNAR, colour=trial, linetype=order)) + 
     scale_x_continuous(labels = percent, limits=c(.025,.1), breaks = c(.025,.05,.075,.1)) +  
 ##    scale_y_continuous(labels = formatC, limits=c(0,.3)) + #, minor_breaks = seq(0,1,.05)) +
     theme(axis.text.x = thax, axis.text.y = thax, plot.title = element_text(vjust=1),
