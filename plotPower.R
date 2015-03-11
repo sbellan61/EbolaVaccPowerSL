@@ -248,3 +248,21 @@ if(jj==2) p.tmp <- p.tmp + scale_y_log10(labels = formatC, breaks = c(.01, .025,
 print(p.tmp)
 graphics.off()
 }
+
+pf
+####################################################################################################
+## Show power by # of cases
+
+subs <- pf[,  vaccEff==.9 & immunoDelay==21 & ((trial == 'SWCT' & mod=='relabCoxME') | (trial %in% c('RCT','FRCT') & mod =='CoxME'))]
+p.tmp <- ggplot(pf[subs], aes(caseTot, vaccGoodNAR, colour=trial, linetype=order)) + thsb +
+#    scale_x_continuous(labels = formatC, limits=c(.5,.9),  breaks = pf[,unique(vaccEff)], minor_breaks=NULL) +  
+        xlab('# of cases in trial population') + ylab('power to detect effective vaccine') + 
+            scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
+                geom_line(size=1)  + # facet_wrap(~pit, scales = "free_y",nrow=1) + 
+                        scale_color_manual(values=group.colors) +
+                                theme(legend.justification=c(1,1), legend.position=c(1,1))
+p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,1), breaks=seq(0,1,by=.1), minor_breaks = NULL) #seq(0,1,.05))
+p.tmp
+ggsave(paste0('Figures/Fig SX - Power by cases.png'), p.tmp, w = 6, h = 4)
+ggsave(paste0('Figures/Fig SX - Power by cases.pdf'), p.tmp, w = 6, h = 4)
+

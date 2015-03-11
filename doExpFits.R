@@ -37,15 +37,21 @@ graphics.off()
 
 ## Show fits and one simulated projection by subregion
 ##pdf('Figures/forecasted Paneled SL cleaned subnational data fromMax.pdf',  w = 10, h = 8)
-jpeg('Figures/forecasted Paneled SL cleaned subnational data fromMax.jpg',  w = 10, h = 8, units='in',res=200)
-nbsize <- 1.2 ## NULL
-par(lwd=1, 'ps' = 12, mar = c(5,3,1.5,.5),mfrow = c(4,4))
-regs <- sl[,unique(reg)]
-srcs <- NULL
-for(rr in regs) srcs[[rr]] <- forecast(fits[[rr]], main = rr, nbsize = nbsize, xlim = xlim)
-graphics.off()
-srcProj <- rbindlist(srcs)
-
+for(ii in 1:2) {
+    set.seed(1)
+    if(ii==1) jpeg('Figures/forecasted Paneled SL cleaned subnational data fromMax.jpg',  w = 10, h = 8, units='in',res=200)
+    if(ii==2) pdf('Figures/forecasted Paneled SL cleaned subnational data fromMax.pdf',  w = 10, h = 8)
+    nbsize <- 1.2 ## NULL
+   par(lwd=1, 'ps' = 10, mar = c(5,3,1.5,.5),mfrow = c(4,4))
+    regs <- sl[,unique(reg)]
+    srcs <- NULL
+    for(ri in 1:length(regs)) {
+        rr <- regs[ri]
+        srcs[[rr]] <- forecast(fits[[rr]], main = rr, nbsize = nbsize, xlim = xlim)#, xticks = ri>12)
+    }
+    graphics.off()
+    srcProj <- rbindlist(srcs)
+}
  
 ## Show simulated hazards from fits
 for(ii in 1:2) {
