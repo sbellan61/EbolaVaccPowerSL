@@ -1,6 +1,6 @@
 ## Construct survival data from waiting times
-makeSurvDat <- function(parms,  whichDo='pop', browse=F) within(parms, {
-    if(browse) browser()
+makeSurvDat <- function(parms,  whichDo='pop') within(parms, {
+    if(verbose ==1.5) browser()
     popTmp <- get(whichDo)
     popTmp$immuneDayThink <- popTmp[,vaccDay] + immunoDelayThink ## vaccine refractory period ASSUMED in analysis
     ## pre-immunity table
@@ -24,9 +24,46 @@ makeSurvDat <- function(parms,  whichDo='pop', browse=F) within(parms, {
     rm(stPre, stPost, popTmp, nmSt)
 }) ## careful with modifying parms, st depends on analysis a bit too (immunoDelayThink), so we can have different st for same popH
 
+## Select subset of survival table to analyze
+activeFXN <- function(parms, whichDo='st') within(parms, { 
+    if(verbose ==1.6) browser()
+    ## for SWCT or unmatched CRCT always include all clusters in analysis because unvaccinated
+    ## clusters are still considered to provide useful information from baseline
+    stA <- copy(get(whichDo))
+    stA$firstActive <- 0
+    if(!includeAllControlPT) { ## remove person-time observed prior to post-refractory period from data
+        if(trial=='CRCT' & ord!='none') ## active once anyone considered immune in matched cluster pair
+            stA[, firstActive := min(immuneDayThink), by = pair]
+        if(trial %in% c('RCT','FRCT')) ## active once anyone considered immune in cluster
+            stA[, firstActive := min(immuneDayThink), by = cluster]
+        if(trial=='SWCT') {## inactive during protective delay; active only when there exists both vacc & unvacc person-time observed
+            firstDayAnyoneImmune <- stA[, min(immuneDayThink)]
+            lastDayAnyoneNotImmune <- stA[, max(immuneDayThink)] - 1
+            stA <- stA[!endDay <= firstDayAnyoneImmune] ## remove inactive observation intervals at beggining of trial
+            stA <- stA[!startDay >= lastDayAnyoneNotImmune] ## remove inactive observation intervals at end of trial
+            rm(firstDayAnyoneImmune, lastDayAnyoneNotImmune)
+            ## remove person-time completely contained within protective delay (should only remove cluster 1's 0-immunedaythink person-time
+            stA <- stA[!(startDay >= vaccDay & endDay <= immuneDayThink)]
+            ## right-truncate at vaccine date person-time intervals that starts before vaccine date and ends
+            ## after vaccine date (i.e. ignore person-time within protective delay)
+            stA[startDay <= vaccDay & endDay >= vaccDay, endDay := vaccDay]
+            ## stA[idByClus==1, list(cluster, vaccDay, immuneDayThink, startDay, endDay)] ## run to see how person-time is distributed between cluster
+        }
+    }
+    stA <- stA[!endDay <= firstActive] ## remove inactive observation intervals (does nothing for SWCT)
+    stA[startDay < firstActive, startDay := firstActive] ## set accumulation of person time as when the cluster/pair is active (does nothing for SWCT)
+    nmStA <- paste0('stActive', sub('st','',whichDo)) ## makes EVpop into EVst for example
+    assign(nmStA, stA)
+    rm(stA, nmStA)
+})
+## p1 <- simTrial(makeParms('RCT', ord='BL', small=F), br=F)
+## s1 <- makeSurvDat(p1)
+## s1 <- activeFXN(s1)
+## s1$st[idByClus%in%1:2, list(indiv, cluster, pair, idByClus,immuneDayThink, startDay,endDay)]
+
 ## Restructure for GEE/GLMM with weekly observations of each cluster.
 makeGEEDat <- function(parms, whichDo='popH') within(parms, {
-    if(verbose ==1.5) browser()
+    if(verbose ==1.7) browser()
     popHTmp <- get(whichDo)
     popHTmp$immuneDayThink <- popHTmp[,vaccDay] + immunoDelayThink ## vaccine refractory period ASSUMED in analysis
     popHTmp$infectDayRCens <- popHTmp$infectDay
@@ -46,30 +83,6 @@ makeGEEDat <- function(parms, whichDo='popH') within(parms, {
     assign(nmSt, clusD) ## combine tables
     rm(popHTmp, clusD, nmSt)
 })
-
-## Select subset of survival table to analyze
-activeFXN <- function(parms, whichDo='st', browse=F) within(parms, { 
-    if(browse) browser()
-    ## for SWCT or unmatched CRCT always include all clusters in analysis because unvaccinated
-    ## clusters are still considered to provide useful information from baseline
-    stA <- copy(get(whichDo))
-    stA$firstActive <- 0
-    if(!includeAllControlPT) { ## remove person-time observed prior to post-refractory period from data
-        if(trial=='CRCT' & ord!='none') ## active once anyone considered immune in matched cluster pair
-            stA[, firstActive := min(immuneDayThink), by = pair]
-        if(trial %in% c('RCT','FRCT')) ## active once anyone considered immune in cluster
-            stA[, firstActive := min(immuneDayThink), by = cluster]
-    }
-    stA <- stA[!endDay <= firstActive] ## remove inactive observation intervals
-    stA[startDay < firstActive, startDay := firstActive] ## set accumulation of person time as when the cluster/pair is active
-    nmStA <- paste0('stActive', sub('st','',whichDo)) ## makes EVpop into EVst for example
-    assign(nmStA, stA)
-    rm(stA, nmStA)
-})
-## p1 <- simTrial(makeParms('RCT', ord='BL', small=F), br=F)
-## s1 <- makeSurvDat(p1)
-## s1 <- activeFXN(s1)
-## s1$st[idByClus%in%1:2, list(indiv, cluster, pair, idByClus,immuneDayThink, startDay,endDay)]
 
 ## Take a survival data from above function and censor it by a specified time in months
 censSurvDat <- function(parms, censorDay = parms$maxInfectDay+parms$hazIntUnit, whichDo = 'stActive') with(parms, {

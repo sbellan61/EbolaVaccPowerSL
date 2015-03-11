@@ -24,7 +24,9 @@ makeParms <- function(
     , weeklyDecay=.9, cvWeeklyDecay=1 ## log-normally distributed incidence decay rates (set var = 0 for constant)
     , hazIntUnit = 7 ## interval between discrete changes in hazard
     , reordLag = 14 ## how long ago's hazard to use when deciding this week's time-updated vaccination sequence
-    , includeAllControlPT = F ## include person-time from controlled trials before end of vaccination refractory period?
+    , includeAllControlPT = F ## include person-time from controlled trials before end of
+                              ## vaccination refractory period? in SWCT also only includes
+                              ## person-time when trial has both protected & unprotected individuals
     , RCTendOption = 2        ## order to vaccinate unvaccinated invididuals when an RCT ends, see EndTrialFuns.R
     , instVaccDelay = 7 ## delay til instant vacc of everyone after trial ends in trials where delayUnit=0 otherwise
     , small=F ## do a small trial for illustration

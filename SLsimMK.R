@@ -28,7 +28,7 @@ parmsMat <- parmsMat[!(delayUnit==0 & ord=='TU')] ## ordering is meaningless wit
 parmsMat <- parmsMat[ !(delayUnit==0 & trial=='FRCT')]  ## FRCT = RCT when delayUnit=0
 parmsMat$simNum <- 1:nrow(parmsMat)
 parmsMat$batchdirnm <- batchdirnm
-nmtmp <- 'simSL-'
+nmtmp <- 'simSL-SWCTptCorr-'
 parmsMat$saveNm <- nmtmp
 parmsMat$nsims <- 17 ## 17*12 is ~ 2000 simulations each (2040 but we'll round)
 parmsMat$reordLag <- 14
@@ -56,20 +56,23 @@ addParm <- function(x, parmsMat,ii) {
     return(x)
 }
 
+parmsMat <- parmsMat[trial=='SWCT']
 parmsMat <- parmsMat[!(propInTrial!=.05 & immunoDelay!=21)]
 parmsMat[, length(nboot), propInTrial]
 parmsMat[, length(nboot), vaccEff]
 parmsMat[, length(nboot), list(vaccEff,propInTrial)]
 parmsMat[, length(nboot), list(immunoDelay,vaccEff,propInTrial)]
+nrow(parmsMat)
 jbs <- NULL
 immDs <- parmsMat[,unique(immunoDelay)]
 jn <- 0
-for(dd in 1:length(immDs)) {
-    for(vv in 1:length(ves)) {
-        for(pp in 1:length(pits)) {
-            parmsMatDo <- parmsMat[vaccEff==ves[vv] & propInTrial==pits[pp] & immunoDelay==immDs[dd]]
+
+## for(dd in 1:length(immDs)) {
+for(vv in 1:length(ves)) {
+        ## for(pp in 1:length(pits)) {
+            parmsMatDo <- parmsMat[vaccEff==ves[vv]]# & propInTrial==pits[pp] & immunoDelay==immDs[dd]]            
             jn <- jn+1
-            jbs <- rbind(jbs, data.table(jn=jn, vaccEff=ves[vv], propInTrial=pits[pp], immunoDelay=immDs[dd]))
+            jbs <- rbind(jbs, data.table(jn=jn, vaccEff=ves[vv]))#, propInTrial=pits[pp], immunoDelay=immDs[dd]))
             sink(paste0('SLsims',jn,'.txt'))
             for(ii in parmsMatDo$simNum) {
                 cmd <- "R CMD BATCH '--no-restore --no-save --args"
@@ -81,7 +84,6 @@ for(dd in 1:length(immDs)) {
             }
             sink()
         }
-    }
-}
-
+     }
+## }
 jbs
