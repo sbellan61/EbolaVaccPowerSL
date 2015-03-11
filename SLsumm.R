@@ -69,7 +69,8 @@ save(finTrials, file=file.path('BigResults', paste0(thing, '.Rdata')))
 
 load(file=file.path('BigResults',paste0(thing, '.Rdata')))
 
-powFin <- summarise(group_by(finTrials, vaccEff, trial, propInTrial, ord, delayUnit, mod, immunoDelay,trialStartDate)
+powFin <- summarise(group_by(finTrials, vaccEff, trial, propInTrial, ord, delayUnit, mod, immunoDelay,trialStartDate
+                             , weeklyDecay, cvWeeklyDecay, cvClus, cvClusTime)
                     , nsim = length(stopped)
                     , stopped = mean(stopped)
                     , vaccGood = mean(vaccGood)
