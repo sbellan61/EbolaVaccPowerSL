@@ -5,12 +5,11 @@ library(RColorBrewer); library(boot)
 ## Simulate SWCT vs RCT vs CRCT for SL
 sapply(c('simFuns.R','AnalysisFuns.R','CoxFxns.R','EndTrialFuns.R'), source)
 
-thing <- 'FalsePosFluct'
+thing <- 'initDateSens'
 batchdirnm <- file.path('BigResults',thing)
 fls <- list.files(batchdirnm, pattern='.Rdata', full.names = T)
+fls <- fls[grepl('SWCTptCorr', fls)]
 length(fls)
-
-p2 <- simTrial(makeParms('RCT',small=F, ord='none', delayUnit = 0, clusSize=300, hazType = 'Phenom', weeklyDecay = .9, cvWeeklyDecay = .5, cvClus = 1.5, cvClusTime = 0.5, numClus = 20))
 
 dparms <- c('trial','sdLogIndiv','vaccEff','doSL','propInTrial','nbsize','ord','reordLag','delayUnit','immunoDelay','trialStartDate'
             , 'weeklyDecay', 'cvWeeklyDecay', 'cvClus', 'cvClusTime'
@@ -65,6 +64,20 @@ front <- c('mod','stopped','vaccGood','vaccBad')
 setcolorder(finTrials, c(front, setdiff(names(finTrials), front)))
 back <- c('nbatch','sim')
 setcolorder(finTrials, c(setdiff(names(finTrials), back), back))
+
+finTCorr <- finTrials
+load(file=file.path('BigResults',paste0(thing, '.Rdata')))
+finOld <- finTrials
+
+dim(finTCorr)
+dim(finOld)
+dim(finOld[trial=='SWCT'])
+finTrials <- rbindlist(list(finTCorr, finOld[trial!='SWCT']), use.names=T, fill=T)
+dim(finTrials)
+
+## save(finTrials, file=file.path('BigResults', paste0(thing, 'SWCTptCorr.Rdata')))
+## save(finTrials, file=file.path('BigResults', paste0(thing, '.Rdata')))
+thing <- paste0(thing,'New')
 save(finTrials, file=file.path('BigResults', paste0(thing, '.Rdata')))
 
 load(file=file.path('BigResults',paste0(thing, '.Rdata')))
