@@ -21,7 +21,6 @@ pf[, biasNAR:=biasNAR/vaccEff]
 levels(pf$order)[1] <- 'random'
 levels(pf$order)[2] <- 'risk-prioritized'
 
-
 ####################################################################################################
 ## them for ms
 thax <- element_text(colour = 'black', size = 8)
@@ -253,13 +252,18 @@ pf
 ####################################################################################################
 ## Show power by # of cases
 
-subs <- pf[,  vaccEff==.9 & immunoDelay==21 & ((trial == 'SWCT' & mod=='relabCoxME') | (trial %in% c('RCT','FRCT') & mod =='CoxME'))]
-p.tmp <- ggplot(pf[subs], aes(caseTot, vaccGoodNAR, colour=trial, linetype=order)) + thsb +
+subs <- pf[,  vaccEff==.9 & immunoDelay==21 & ((trial == 'SWCT' & mod=='relabCoxME') | (trial %in% c('RCT') & mod =='CoxME'))]
+pf$type <- pf[, paste(order,trial)]
+pf[grepl('SWCT',type), type:='SWCT']
+group.colors2 <- c('purple','blue', "#F8766D", "orange")
+names(group.colors2) <- pf[subs,unique(type)]
+p.tmp <- ggplot(pf[subs], aes(caseTot, vaccGoodNAR, colour=type)) + thsb +
 #    scale_x_continuous(labels = formatC, limits=c(.5,.9),  breaks = pf[,unique(vaccEff)], minor_breaks=NULL) +  
         xlab('# of cases in trial population') + ylab('power to detect effective vaccine') + 
-            scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
-                geom_line(size=1)  + # facet_wrap(~pit, scales = "free_y",nrow=1) + 
-                        scale_color_manual(values=group.colors) +
+       #     scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
+                geom_line(size=3)  +# facet_wrap(~pit, scales = "free_y",nrow=1) +
+                                    geom_point(aes(caseTot, vaccGoodNAR, colour=type, shape=pit), size = 7) + #scale_shape(solid = FALSE) +
+                        scale_color_manual(values=group.colors2) +
                                 theme(legend.justification=c(1,1), legend.position=c(1,1))
 p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,1), breaks=seq(0,1,by=.1), minor_breaks = NULL) #seq(0,1,.05))
 p.tmp
