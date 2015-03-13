@@ -67,6 +67,8 @@ activeFXN <- function(parms, whichDo='st') within(parms, {
                        , ' infected in protective delay'))
             stA[, sum(infected==1 & infectDay < Inf & !(infectDay >= startDay & infectDay <= endDay)), cluster]
             stA[infected==1 & infectDay < Inf & !(infectDay >= startDay & infectDay <= endDay), infected:=0]
+            ## make events that happen after endDay not count
+            stA[infectDay>endDay, infected:=0]
             ## run to see how person-time is distributed between cluster
             ## stA[idByClus==1, list(cluster, vaccDay, immuneDayThink, startDay, endDay)]
             ## stA[idByClus==1 & immuneGrp==1, list(cluster, vaccDay, immuneDayThink, startDay, endDay)]
@@ -94,9 +96,9 @@ plotSTA <- function(stA) {
     stA[idByClus==1 & immuneGrp==0, segments(startDay, indiv, endDay, indiv, col = 'dodger blue'), cluster]
     stA[idByClus==1 & immuneGrp==1, segments(startDay, indiv, min(168,endDay), indiv, col = 'red'), cluster]
     print('# infections')
-    print(stA[, sum(infected==1 & infectDay<Inf), immuneGrp])
-        print('empirical hazard (remember declining incidence distorts this')
-    print(stA[, sum(infected==1 & infectDay<Inf)/sum(min(endDay,168)-min(startDay,168)), immuneGrp])
+    print(stA[, sum(infected==1), immuneGrp])
+    print('empirical hazard (remember declining incidence distorts this')
+    print(stA[, sum(infected==1)/sum(min(endDay,168)-min(startDay,168)), immuneGrp])
 }
 
 ## Restructure for GEE/GLMM with weekly observations of each cluster.
@@ -109,23 +111,25 @@ makeGEEDat <- function(parms, whichDo='popH') within(parms, {
     popHTmp$immuneGrp <- 0
     popHTmp[day >= immuneDayThink, immuneGrp := 1]
     popHTmp$firstActive <- 0
-    if(trial=='CRCT' & ord!='none') ## active once anyone considered immune in matched cluster pair
-        popHTmp[, firstActive := min(immuneDayThink), by = pair]
-    if(trial %in% c('RCT','FRCT')) ## active once anyone considered immune in cluster
-        popHTmp[, firstActive := min(immuneDayThink), cluster]
+    if(!includeAllControlPT) { ## remove person-time observed prior to post-refractory period from data
+        if(trial=='CRCT' & ord!='none') ## active once anyone considered immune in matched cluster pair
+            popHTmp[, firstActive := min(immuneDayThink), by = pair]
+        if(trial %in% c('RCT','FRCT')) ## active once anyone considered immune in cluster
+            popHTmp[, firstActive := min(immuneDayThink), cluster]
+    }
     popHTmp$active <- popHTmp[,day>=firstActive]
     clusD <- popHTmp[active==T, list(cases = sum(!is.na(infectDayRCens))), list(cluster, day, immuneGrp, vaccDay, immuneDayThink)]
     clusD <- clusD[order(cluster, day)]
     clusD <- mutate(group_by(clusD, cluster), atRisk = clusSize - c(0, cumsum(cases[-length(cases)])))
-    if(trial == 'SWCT') {
-            firstDayAnyoneImmune <- popHTmp[, min(immuneDayThink)]
-            lastDayAnyoneNotVacc <- popHTmp[, max(immuneDayThink)] - 1
-            clusD <- clusD[!day < firstDayAnyoneImmune] ## remove inactive observation intervals at beggining of trial
-            clusD <- clusD[!day > lastDayAnyoneNotVacc] ## remove inactive observation intervals at end of trial
-            rm(firstDayAnyoneImmune, lastDayAnyoneNotVacc)
-            if(remProtDel) { ## exclude protective delay
-                clusD <- clusD[!(day >= vaccDay & day < immuneDayThink)]
-            }
+    if(!includeAllControlPT & trial == 'SWCT') {
+        firstDayAnyoneImmune <- popHTmp[, min(immuneDayThink)]
+        lastDayAnyoneNotVacc <- popHTmp[, max(immuneDayThink)] - 1
+        clusD <- clusD[!day < firstDayAnyoneImmune] ## remove inactive observation intervals at beggining of trial
+        clusD <- clusD[!day > lastDayAnyoneNotVacc] ## remove inactive observation intervals at end of trial
+        rm(firstDayAnyoneImmune, lastDayAnyoneNotVacc)
+        if(remProtDel) { ## exclude protective delay
+            clusD <- clusD[!(day >= vaccDay & day < immuneDayThink)]
+        }
     }
     ## plotClusD(clusD) ## to check result
     nmSt <- paste0('clusDat', sub('popH','',whichDo)) ## makes EVpop into EVst for example
@@ -139,7 +143,7 @@ plotClusD <- function(clusD) {
     clusD[immuneGrp==1, segments(day, cluster, day+7, cluster, col = 'red'), cluster]    
     print('# infections')
     print(clusD[, sum(cases), immuneGrp])
-        print('empirical hazard (remember declining incidence distorts this')
+    print('empirical hazard (remember declining incidence distorts this')
     print(clusD[, sum(cases)/(sum(atRisk)*7), immuneGrp])
 }
 
@@ -253,15 +257,15 @@ getEndResults <- function(parms, bump = T) {
 }
 
 simNtrials <- function(seed = 1, parms=makeParms(), N = 2, returnAll = F,
-                       doSeqStops = F, showSeqStops = F, flnm='test', verbose=1, verbFreq=10) {
+                       doSeqStops = F, showSeqStops = F, flnm='test', verbFreq=10) {
     set.seed(seed)
     caseXVaccRandGrpList <- caseXPT_ImmuneList <- weeklyAnsList <- list()
     length(caseXVaccRandGrpList) <- length(caseXPT_ImmuneList) <- length(weeklyAnsList) <- N
     finInfo <- finMods <- stopPoints <- data.frame(NULL)
     for(ss in 1:N) {
-        if(verbose>0 & (ss %% verbFreq == 0)) print(paste('on',ss,'of',N))
-        if(verbose>.5 & (ss %% 1 == 0)) print(paste('on',ss,'of',N))
-        if(verbose==2) browser()
+        if(parms$verbose>0 & (ss %% verbFreq == 0)) print(paste('on',ss,'of',N))
+        if(parms$verbose>.5 & (ss %% 1 == 0)) print(paste('on',ss,'of',N))
+        if(parms$verbose==2) browser()
         res <- simTrial(parms)
         res <- makeSurvDat(res)
         res <- makeGEEDat(res)
