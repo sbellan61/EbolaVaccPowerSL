@@ -98,6 +98,11 @@ SWCT <- pnleg +  geom_rect(aes(alpha=status)) + labs(alpha="") +
     labs(title="SWCT")
 SWCT
 
+SWCTtu <- pnleg + aes(y=vaxorder, ymin = as.numeric(vaxorder)-0.5+yspacing, ymax = as.numeric(vaxorder)+0.5 - yspacing) +
+  geom_rect(aes(alpha=status)) + labs(alpha="") +
+  labs(title="SWCT, underlying order by risk priority")
+SWCTtu
+
 RCTtu <- pnleg +  aes(y=vaxorder, ymin = as.numeric(vaxorder)-0.5+yspacing, ymax = as.numeric(vaxorder)+0.5 - yspacing) +
     geom_rect(data=dat[order_status == "unvaccinated"]) +
     geom_rect(data=dat[order_status != "unvaccinated"], mapping = aes(ymax=as.numeric(vaxorder), alpha=order_status)) +
