@@ -110,6 +110,18 @@ RCTtu <- pnleg +  aes(y=vaxorder, ymin = as.numeric(vaxorder)-0.5+yspacing, ymax
     labs(title="risk-prioritized RCT") +  labs(alpha="")
 RCTtu
 
+SimInst <- pnleg +  aes(y=vaxorder, ymin = as.numeric(vaxorder)-0.5+yspacing, ymax = as.numeric(vaxorder)+0.5 - yspacing) +
+  geom_rect(mapping = aes(ymax=as.numeric(vaxorder), alpha=factor(ifelse(week <= 3,"protective delay","vaccinated"), levels=states) )) +
+  geom_rect(mapping = aes(ymin=as.numeric(vaxorder))) +
+  labs(title="Simultaneous Instant RCT, by Hazard") +  labs(alpha="")
+SimInst
+
+SimInstByID <- pnleg +
+  geom_rect(mapping = aes(ymax=as.numeric(cluster_id), alpha=factor(ifelse(week <= 3,"protective delay","vaccinated"), levels=states) )) +
+  geom_rect(mapping = aes(ymin=as.numeric(cluster_id))) +
+  labs(title="Simultaneous Instant RCT, by Cluster ID") +  labs(alpha="")
+SimInstByID
+
 SWCThom <- pnleg +  geom_rect(aes(alpha=status, fill=hazHomogeneous)) +
     labs(title="SWCT, homogeneous hazard shapes")
 SWCThom
