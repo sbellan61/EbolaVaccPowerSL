@@ -133,12 +133,19 @@ RCTnone <- pnleg +
     labs(title="random ordered RCT")
 RCTnone
 
-FRCT <- pnleg +  
+FRCT <- pnleg +
   geom_rect(data=dat[frct_status == "unvaccinated"]) +
   geom_rect(data=dat[frct_status != "unvaccinated"], mapping = aes(ymin=as.numeric(cluster_id))) +
   geom_rect(data=dat[frct_status != "unvaccinated"], mapping = aes(ymax=as.numeric(cluster_id), alpha=frct_status)) +
   labs(title="random ordered FRCT")
 FRCT
+
+FRCTByHaz <- pnleg + aes(y=vaxorder, ymin = as.numeric(vaxorder)-0.5+yspacing, ymax = as.numeric(vaxorder)+0.5 - yspacing) +
+  geom_rect(data=dat[frct_status == "unvaccinated"]) +
+  geom_rect(data=dat[frct_status != "unvaccinated"], mapping = aes(ymin=as.numeric(vaxorder))) +
+  geom_rect(data=dat[frct_status != "unvaccinated"], mapping = aes(ymax=as.numeric(vaxorder), alpha=frct_status)) +
+  labs(title="random ordered FRCT, underlying order by hazard")
+FRCTByHaz
 
 pdf('Figures/Fig 3 schematic.pdf', w = 6.5, h = 4)
 multiplot(SWCT, OrigOrderRCTtu, cols = 2)
