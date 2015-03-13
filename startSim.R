@@ -17,7 +17,6 @@ if(length(args)>0)  { ## Then cycle through each element of the list and evaluat
 
 ## seed=1;trial="RCT";ord="none";propInTrial=0.05;sdLogIndiv=1;delayUnit=0;immunoDelay=5;vaccEff=0.7;simNum=11641;batchdirnm="BigResults/SLSimsFinal";saveNm="simSL-";nsims=1;reordLag=14;nboot=20;trialStartDate="2015-02-18"
 
-includeAllControlPT = F
 verbose <- 1
 parmArgs <- subsArgs(as.list(environment()), makeParms)
 print(parmArgs)
