@@ -5,10 +5,10 @@ library(RColorBrewer); library(boot)
 ## Simulate SWCT vs RCT vs CRCT for SL
 sapply(c('simFuns.R','AnalysisFuns.R','CoxFxns.R','EndTrialFuns.R'), source)
 
-thing <- 'initDateSens'
+thing <- 'SLSimsFinal'
 batchdirnm <- file.path('BigResults',thing)
 fls <- list.files(batchdirnm, pattern='.Rdata', full.names = T)
-fls <- fls[grepl('SWCTptCorr', fls)]
+#fls <- fls[grepl('SWCTptCorr', fls)]
 length(fls)
 
 dparms <- c('trial','sdLogIndiv','vaccEff','doSL','propInTrial','nbsize','ord','reordLag','delayUnit','immunoDelay','trialStartDate'
@@ -43,7 +43,6 @@ finTrials$vaccEff <- as.numeric(finTrials$vaccEff)
 ## finTrials$tooSmall <- finTrials[, (caseCXimmGrpEnd + caseVXimmGrpEnd) < 10]
 ## finTrials[tooSmall==T, c('vaccGood','vaccBad','stopped') := F]
 ## finTrials[tooSmall==T, c('lci','uci','p') := list(-Inf,1,1)]
-
     
 ## Determine if stopped
 finTrials[grepl('boot',mod), stopped := lci > 0 | uci < 0]
@@ -67,25 +66,12 @@ setcolorder(finTrials, c(front, setdiff(names(finTrials), front)))
 back <- c('nbatch','sim')
 setcolorder(finTrials, c(setdiff(names(finTrials), back), back))
 
-finTCorr <- finTrials
-load(file=file.path('BigResults',paste0(thing, '.Rdata')))
-finOld <- finTrials
-
-dim(finTCorr)
-dim(finOld)
-dim(finOld[trial=='SWCT'])
-finTrials <- rbindlist(list(finTCorr, finOld[trial!='SWCT']), use.names=T, fill=T)
-dim(finTrials)
-
-## save(finTrials, file=file.path('BigResults', paste0(thing, 'SWCTptCorr.Rdata')))
-## save(finTrials, file=file.path('BigResults', paste0(thing, '.Rdata')))
-thing <- paste0(thing,'New')
 save(finTrials, file=file.path('BigResults', paste0(thing, '.Rdata')))
 
 load(file=file.path('BigResults',paste0(thing, '.Rdata')))
 
 powFin <- summarise(group_by(finTrials, vaccEff, trial, propInTrial, ord, delayUnit, mod, immunoDelay,trialStartDate
-                             , weeklyDecay, cvWeeklyDecay, cvClus, cvClusTime)
+                             , weeklyDecay, cvWeeklyDecay, cvClus)#, cvClusTime)
                     , nsim = length(stopped)
                     , stopped = mean(stopped)
                     , vaccGood = mean(vaccGood)

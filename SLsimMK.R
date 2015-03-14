@@ -68,11 +68,11 @@ immDs <- parmsMat[,unique(immunoDelay)]
 jn <- 0
 
 ## for(dd in 1:length(immDs)) {
-for(vv in 1:length(ves)) {
+##for(vv in 1:length(ves)) {
         ## for(pp in 1:length(pits)) {
-            parmsMatDo <- parmsMat[vaccEff==ves[vv]]# & propInTrial==pits[pp] & immunoDelay==immDs[dd]]            
+            parmsMatDo <- parmsMat#[vaccEff==ves[vv]]# & propInTrial==pits[pp] & immunoDelay==immDs[dd]]            
             jn <- jn+1
-            jbs <- rbind(jbs, data.table(jn=jn, vaccEff=ves[vv]))#, propInTrial=pits[pp], immunoDelay=immDs[dd]))
+##            jbs <- rbind(jbs, data.table(jn=jn, vaccEff=ves[vv]))#, propInTrial=pits[pp], immunoDelay=immDs[dd]))
             sink(paste0('SLsims',jn,'.txt'))
             for(ii in parmsMatDo$simNum) {
                 cmd <- "R CMD BATCH '--no-restore --no-save --args"
@@ -83,7 +83,8 @@ for(vv in 1:length(ves)) {
                 cat('\n')              # add new line
             }
             sink()
-        }
-     }
+##        }
+##     }
 ## }
+
 jbs
