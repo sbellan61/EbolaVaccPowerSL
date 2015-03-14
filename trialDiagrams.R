@@ -34,8 +34,10 @@ dat <- data.table(
   hazHeterogeneous = hazHe,
   status = factor("unvaccinated", levels=states),
   order_status = factor("unvaccinated", levels=states),
+  frct_order_status = factor("unvaccinated", levels=states),
   frct_status = factor("unvaccinated", levels=states)
 )
+setkey(dat, cluster_id, week)
 
 stateFact <- factor(states, levels=states)
 
@@ -52,10 +54,32 @@ for (w in 1:cats) {
   dat[(week >= (w+eclipseT)) & cluster_id == markcluster, order_status := "vaccinated"]
 }
 
+frct_clusters <- 2
+
+for (w in 1:round(cats/2)) {
+  for (i in 1:frct_clusters) {
+    excludeclusters <- dat[(week == w) & (frct_order_status != "unvaccinated"), ]$cluster_id
+    markcluster <- dat[(week == (w-2)) & !(cluster_id %in% excludeclusters) & (hazHeterogeneous == dat[(week == (w-2)) & !(cluster_id %in% excludeclusters), max(hazHeterogeneous)]),]$cluster_id
+    dat[(week >= w) & cluster_id == markcluster, frct_order_status := "protective delay"]
+    dat[(week >= (w+eclipseT)) & cluster_id == markcluster, frct_order_status := "vaccinated"]
+  }
+}
+
+frctvaxord <- dat[frct_order_status != "unvaccinated", list(vaxorder = min(week)), by="cluster_id"]
+frctvaxord[,week := vaxorder]
+setkey(frctvaxord, cluster_id, week)
+joined <- dat[frctvaxord, list(hazHeterogeneous, vaxorder, cluster_id)]
+setkey(joined, vaxorder, hazHeterogeneous)
+joined[,frct_vaxorder := .I]
+
+#frctvaxord[dat, hazHeterogeneous, by=c("vaxorder")]
+
 vaxord <- dat[order_status != "unvaccinated", list(vaxorder = min(week)), by="cluster_id"]
 setkey(vaxord, "vaxorder")
 vaxord$vaxorder <- factor(vaxord$vaxorder-min(vaxord$vaxorder)+1)
+
 dat <- merge(dat, vaxord, by="cluster_id")
+dat <- merge(dat, joined[,frct_vaxorder,by=cluster_id], by="cluster_id")
 dat <- dat[week > 0,]
 
 p <- ggplot(dat) +
@@ -133,12 +157,33 @@ RCTnone <- pnleg +
     labs(title="random ordered RCT")
 RCTnone
 
-FRCT <- pnleg +  
+FRCT <- pnleg +
   geom_rect(data=dat[frct_status == "unvaccinated"]) +
   geom_rect(data=dat[frct_status != "unvaccinated"], mapping = aes(ymin=as.numeric(cluster_id))) +
   geom_rect(data=dat[frct_status != "unvaccinated"], mapping = aes(ymax=as.numeric(cluster_id), alpha=frct_status)) +
   labs(title="random ordered FRCT")
 FRCT
+
+FRCTByHaz <- pnleg + aes(y=vaxorder, ymin = as.numeric(vaxorder)-0.5+yspacing, ymax = as.numeric(vaxorder)+0.5 - yspacing) +
+  geom_rect(data=dat[frct_status == "unvaccinated"]) +
+  geom_rect(data=dat[frct_status != "unvaccinated"], mapping = aes(ymin=as.numeric(vaxorder))) +
+  geom_rect(data=dat[frct_status != "unvaccinated"], mapping = aes(ymax=as.numeric(vaxorder), alpha=frct_status)) +
+  labs(title="random ordered FRCT, underlying order by hazard")
+FRCTByHaz
+
+FRCTHazOrdByHaz <- pnleg + aes(y=frct_vaxorder, ymin = as.numeric(frct_vaxorder)-0.5+yspacing, ymax = as.numeric(frct_vaxorder)+0.5 - yspacing) +
+  geom_rect(data=dat[frct_order_status == "unvaccinated"]) +
+  geom_rect(data=dat[frct_order_status != "unvaccinated"], mapping = aes(ymin=as.numeric(frct_vaxorder))) +
+  geom_rect(data=dat[frct_order_status != "unvaccinated"], mapping = aes(ymax=as.numeric(frct_vaxorder), alpha=frct_order_status)) +
+  labs(title="haz ordered FRCT, underlying order by hazard")
+FRCTHazOrdByHaz
+
+FRCTHazOrdByID <- pnleg + 
+  geom_rect(data=dat[frct_order_status == "unvaccinated"]) +
+  geom_rect(data=dat[frct_order_status != "unvaccinated"], mapping = aes(ymin=as.numeric(cluster_id))) +
+  geom_rect(data=dat[frct_order_status != "unvaccinated"], mapping = aes(ymax=as.numeric(cluster_id), alpha=frct_order_status)) +
+  labs(title="haz ordered FRCT, underlying order by ID")
+FRCTHazOrdByID
 
 pdf('Figures/Fig 3 schematic.pdf', w = 6.5, h = 4)
 multiplot(SWCT, OrigOrderRCTtu, cols = 2)
