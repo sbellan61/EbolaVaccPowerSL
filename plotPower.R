@@ -8,6 +8,18 @@ labs <- c('','log')
 
 thing <- 'SLSimsFinal'
 load(file=file.path('Results',paste0('powFin_',thing,'.Rdata')))
+pfOld <- pf
+thing <- 'SLSimsFinalPTCorr' ## adding results with new SWCT pt calculations
+load(file=file.path('Results',paste0('powFin_',thing,'.Rdata')))
+pfNew <- pf
+
+pfOld[, length(mean), trial]
+pfNew[, length(mean), trial]
+pfNew$swctPT <- 'partial'
+pfOld$swctPT <- 'all'
+pf <- rbindlist(list(pfOld, pfNew), use.names=T, fill=T)
+pf[, length(mean), list(trial,swctPT)]
+
 pf[vaccEff==.5 & trial=='RCT' & propInTrial==.025 & mod=='CoxME']
 gg_color_hue <- function(n) {
   hues = seq(15, 375, length=n+1)
@@ -46,23 +58,32 @@ theme_set(theme_grey(base_size = 12))
 pf$modLab2 <- pf$mod
 levels(pf$modLab2)[levels(pf$modLab2) %in% c('CoxME','bootCoxME','relabCoxME')] <- c('(A) CoxPH', '(B) Bootstrap', '(C) Permutation')
 
+## Only include SWCT partial pt
+pf$incl <- pf[, (trial=='SWCT' & swctPT=='partial') | (trial!='SWCT' & swctPT=='all')]
+pfA <- pf
+pf <- pf[incl==T]
+
 ####################################################################################################
 ## Figure 2 - Type I errors
-for(jj in 1:2) {
-    subs <- pf[,trial %in% c('SWCT','RCT') & vaccEff==0 & mod %in% c('CoxME','bootCoxME','relabCoxME') & immunoDelay==21]
-    subs <- subs & pf[,!(trial=='RCT' & grepl('boot',mod))]
-    p.tmp <- ggplot(pf[subs], 
-                    aes(propInTrial, stoppedNAR, colour=trial, linetype=order)) + thsb +
-                        scale_x_continuous(labels = percent, limits=c(.025,.1), minor_breaks=NULL, breaks = c(.025,.05,.075,.1)) +  
-                            xlab('% of district-level cases in trial population') + ylab('False Positive Rate') + 
-                                scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
-                                    geom_hline(yintercept=.05, color='dark gray', size = 1) +
-                                        geom_line(size=1) + facet_wrap(~modLab2, scales = "free_y") + scale_color_manual(values=group.colors)
-    if(jj==1) p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,.1))
-    if(jj==2) p.tmp <- p.tmp + scale_y_log10(labels = formatC, breaks = c(.01, .025, .05, .1), limits = c(.005,.1), minor_breaks=NULL)
-    ggsave(paste0('Figures/Fig 2A -',labs[jj],'Type I SL.png'), p.tmp, w = 8.5, h = 3.5)
-    ggsave(paste0('Figures/Fig 2A -',labs[jj],'Type I SL.pdf'), p.tmp, w = 8.5, h = 3.5)
-}
+subs <- pf[,  trial %in% c('SWCT','RCT') & vaccEff==0 & mod %in% c('CoxME','bootCoxME','relabCoxME') & immunoDelay==21]
+subs <- subs & pf[,!(trial=='RCT' & grepl('boot',mod))]
+p.tmp <- ggplot(pf[subs], 
+                aes(propInTrial, stoppedNAR, colour=trial, linetype=order)) + thsb +
+    scale_x_continuous(labels = percent, limits=c(.025,.1), minor_breaks=NULL, breaks = c(.025,.05,.075,.1)) +  
+    xlab('% of district-level cases in trial population') + ylab('False Positive Rate') + 
+    scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
+    geom_hline(yintercept=.05, color='dark gray', size = 1) +
+    geom_line(size=1) + facet_wrap(~modLab2, scales = "free_y") + scale_color_manual(values=group.colors)
+p.tmpunt <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,.2))
+p.tmplog <- p.tmp + scale_y_log10(labels = formatC, breaks = c(.01, .025, .05, .1), limits = c(.005,.16), minor_breaks=NULL)
+for(typ in c('.png','.pdf')) ggsave(paste0('Figures/Fig 2A - Type I SL',typ), p.tmpunt, w = 8.5, h = 3.5)
+for(typ in c('.png','.pdf')) ggsave(paste0('Figures/Fig 2A - log Type I SL',typ), p.tmpunt, w = 8.5, h = 3.5)
+
+p.tmpunt 
+
+swctOld <- pfA[trial=='SWCT' & swctPT=='all' & vaccEff==0 & mod %in% c('CoxME','bootCoxME','relabCoxME') & immunoDelay==21]
+p.tmpuntNO <- p.tmpunt + geom_line(data=swctOld , mapping=aes(propInTrial, stoppedNAR), linetype=4, size = 1)
+ggsave(paste0('Figures/Fig 4 new vs old',typ), p.tmpuntNO, w = 8.5, h = 3.5)
 
 ####################################################################################################
 ## Figure 2B - Type I errors
@@ -86,21 +107,20 @@ ggsave(paste0('Figures/Fig 2B -',labs[jj],'Type I SL.pdf'), p.tmp, w = 6.5, h = 
 
 ####################################################################################################
 ## Figure 4 - Power
-subs <- pf[, immunoDelay==21 & ((trial == 'SWCT' & mod=='relabCoxME') | (trial %in% c('RCT','FRCT') & mod =='CoxME'))]
-for(jj in 1:2) {
-    thax <- element_text(colour = 'black', size = 8)
-    p.tmp <- ggplot(pf[subs], aes(vaccEff, vaccGoodNAR, colour=trial, linetype=order)) + thsb +
-        scale_x_continuous(labels = formatC, limits=c(.5,.9),  breaks = pf[,unique(vaccEff)], minor_breaks=NULL) +  
-            xlab('vaccine efficacy') + ylab('power to detect effective vaccine') + 
-                scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
-                    geom_line(size=1) + facet_wrap(~pit, scales = "free_y",nrow=1) + 
-                        ggtitle('expected % of district-level cases in trial population') + 
-                            scale_color_manual(values=group.colors)
-    if(jj==1) p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,1), breaks=seq(0,1,by=.1), minor_breaks = NULL) #seq(0,1,.05))
-    if(jj==2) p.tmp <- p.tmp + scale_y_log10(labels = formatC, limits=c(0.01,.9), breaks = c(.01,.025,.05,.1,.2,.5,.8))
-    ggsave(paste0('Figures/Fig 4 -',labs[jj],'Power SL.png'), p.tmp, w = 9, h = 4)
-    ggsave(paste0('Figures/Fig 4 -',labs[jj],'Power SL.pdf'), p.tmp, w = 9, h = 4)
-}
+subs <- pf[, incl==T & vaccEff>0 &  immunoDelay==21 & ((trial == 'SWCT' & mod=='relabCoxME') | (trial %in% c('RCT','FRCT') & mod =='CoxME'))]
+thax <- element_text(colour = 'black', size = 8)
+p.tmp <- ggplot(pf[subs], aes(vaccEff, vaccGoodNAR, colour=trial, linetype=order)) + thsb +
+    scale_x_continuous(labels = formatC, limits=c(.5,.9),  breaks = pf[,unique(vaccEff)], minor_breaks=NULL) +  
+    xlab('vaccine efficacy') + ylab('power to detect effective vaccine') + 
+    scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
+    geom_line(size=1) + facet_wrap(~pit, scales = "free_y",nrow=1) + 
+    ggtitle('expected % of district-level cases in trial population') + 
+    scale_color_manual(values=group.colors)
+p.tmpunt <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,1), breaks=seq(0,1,by=.1), minor_breaks = NULL) #seq(0,1,.05))
+p.tmplog <- p.tmp + scale_y_log10(labels = formatC, limits=c(0.01,.96), breaks = c(.01,.025,.05,.1,.2,.5,.8,.9))
+for(typ in c('.png','.pdf'))    ggsave(paste0('Figures/Fig 4 - Power SL', typ), p.tmpunt, w = 9, h = 4)
+for(typ in c('.png','.pdf'))    ggsave(paste0('Figures/Fig 4 - log Power SL', typ), p.tmplog, w = 9, h = 4)
+p.tmpunt
 
 ####################################################################################################
 ## Figure 5 - Power by immunedelay
@@ -115,7 +135,6 @@ scale_color_manual(values=group.colors) +
  p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,1), breaks=seq(0,1,by=.1), minor_breaks = NULL) #seq(0,1,.05))
 ggsave(paste0('Figures/Fig 5 - Power by seroconversion delay SL.png'), p.tmp, w = 5, h = 4)
 ggsave(paste0('Figures/Fig 5 - Power by seroconversion delay SL.pdf'), p.tmp, w = 5, h = 4)
-
 
 
 ####################################################################################################
@@ -194,8 +213,6 @@ tab1
 tab1 <- data.table(tab1[trial=='RCT',list(pit, cvr,biasNAR)], tab1[trial=='SWCT',list(cvr,biasNAR)])
 tab1
 write.csv(tab1, file='Results/biasCoverage.csv')
-
-
 
 
 #################################################
