@@ -12,12 +12,19 @@ pfOld <- pf
 thing <- 'SLSimsFinalPTCorr' ## adding results with new SWCT pt calculations
 load(file=file.path('Results',paste0('powFin_',thing,'.Rdata')))
 pfNew <- pf
+thing <- 'SWCTkeepStartFin' ## adding results with new SWCT pt calculations
+load(file=file.path('Results',paste0('powFin_',thing,'.Rdata')))
+pfSF <- pf
 
 pfOld[, length(mean), trial]
 pfNew[, length(mean), trial]
-pfNew$swctPT <- 'partial'
-pfOld$swctPT <- 'all'
-pf <- rbindlist(list(pfOld, pfNew), use.names=T, fill=T)
+pfSF[, length(mean), trial]
+pfNew$swctPT <- 'remPD_SF'
+pfSF$swctPT <- 'remPD'
+pfOld$swctPT <- as.character(NA)
+pfOld[trial=='SWCT', swctPT:='all']
+
+pf <- rbindlist(list(pfOld, pfNew, pfSF), use.names=T, fill=T)
 pf[, length(mean), list(trial,swctPT)]
 
 pf[vaccEff==.5 & trial=='RCT' & propInTrial==.025 & mod=='CoxME']
@@ -32,6 +39,21 @@ pf$trial <- factor(pf$trial, levels=levels(pf$trial)[c(2,1,3)])
 pf[, biasNAR:=biasNAR/vaccEff]
 levels(pf$order)[1] <- 'random'
 levels(pf$order)[2] <- 'risk-prioritized'
+
+## Set up line types for ease
+pf$analysis <- 1
+pf[trial=='SWCT' & swctPT=='remPD', analysis:=2]
+pf[trial=='SWCT' & swctPT=='remPD_SF', analysis:=3]
+pf$analysis <- factor(pf$analysis, levels = 1:3, labels = c('SWCT including protective delay \n& early/late person-time',
+                                         'SWCT including \nearly/late person-time \n& excluding protective delay', 
+                                         'SWCT excluding \nboth protective delay \n& early/late person-time'))
+
+## Relabel models
+pf$modLab2 <- pf$mod
+levels(pf$modLab2)[levels(pf$modLab2) %in% c('CoxME','bootCoxME','relabCoxME')] <- c('(A) CoxPH', '(B) Bootstrap', '(C) Permutation')
+
+## Only include SWCT remPD_SF pt
+pf$allSWCTpt <- pf[, trial!='SWCT' | (trial=='SWCT' & swctPT=='all')]
 
 ####################################################################################################
 ## them for ms
@@ -55,13 +77,6 @@ thsb <- theme(axis.text.x = thax, axis.text.y = thax, plot.title = element_text(
 theme_set(theme_grey(base_size = 12))
 ##thsb <- thsb + theme_bw()#
 
-pf$modLab2 <- pf$mod
-levels(pf$modLab2)[levels(pf$modLab2) %in% c('CoxME','bootCoxME','relabCoxME')] <- c('(A) CoxPH', '(B) Bootstrap', '(C) Permutation')
-
-## Only include SWCT partial pt
-pf$partSWCTpt <- pf[, trial!='SWCT' | (trial=='SWCT' & swctPT=='partial')]
-pf$allSWCTpt <- pf[, trial!='SWCT' | (trial=='SWCT' & swctPT=='all')]
-
 ####################################################################################################
 ## Figure 4 - Type I errors
 subs <- pf[, allSWCTpt==T & trial %in% c('SWCT','RCT') & vaccEff==0 & mod %in% c('CoxME','bootCoxME','relabCoxME') & immunoDelay==21]
@@ -70,11 +85,26 @@ p.tmp <- ggplot(pf[subs],
                 aes(propInTrial, stoppedNAR, colour=trial, linetype=order)) + thsb +
     scale_x_continuous(labels = percent, limits=c(.025,.1), minor_breaks=NULL, breaks = c(.025,.05,.075,.1)) +  
     xlab('% of district-level cases in trial population') + ylab('False Positive Rate') + 
-    scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
+    #scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
     geom_hline(yintercept=.05, color='dark gray', size = 1) +
     geom_line(size=1) + facet_wrap(~modLab2, scales = "free_y") + scale_color_manual(values=group.colors)
 p.tmpunt <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,.15))
+p.tmpunt
 for(typ in c('.png','.pdf')) ggsave(paste0('Figures/Fig 4 - Type I by analysis',typ), p.tmpunt, w = 8.5, h = 3.5)
+
+####################################################################################################
+## Comparison of SWCT pt stuff
+subs <- pf[, trial %in% c('SWCT') & vaccEff==0 & mod %in% c('CoxME','bootCoxME','relabCoxME') & immunoDelay==21]
+p.tmp <- ggplot(pf[subs], 
+                aes(propInTrial, stoppedNAR, linetype=analysis)) + thsb +
+    scale_x_continuous(labels = percent, limits=c(.025,.1), minor_breaks=NULL, breaks = c(.025,.05,.075,.1)) +  
+    xlab('% of district-level cases in trial population') + ylab('False Positive Rate') + 
+    scale_linetype_manual(breaks=levels(pf$analysis), values=1:3) +
+    geom_hline(yintercept=.05, color='dark gray', size = 1) + theme(legend.key.height=unit(3,"line")) + 
+    geom_line(size=1, colour = group.colors['SWCT']) + facet_wrap(~modLab2, scales = "free_y") + scale_color_manual(values=group.colors)
+p.tmpunt <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,.17))
+p.tmpunt
+for(typ in c('.png','.pdf')) ggsave(paste0('Figures/type I by SWCT person-time',typ), p.tmpunt, w = 8.5, h = 3.5)
 
 ####################################################################################################
 ## Figure 4B - Type I errors panels by trial type
@@ -108,7 +138,7 @@ p.tmpunt <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,1), breaks=s
 for(typ in c('.png','.pdf'))    ggsave(paste0('Figures/Fig 5 - Power SL', typ), p.tmpunt, w = 9, h = 4)
 
 ####################################################################################################
-## Figure 5 - Power by immunedelay
+##  Power by immunedelay
 for(ii in 1:2) {
     if(ii==1) pdf('Figures/Fig 5 - Power by seroconversion delay SL.pdf', w = 4, h=5)
     if(ii==2) png('Figures/Fig 5 - Power by seroconversion delay SL.png', w = 4, h=5, res = 300, units='in')
@@ -121,11 +151,44 @@ for(ii in 1:2) {
     axis(2, seq(0,1,l=5),las=1)
     with(pf[subs & trial=='RCT'], lines(immunoDelay, vaccGoodNAR, col = group.colors['RCT'], lty = 2, lwd = 3))
     with(pf[subs & trial=='SWCT' & swctPT=='all'], lines(immunoDelay, vaccGoodNAR, col = group.colors['SWCT'], lty = 1, lwd = 3))
-    with(pf[subs & trial=='SWCT' & swctPT=='partial'], lines(immunoDelay, vaccGoodNAR, col = group.colors['SWCT'], lty = 4, lwd = 3))
-    legend('topleft', leg = c('risk-prioritized RCT', 'SWCT, all person-time', 'SWCT, partial person-time'),
+    with(pf[subs & trial=='SWCT' & swctPT=='remPD_SF'], lines(immunoDelay, vaccGoodNAR, col = group.colors['SWCT'], lty = 4, lwd = 3))
+    legend('topleft', leg = c('risk-prioritized RCT', 'SWCT, all person-time', 'SWCT, remPD_SF person-time'),
            col = c(group.colors['RCT'], rep(group.colors['SWCT'],2)), lty = c(2,1,4), lwd = 3, bty = 'n')
     graphics.off()
 }
+
+####################################################################################################
+##  Power by SWCT design
+subs <- pf[, vaccEff>0 & immunoDelay==21 & (trial == 'SWCT' & mod %in% c('CoxME','bootCoxME','relabCoxME'))]
+thax <- element_text(colour = 'black', size = 8)
+p.tmp <- ggplot(pf[subs], aes(vaccEff, vaccGoodNAR, linetype=analysis)) + thsb +
+    scale_x_continuous(labels = formatC, limits=c(.5,.9),  breaks = pf[,unique(vaccEff)], minor_breaks=NULL) +  
+    xlab('vaccine efficacy') + ylab('power to detect effective vaccine') + 
+    scale_linetype_manual(breaks=levels(pf$analysis), values=1:3) +
+    geom_line(size=1, colour=group.colors['SWCT']) + facet_wrap(mod~pit, scales = "free",nrow=3) +
+ theme(legend.key.height=unit(3,"line")) + 
+    ggtitle('expected % of district-level cases in trial population') + 
+    scale_color_manual(values=group.colors)
+p.tmpunt <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,.7), breaks=seq(0,.7,by=.1), minor_breaks = NULL) #seq(0,1,.05))
+p.tmpunt
+for(typ in c('.png','.pdf'))    ggsave(paste0('Figures/Power by SWCT pt', typ), p.tmpunt, w = 9, h = 8)
+
+####################################################################################################
+##  Prob rej null by SWCT design
+subs <- pf[, immunoDelay==21 & (trial == 'SWCT' & mod %in% c('CoxME','bootCoxME','relabCoxME'))]
+thax <- element_text(colour = 'black', size = 8)
+p.tmp <- ggplot(pf[subs], aes(vaccEff, vaccGoodNAR, linetype=analysis)) + thsb +
+    scale_x_continuous(labels = formatC, limits=c(0,.9),  breaks = pf[,unique(vaccEff)], minor_breaks=NULL) +  
+    xlab('vaccine efficacy') + ylab('power to detect effective vaccine') + 
+    scale_linetype_manual(breaks=levels(pf$analysis), values=1:3) +
+    geom_line(size=1, colour=group.colors['SWCT']) + facet_wrap(mod~pit, scales = "free",nrow=3) +
+    theme(legend.key.height=unit(3,"line")) + 
+    ggtitle('expected % of district-level cases in trial population') + 
+    geom_hline(yintercept=.025, color='dark gray', size = 1) + 
+    scale_color_manual(values=group.colors)
+p.tmplog <- p.tmp + scale_y_log10(labels = formatC, breaks = c(.01, .025, .05, .1, .25, .5, 1), limits = c(.005,1), minor_breaks=NULL) 
+p.tmplog
+for(typ in c('.png','.pdf'))    ggsave(paste0('Figures/CoxPH Prob rej null by SWCT pt log', typ), p.tmplog, w = 9, h = 4)
 
 ####################################################################################################
 ## Figure SX - Power by model
@@ -165,7 +228,7 @@ p.tmp <- ggplot(pf[subs], aes(vaccEff, caseTot, colour=trial, linetype=order)) +
     geom_line(size=1) + facet_wrap(~pit, scale='free_y', nrow=1) + 
     ggtitle('% of district-level cases in trial population')  + scale_color_manual(values=group.colors) + 
     scale_y_continuous(labels = formatC, limits=c(0,105)) 
-subs <- pf[, swctPT=='partial' & immunoDelay==21 & (trial == 'SWCT' & mod=='relabCoxME')]
+subs <- pf[, swctPT=='remPD_SF' & immunoDelay==21 & (trial == 'SWCT' & mod=='relabCoxME')]
 p.tmp <- p.tmp + geom_line(aes(vaccEff, caseTot), data = pf[subs], linetype = 4, col = 'orange', size = 1.3)
 for(typ in c('.png','.pdf')) ggsave(paste0('Figures/Cases SL ALL',typ), p.tmp, w = 9, h = 3.5)
 
@@ -218,7 +281,7 @@ for(jj in 1:2) {
                                   geom_line(size=1) + facet_wrap(~pit, nrow=1) + 
                                       ggtitle('power by expected % of district-level cases in trial population') +
                                           geom_hline(yintercept=.025, color='black', linetype='dotted')
-        subs <- pf[, swctPT=='partial' & model==modTmp & immunoDelay==21 & trial=='SWCT']
+        subs <- pf[, swctPT=='remPD_SF' & model==modTmp & immunoDelay==21 & trial=='SWCT']
         p.tmp <- p.tmp + geom_line(aes(vaccEff, vaccGoodNAR), colour=group.colors['SWCT'], linetype=4, data =pf[subs], size = 1)
         if(jj==1) p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,1), minor_breaks = seq(0,1,.05))
         if(jj==2) p.tmp <- p.tmp + scale_y_log10(labels = formatC, limits=c(0.0005,.96), breaks = c(.01,.025,.05,.1,.2,.5,.8))
@@ -247,7 +310,7 @@ p.tmp <- ggplot(pf[subs], aes(propInTrial, stoppedNAR, colour=trial, linetype=or
     scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
     geom_line(size=1) + facet_wrap(~model) + 
 geom_hline(yintercept=.05, color='black', linetype='dotted', size = 1.2)
-       subs <- pf[,swctPT=='partial' & trial =='SWCT' & vaccEff==0 & immunoDelay==21 & !(trial=='RCT' & grepl('boot',mod))]
+       subs <- pf[,swctPT=='remPD_SF' & trial =='SWCT' & vaccEff==0 & immunoDelay==21 & !(trial=='RCT' & grepl('boot',mod))]
         p.tmp <- p.tmp + geom_line(aes(propInTrial, stoppedNAR), colour=group.colors['SWCT'], linetype=4, data =pf[subs], size = 1)
 if(jj==1) p.tmp <- p.tmp + scale_y_continuous(labels = formatC)#, limits=c(0,.3))
 if(jj==2) p.tmp <- p.tmp + scale_y_log10(labels = formatC, breaks = c(.01, .025, .05, .1, .2, .3, .4))#,  limits=c(.01,.3))
@@ -268,7 +331,7 @@ p.tmp <- ggplot(pf[subs], aes(caseTot, vaccGoodNAR, colour=type)) + thsb +
     geom_point(aes(caseTot, vaccGoodNAR, colour=type, shape=pit), size = 5) +
     scale_color_manual(values=group.colors2) + scale_shape_manual(values=c(15:18)) + 
     scale_y_continuous(labels = formatC, limits=c(0,1), breaks=seq(0,1,by=.1), minor_breaks = NULL) 
-subs <- pf[,  swctPT=='partial' & vaccEff==.9 & immunoDelay==21 & (trial == 'SWCT' & mod=='relabCoxME')]
+subs <- pf[,  swctPT=='remPD_SF' & vaccEff==.9 & immunoDelay==21 & (trial == 'SWCT' & mod=='relabCoxME')]
 p.tmp <- p.tmp + geom_point(aes(caseTot, vaccGoodNAR, shape=pit), data = pf[subs], size = 5) +
     geom_line(aes(caseTot, vaccGoodNAR), data = pf[subs], linetype=4, size = 1.3)
 for(typ in c('.png','.pdf')) ggsave(paste0('Figures/Fig SX - Power by cases',typ), p.tmp, w = 8, h = 4)
