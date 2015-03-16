@@ -3,7 +3,7 @@ if(grepl('stevebellan', Sys.info()['login'])) setwd('~/Documents/R Repos/EbolaVa
 if(grepl('tacc', Sys.info()['nodename'])) setwd('/home1/02413/sbellan/VaccEbola/')
 sapply(c('simFuns.R','AnalysisFuns.R','CoxFxns.R','EndTrialFuns.R'), source)
  
-batchdirnm <- file.path('BigResults','initDateSensSWCTptCorr')
+batchdirnm <- file.path('BigResults','initDateSens')
 routdirnm <- file.path(batchdirnm,'Routs')
 if(!file.exists(batchdirnm)) dir.create(batchdirnm)
 if(!file.exists(routdirnm)) dir.create(routdirnm)
@@ -24,11 +24,13 @@ parmsMat <- as.data.table(expand.grid(
     , vaccEff = ves
     , trialStartDate = trialSDseq
     ))
+parmsMat$remProtDel <- T
+parmsMat$remStartFin <- F
 parmsMat$ord <- 'TU'
 parmsMat[trial=='SWCT', ord := 'none']
 parmsMat$simNum <- 1:nrow(parmsMat)
 parmsMat$batchdirnm <- batchdirnm
-nmtmp <- 'simSL-initD-SWCTptCorr'
+nmtmp <- 'simSL-initD-remPD-'
 parmsMat$saveNm <- nmtmp
 parmsMat$nsims <- 17 ## 17*12 is ~ 2000 simulations each (2040 but we'll round)
 parmsMat$reordLag <- 14

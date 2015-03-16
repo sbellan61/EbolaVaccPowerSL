@@ -28,7 +28,7 @@ makeParms <- function(
                               ## vaccination refractory period? in SWCT also only includes
                               ## person-time when trial has both protected & unprotected individuals
     , remProtDel = T## remove protective delay PT from SWCT
-    , remStartFin = T ## remove start
+    , remStartFin = F ## remove start
     , RCTendOption = 2        ## order to vaccinate unvaccinated invididuals when an RCT ends, see EndTrialFuns.R
     , instVaccDelay = 7 ## delay til instant vacc of everyone after trial ends in trials where delayUnit=0 otherwise
     , small=F ## do a small trial for illustration
