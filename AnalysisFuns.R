@@ -37,23 +37,28 @@ activeFXN <- function(parms, whichDo='st') within(parms, {
         if(trial %in% c('RCT','FRCT')) ## active once anyone considered immune in cluster
             stA[, firstActive := min(immuneDayThink), by = cluster]
         if(trial=='SWCT') {## inactive during protective delay; active only when there exists both vacc & unvacc person-time observed
-            firstDayAnyoneImmune <- stA[, min(immuneDayThink)]
-            lastDayAnyoneNotVacc <- stA[, max(immuneDayThink)]
-            if(verbose>1.5)    {
-                print(paste0('excluding ', stA[endDay <= firstDayAnyoneImmune, sum(infectDay<Inf)], ' infected before ', firstDayAnyoneImmune, ' days'))
-                print(paste0('excluding ', stA[startDay >= lastDayAnyoneNotVacc, sum(infectDay<Inf)], ' infected after ', lastDayAnyoneNotVacc, ' days'))
-            } 
-            stA <- stA[!endDay <= firstDayAnyoneImmune] ## remove inactive observation intervals at beggining of trial
-            stA <- stA[!startDay >= lastDayAnyoneNotVacc] ## remove inactive observation intervals at end of trial
-            ## Left-truncate person-time before firstDay
-            stA[startDay < firstDayAnyoneImmune, startDay:=firstDayAnyoneImmune]
-            ## Right-truncate person-time after lastDay
-            stA[endDay > lastDayAnyoneNotVacc, endDay:=lastDayAnyoneNotVacc]
-            ## Now check that infectDay is still in intervals
-            if(verbose>1.5) print(paste0('excluding ', stA[, sum(infected==1 & infectDay < Inf & !(infectDay >= startDay & infectDay <= endDay))]
-                       , ' infected after ', lastDayAnyoneNotVacc, ' days'))
-            stA[infected==1 & infectDay < Inf & !(infectDay >= startDay & infectDay <= endDay), infected:=0]
-            rm(firstDayAnyoneImmune, lastDayAnyoneNotVacc)
+            if(remStartFin) {
+                firstDayAnyoneImmune <- stA[, min(immuneDayThink)]
+                lastDayAnyoneNotVacc <- stA[, max(immuneDayThink)]
+                if(verbose>1.5)    {
+                    print(paste0('excluding ', stA[endDay <= firstDayAnyoneImmune, sum(infectDay<Inf)], 
+                                 ' infected before ', firstDayAnyoneImmune, ' days'))
+                    print(paste0('excluding ', stA[startDay >= lastDayAnyoneNotVacc, sum(infectDay<Inf)], 
+                                 ' infected after ', lastDayAnyoneNotVacc, ' days'))
+                } 
+                stA <- stA[!endDay <= firstDayAnyoneImmune] ## remove inactive observation intervals at beggining of trial
+                stA <- stA[!startDay >= lastDayAnyoneNotVacc] ## remove inactive observation intervals at end of trial
+                ## Left-truncate person-time before firstDay
+                stA[startDay < firstDayAnyoneImmune, startDay:=firstDayAnyoneImmune]
+                ## Right-truncate person-time after lastDay
+                stA[endDay > lastDayAnyoneNotVacc, endDay:=lastDayAnyoneNotVacc]
+                ## Now check that infectDay is still in intervals
+                if(verbose>1.5) print(paste0('excluding ', 
+                                             stA[, sum(infected==1 & infectDay < Inf & !(infectDay >= startDay & infectDay <= endDay))]
+                                             , ' infected after ', lastDayAnyoneNotVacc, ' days'))
+                stA[infected==1 & infectDay < Inf & !(infectDay >= startDay & infectDay <= endDay), infected:=0]
+                rm(firstDayAnyoneImmune, lastDayAnyoneNotVacc)
+            }
             if(remProtDel) { ## exclude protective delay
                 ## right-truncate at vaccine date person-time intervals that starts before vaccine date and ends
                 ## after vaccine date (i.e. ignore person-time within protective delay)
@@ -61,12 +66,12 @@ activeFXN <- function(parms, whichDo='st') within(parms, {
                 ## remove person-time completely contained within protective delay (should only remove cluster 1's 0-immunedaythink person-time, but
                 ## already removed above, so redundant)
                 stA <- stA[!(startDay >= vaccDay & endDay <= immuneDayThink)]
+                ## Now check that infectDay is still in intervals
+                if(verbose>1.5) 
+                    print(paste0('excluding ', stA[, sum(infected==1 & infectDay < Inf & !(infectDay >= startDay & infectDay <= endDay))]
+                                 , ' infected in protective delay'))
+                stA[infected==1 & infectDay < Inf & !(infectDay >= startDay & infectDay <= endDay), infected:=0]
             }
-            ## Now check that infectDay is still in intervals
-            if(verbose>1.5) print(paste0('excluding ', stA[, sum(infected==1 & infectDay < Inf & !(infectDay >= startDay & infectDay <= endDay))]
-                       , ' infected in protective delay'))
-            stA[, sum(infected==1 & infectDay < Inf & !(infectDay >= startDay & infectDay <= endDay)), cluster]
-            stA[infected==1 & infectDay < Inf & !(infectDay >= startDay & infectDay <= endDay), infected:=0]
             ## make events that happen after endDay not count
             stA[infectDay>endDay, infected:=0]
             ## run to see how person-time is distributed between cluster
@@ -122,11 +127,13 @@ makeGEEDat <- function(parms, whichDo='popH') within(parms, {
     clusD <- clusD[order(cluster, day)]
     clusD <- mutate(group_by(clusD, cluster), atRisk = clusSize - c(0, cumsum(cases[-length(cases)])))
     if(!includeAllControlPT & trial == 'SWCT') {
-        firstDayAnyoneImmune <- popHTmp[, min(immuneDayThink)]
-        lastDayAnyoneNotVacc <- popHTmp[, max(immuneDayThink)] - 1
-        clusD <- clusD[!day < firstDayAnyoneImmune] ## remove inactive observation intervals at beggining of trial
-        clusD <- clusD[!day > lastDayAnyoneNotVacc] ## remove inactive observation intervals at end of trial
-        rm(firstDayAnyoneImmune, lastDayAnyoneNotVacc)
+        if(remStartFin) {
+            firstDayAnyoneImmune <- popHTmp[, min(immuneDayThink)]
+            lastDayAnyoneNotVacc <- popHTmp[, max(immuneDayThink)] - 1
+            clusD <- clusD[!day < firstDayAnyoneImmune] ## remove inactive observation intervals at beggining of trial
+            clusD <- clusD[!day > lastDayAnyoneNotVacc] ## remove inactive observation intervals at end of trial
+            rm(firstDayAnyoneImmune, lastDayAnyoneNotVacc)
+        }
         if(remProtDel) { ## exclude protective delay
             clusD <- clusD[!(day >= vaccDay & day < immuneDayThink)]
         }
