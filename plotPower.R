@@ -94,6 +94,10 @@ p.tmpunt <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,.15))
 p.tmpunt
 for(typ in c('.png','.pdf')) ggsave(paste0('Figures/Fig 4 - Type I by analysis',typ), p.tmpunt, w = 8.5, h = 3.5)
 
+subs <- pf[, mainAn==T & trial %in% c('SWCT','RCT') & vaccEff==0 & mod %in% c('CoxME','GLMFclus', 'bootCoxME','bootGLMFclus', 'relabCoxME') & immunoDelay==21]
+subs <- subs & pf[,!(trial=='RCT' & grepl('boot',mod))]
+pf[vaccEff==0 & immunoDelay==21 & subs & pit=='10%', list(trial, stoppedNAR,mod)]
+
 ####################################################################################################
 ## Comparison of SWCT pt stuff
 subs <- pf[, trial %in% c('SWCT') & vaccEff==0 & mod %in% c('CoxME','GLMFclus','bootCoxME','relabCoxME') & immunoDelay==21]
@@ -140,6 +144,10 @@ p.tmp <- ggplot(pf[subs], aes(vaccEff, vaccGoodNAR, colour=trial, linetype=order
 p.tmpunt <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,1), breaks=seq(0,1,by=.1), minor_breaks = NULL) #seq(0,1,.05))
 p.tmpunt
 for(typ in c('.png','.pdf'))    ggsave(paste0('Figures/Fig 5 - Power SL', typ), p.tmpunt, w = 9, h = 4)
+
+tmpS <- arrange(pf[subs & trial=='SWCT', list(trial, vaccEff, vaccGoodNAR, order,pit)],pit)
+tmpR <- arrange(pf[subs & trial=='RCT' & order=='risk-prioritized', list(trial, vaccEff, vaccGoodNAR, order,pit)], pit)
+tmpR$vaccGoodNAR/tmpS$vaccGoodNAR
 
 ####################################################################################################
 ##  Power by immunedelay
