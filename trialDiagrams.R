@@ -191,5 +191,5 @@ graphics.off()
 
 
 pdf('Figures/Fig SX schematic.pdf', w = 6.5, h = 7)
-multiplot(SWCT, RCTnone, OrigOrderRCTtu, FRCTHazOrdByID, cols = 2)
+multiplot(SWCT, RCTnone, OrigOrderRCTtu, SimInstByID, cols = 2)
 graphics.off()
