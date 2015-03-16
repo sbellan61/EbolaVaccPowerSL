@@ -3,7 +3,7 @@ if(grepl('stevebellan', Sys.info()['login'])) setwd('~/Documents/R Repos/EbolaVa
 if(grepl('tacc', Sys.info()['nodename'])) setwd('/home1/02413/sbellan/VaccEbola/')
 sapply(c('simFuns.R','AnalysisFuns.R','CoxFxns.R','EndTrialFuns.R'), source)
  
-batchdirnm <- file.path('BigResults','SWCTkeepStartFin')
+batchdirnm <- file.path('BigResults','SLSimsFinalPTCorr')
 routdirnm <- file.path(batchdirnm,'Routs')
 if(!file.exists(batchdirnm)) dir.create(batchdirnm)
 if(!file.exists(routdirnm)) dir.create(routdirnm)
@@ -12,8 +12,8 @@ numEach <- 12*10
 
 ves <- c(0, seq(.5, .9, by = .2))
 ## ves <- 0
- pits <- c(.025, .05, .075, .1)##
-##pits <- c(.15,.2,.3)
+##pits <- c(.025, .05, .075, .1)##
+pits <- c(.15,.2,.3)
 parmsMat <- as.data.table(expand.grid(
     seed =  1:numEach
     , trial = tnms
@@ -24,7 +24,7 @@ parmsMat <- as.data.table(expand.grid(
     , immunoDelay = c(5, 21)
     , vaccEff = ves
     ))
-parmsMat$remStartFin <- FALSE ##***
+parmsMat$remStartFin <- TRUE ##***
 parmsMat$remProtDel <- TRUE
 parmsMat <- parmsMat[!(trial=='SWCT' & (delayUnit==0 | ord=='TU'))] ## SWCT must have delay and cannot be ordered
 parmsMat <- parmsMat[!(delayUnit==0 & ord=='TU')] ## ordering is meaningless with simultaneous instant vacc
