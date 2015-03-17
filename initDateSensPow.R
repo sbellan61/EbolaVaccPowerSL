@@ -13,14 +13,17 @@ gg_color_hue <- function(n) {
   hues = seq(15, 375, length=n+1)
   hcl(h=hues, l=65, c=100)[1:n]
 }
-group.colors <- c('risk-prioritized RCT' = "#333BFF", FRCT = "#CC6600", 'SWCT' ="#9633FF")
+group.colors <- c(RCT = "#333BFF", FRCT = "#CC6600", SWT ="#9633FF")
 group.colors[c(1,3,2)] <- gg_color_hue(3)
 group.colors['SWCT'] <- 'orange'
-pf$design <- factor(pf$design, levels=levels(pf$design)[c(2,1,3)])
+pf$trial <- factor(pf$trial, levels=levels(pf$trial)[c(2,1,3)])
 pf[, biasNAR:=biasNAR/vaccEff]
+levels(pf$order)[1] <- 'random'
+levels(pf$order)[2] <- 'risk-prioritized'
 
 ####################################################################################################
 ## them for ms
+thax <- element_text(colour = 'black', size = 8)
 thsb <- theme(axis.text.x = thax, axis.text.y = thax, plot.title = element_text(vjust=1),
               axis.title.y = element_text(vjust = 1), axis.title.x = element_text(vjust = -.5),
               axis.line = element_line(), axis.ticks = element_line(color='black'),
@@ -41,14 +44,13 @@ thsb <- theme(axis.text.x = thax, axis.text.y = thax, plot.title = element_text(
 theme_set(theme_grey(base_size = 12))
 ##thsb <- thsb + theme_bw()#
 
-levels(pf$trial)
-levels(pf$design) <- c('risk-prioritized RCT', 'SWCT', 'FRCT')
+pf[, length(design), list(trial, remProtDel, remStartFin)]
+
 ####################################################################################################
 ## Figure 4 - Power
-subs <- pf[, immunoDelay==21 & ((trial == 'SWCT' & mod=='relabCoxME') | (trial == 'RCT' & order=='time-updated' & mod =='CoxME'))]
-thax <- element_text(colour = 'black', size = 8)
+subs <- pf[,  immunoDelay==21 & ((trial == 'SWCT' & remProtDel==T & mod=='relabCoxME') | (trial == 'RCT' & order=='risk-prioritized' & mod =='CoxME'))]
 p.tmp <- ggplot(pf[subs]) +
-  aes(x=trialStartDate, y=vaccGoodNAR, colour=design, linetype=order) + 
+  aes(x=trialStartDate, y=vaccGoodNAR, colour=trial, linetype=order) + 
   thsb + theme(axis.text.x = element_text(angle=90)) +
   scale_x_date(labels = date_format("%b-%d"), breaks = pf[,unique(trialStartDate)], minor_breaks=NULL) +
   scale_y_continuous(labels = formatC, limits=c(0,1), breaks=seq(0,1,by=.1), minor_breaks = NULL) +  
@@ -61,18 +63,7 @@ p.tmp <- ggplot(pf[subs]) +
   scale_linetype_discrete(guide=F)# breaks=group.colors,
 p.tmp
 ## ggtitle('expected % of district-level cases in trial population')
-ggsave(paste0('Figures/Fig 6 - Power by start date SL.png'), p.tmp, w = 5, h = 3)
+ggsave(paste0('Figures/Fig 6 - Power by start date SL.pdf'), p.tmp, w = 4, h = 3)
 
-
-subs <- pf[, vaccEff>.8 & immunoDelay==21 & propInTrial == .05 & 
-           ((mod %in% c('relabCoxME') &  (trial=='SWCT' & ord=='none') ) |
-           (mod %in% c('CoxME') & trial=='RCT' & ord=='TU' ))]
-tab1 <- pf[subs, list(vaccGoodNAR), list(trial, pit,trialStartDate)]
-tab1 <- dcast.data.table(tab1, trial ~ trialStartDate)
-tab2 <- t(tab1[,-1,with=F])
-tab2
-colnames(tab2) <- tab1[,trial]
-tab2[-1,]/tab2[-nrow(tab2),]
-
-1-tab2[5,]/tab2[3,]
+pf[subs, list(vaccGoodNAR), list(trial, pit,trialStartDate)]
 
