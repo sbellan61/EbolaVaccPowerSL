@@ -6,27 +6,6 @@ library(RColorBrewer); library(data.table); library(ggplot2); library(dplyr); li
 percent <- function(x) paste0(formatC(x*100), '%')
 labs <- c('','log')
 
-## thing <- 'SLSimsFinal'
-## load(file=file.path('Results',paste0('powFin_',thing,'.Rdata')))
-## pfOld <- pf
-## thing <- 'SLSimsFinalPTCorr' ## adding results with new SWCT pt calculations
-## load(file=file.path('Results',paste0('powFin_',thing,'.Rdata')))
-## pfNew <- pf
-## thing <- 'SWCTkeepStartFin' ## adding results with new SWCT pt calculations
-## load(file=file.path('Results',paste0('powFin_',thing,'.Rdata')))
-## pfSF <- pf
-
-## pfOld[, length(mean), trial]
-## pfNew[, length(mean), trial]
-## pfSF[, length(mean), trial]
-## pfNew$swctPT <- 'remPD_SF'
-## pfSF$swctPT <- 'remPD'
-## pfOld$swctPT <- as.character(NA)
-## pfOld[trial=='SWCT', swctPT:='all']
-
-## pf <- rbindlist(list(pfOld, pfNew, pfSF), use.names=T, fill=T)
-## pf[, length(mean), list(trial,swctPT)]
-## save(pf, file=file.path('Results','powFin_All.Rdata'))
 load(file=file.path('Results','powFin_All.Rdata'))
 
 pf[vaccEff==.5 & trial=='RCT' & propInTrial==.025 & mod=='CoxME']
