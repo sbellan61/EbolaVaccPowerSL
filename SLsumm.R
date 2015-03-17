@@ -5,13 +5,14 @@ library(RColorBrewer); library(boot)
 ## Simulate SWCT vs RCT vs CRCT for SL
 sapply(c('simFuns.R','AnalysisFuns.R','CoxFxns.R','EndTrialFuns.R'), source)
 
-thing <- 'SLSimsFinalPTCorr'
+thing <- 'initDateSens'
 batchdirnm <- file.path('BigResults',thing)
 fls <- list.files(batchdirnm, pattern='.Rdata', full.names = T)
+##fls <- fls[grepl('remPD', fls)]
 length(fls)
 
 dparms <- c('trial','sdLogIndiv','vaccEff','doSL','propInTrial','nbsize','ord','reordLag','delayUnit','immunoDelay','trialStartDate'
-            , 'weeklyDecay', 'cvWeeklyDecay', 'cvClus', 'cvClusTime'
+            , 'weeklyDecay', 'cvWeeklyDecay', 'cvClus', 'cvClusTime', 'remStartFin', 'remProtDel'
             )
 nbatch <- length(fls)
 finInfoList <- finModList <- stopList <- parmsList <- list(NULL)
@@ -28,7 +29,14 @@ for(ii in 1:nbatch) {
     }
 }
 
-parmsDT <- rbindlist(parmsList)
+parmsDT <- rbindlist(parmsList, use.names = T, fill = T)
+parmsDT$remStartFin <- levels(parmsDT$remStartFin)[parmsDT$remStartFin]
+parmsDT$remProtDel <- levels(parmsDT$remProtDel)[parmsDT$remProtDel]
+class(parmsDT$remProtDel) <- class(parmsDT$remStartFin) <- 'logical'
+
+parmsDT[trial=='SWCT' & is.na(remStartFin), remStartFin := F]
+parmsDT[trial=='SWCT' & is.na(remProtDel), remProtDel := F]
+
 finTrials <- merge(rbindlist(finModList), parmsDT, by = c('nbatch'))
 finTrials[,vaccEff := levels(vaccEff)[vaccEff]]
 
