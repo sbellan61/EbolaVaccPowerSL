@@ -153,8 +153,11 @@ for(ii in 1:2) {
     graphics.off()
 }
 
+subs <- pf[, propInTrial==.05 & vaccEff == .9 & ((trial == 'SWCT' & mod=='relabCoxME') | (trial=='RCT' & order=='risk-prioritized' & mod =='CoxME'))]
+arrange(pf[subs & (trial=='RCT' | trial=='SWCT' & as.numeric(analysis)==1), list(trial, immunoDelay, propInTrial, vaccGoodNAR)],trial)
+
 ####################################################################################################
-##  Power by SWCT design
+##  Power by SWCT design all analyses
 subs <- pf[, vaccEff>0 & propInTrial <= .1 & immunoDelay==21 & (trial == 'SWCT' & mod %in% c('CoxME','GLMFclus','bootCoxME','relabCoxME'))]
 thax <- element_text(colour = 'black', size = 8)
 p.tmp <- ggplot(pf[subs], aes(vaccEff, vaccGoodNAR, linetype=analysis)) + thsb +
@@ -168,6 +171,21 @@ p.tmp <- ggplot(pf[subs], aes(vaccEff, vaccGoodNAR, linetype=analysis)) + thsb +
 p.tmpunt <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,1), breaks=seq(0,1,by=.1), minor_breaks = NULL) #seq(0,1,.05))
 p.tmpunt
 for(typ in c('.png','.pdf'))    ggsave(paste0('Figures/Power by SWCT pt', typ), p.tmpunt, w = 9, h = 8)
+ 
+##  Power by SWCT design permutation
+subs <- pf[, vaccEff>0 & propInTrial <= .1 & immunoDelay==21 & (trial == 'SWCT' & mod %in% 'relabCoxME')]
+thax <- element_text(colour = 'black', size = 8)
+p.tmp <- ggplot(pf[subs], aes(vaccEff, vaccGoodNAR, linetype=analysis)) + thsb +
+    scale_x_continuous(labels = formatC, limits=c(.5,.9),  breaks = pf[,unique(vaccEff)], minor_breaks=NULL) +  
+    xlab('vaccine efficacy') + ylab('power to detect effective vaccine') + 
+    scale_linetype_manual(breaks=levels(pf$analysis), values=1:3) +
+    geom_line(size=1, colour=group.colors['SWCT']) + facet_wrap(~pit, scales = "free", nrow = 1) +
+ theme(legend.key.height=unit(3,"line")) + 
+    ggtitle('expected % of district-level cases in trial population') + 
+    scale_color_manual(values=group.colors)
+p.tmpunt <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,.43), breaks=seq(0,.4,by=.1), minor_breaks = NULL) #seq(0,1,.05))
+p.tmpunt
+for(typ in c('.png','.pdf'))    ggsave(paste0('Figures/Power by SWCT pt (CoxME)', typ), p.tmpunt, w = 9, h = 3.5)
 
 ####################################################################################################
 ##  Prob rej null by SWCT design
