@@ -276,7 +276,7 @@ tab1
 tab1[, list(trial, cvr, biasNAR)]
 tab1[trial=='SWCT', cvr:= cvr[!is.na(cvr)], list(pit,vaccEff)]
 tab1 <- tab1[!(trial=='SWCT' & mod=='CoxME')]
-tab1[, c('cvr','biasNAR') := list(signif(cvr,2), signif(biasNAR,2))]
+tab1[, c('cvr','biasNAR') := list(signif(cvr,4), signif(biasNAR,4))]
 tab1
 
 tab1 <- data.table(tab1[trial=='RCT',list(pit, cvr,biasNAR)], tab1[trial=='SWCT',list(cvr,biasNAR)])
