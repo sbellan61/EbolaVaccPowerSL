@@ -1,4 +1,4 @@
-## Code adapted from https://github.com/ICI3D/ebola-forecast/ (Carl Pearson)
+## Code adapted from https://github.com/ICI3D/ebola-forecast/ (Carl Pearson & Travis Porco)
 ## Steve Bellan 2015
 
 library(boot); library(ggplot2); require(data.table)

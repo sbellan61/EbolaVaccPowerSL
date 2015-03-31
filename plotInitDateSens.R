@@ -1,5 +1,5 @@
 ####################################################################################################
-## Plot Figure S7.
+## Plot sensitivity analysis to trial start date.
 ####################################################################################################
 ## Code base accompanying:
 ## 
@@ -11,35 +11,32 @@
 ## Steve Bellan, March 2015
 ## License at bottom.
 ####################################################################################################
-library(RColorBrewer); library(data.table); library(ggplot2); library(dplyr); library(grid)
-
-labs <- c('','log')
-thing <- 'FalsePosFluct'
+library(RColorBrewer); library(data.table); library(ggplot2); library(dplyr); library(grid); library(scales)
+thing <- 'initDateSens'
 load(file=file.path('Results',paste0('powFin_',thing,'.Rdata')))
 source('ggplotTheme.R')
-
-pf$cvWeeklyDecay <- pf[, as.numeric(levels(cvWeeklyDecay)[cvWeeklyDecay])]
-pf$weeklyDecay <- pf[, as.numeric(levels(weeklyDecay)[weeklyDecay])]
-pf$cvClus <- pf[, as.numeric(levels(cvClus)[cvClus])]
-pf$cvClusTime <- pf[, as.numeric(levels(cvClusTime)[cvClusTime])]
+pf[, length(design), list(trial, remProtDel, remStartFin)]
 
 ####################################################################################################
-## Figure S7 - Type I errors by phenomenological amount of fluctuation False positive rates for
-## varying degrees of inter- and intra-cluster heterogeneity in trends.
+## Figure 6
 ####################################################################################################
-subs <- pf[,trial %in% c('SWCT','RCT') & vaccEff==0 & mod %in% c('CoxME','bootCoxME','relabCoxME') & immunoDelay==21]
-subs <- subs & pf[,!(trial=='RCT' & grepl('boot',mod))]
-p.tmp <- ggplot(pf[subs], 
-                aes(cvWeeklyDecay, stoppedNAR, colour=trial, linetype=order)) + thsb +
-    scale_x_continuous(limits=c(0,1), minor_breaks=NULL, breaks = unique(pf[,cvWeeklyDecay])) +  
-    xlab('coef variation of weekly decay rate') + ylab('False Positive Rate') + 
-    scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
-    geom_hline(yintercept=.05, color='dark gray', size = 1) +
-    geom_line(size=1) + facet_wrap(mod ~ cvClusTime, scales='free') + scale_color_manual(values=group.colors)
- p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,.15))
-ggsave(paste0('Figures/Fig S7 - Type I by fluct & weekly decay CV.pdf'), p.tmp, w = 7.5, h = 5.5)
-ggsave(paste0('Figures/Fig S7 - Type I by fluct & weekly decay CV.png'), p.tmp, w = 7.5, h = 5.5)
+subs <- pf[,  immunoDelay==21 & ((trial == 'SWCT' & remProtDel==T & mod=='relabCoxME') | (trial == 'RCT' & order=='risk-prioritized' & mod =='CoxME'))]
+p.tmp <- ggplot(pf[subs]) +
+  aes(x=trialStartDate, y=vaccGoodNAR, colour=trial, linetype=order) + 
+  thsb + theme(axis.text.x = element_text(angle=90)) +
+  scale_x_date(labels = date_format("%b-%d"), breaks = pf[,unique(trialStartDate)], minor_breaks=NULL) +
+  scale_y_continuous(labels = formatC, limits=c(0,1), breaks=seq(0,1,by=.1), minor_breaks = NULL) +  
+  xlab('trial start date') + ylab('power') + 
+  geom_rect(aes(xmin=as.Date('2015-02-18'), xmax = as.Date('2015-03-18'), ymin=0, ymax=1), fill = "lightgrey", color=NA) +
+  geom_line(size=1) +
+  scale_color_manual('', values=group.colors) +
+      guides(colour = guide_legend(override.aes = list(linetype=c(2,1)))) +
+          theme(legend.justification=c(2,1), legend.position=c(1,1.25)) +
+  scale_linetype_discrete(guide=F)     
+p.tmp
+ggsave(paste0('Figures/Fig 6 - Power by start date SL.pdf'), p.tmp, w = 4, h = 3)
 
+pf[subs, list(vaccGoodNAR), list(trial, pit,trialStartDate)]
 
 ####################################################################################################
 ### LICENSE

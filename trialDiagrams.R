@@ -1,13 +1,26 @@
+####################################################################################################
+## Trial diagram plots.
+####################################################################################################
+## Code base accompanying:
+## 
+## Bellan, SE, JRC Pulliam, CAB Pearson, DChampredon, SJ Fox, L Skrip, AP Galvani, M Gambhir, BA
+## Lopman, TC Porco, LA Meyers, J Dushoff (2015). The statistical power and validity of Ebola
+## vaccine trials in Sierra Leone: A simulation study of trial design and analysis. _Lancet
+## Infectious Diseases_.
+##
+## Carl Pearson, Steve Bellan, March 2015
+## License at bottom.
+####################################################################################################
+
 require(ggplot2); require(data.table); require(gridExtra)
 source('multiplot.R')
 
 set.seed(6)
 
-cats <- 20#length(unique(ht$cluster))
+cats <- 20                              
 eclipseT <- 3
 addT <- 3
 
-## weeks <- cats + 2 + eclipseT + addT
 weeks <- 24
 
 weekFact <- seq(-1, weeks)
@@ -72,8 +85,6 @@ joined <- dat[frctvaxord, list(hazHeterogeneous, vaxorder, cluster_id)]
 setkey(joined, vaxorder, hazHeterogeneous)
 joined[,frct_vaxorder := .I]
 
-#frctvaxord[dat, hazHeterogeneous, by=c("vaxorder")]
-
 vaxord <- dat[order_status != "unvaccinated", list(vaxorder = min(week)), by="cluster_id"]
 setkey(vaxord, "vaxorder")
 vaxord$vaxorder <- factor(vaxord$vaxorder-min(vaxord$vaxorder)+1)
@@ -131,7 +142,7 @@ RCTtu <- pnleg +  aes(y=vaxorder, ymin = as.numeric(vaxorder)-0.5+yspacing, ymax
     geom_rect(data=dat[order_status == "unvaccinated"]) +
     geom_rect(data=dat[order_status != "unvaccinated"], mapping = aes(ymax=as.numeric(vaxorder), alpha=order_status)) +
     geom_rect(data=dat[order_status != "unvaccinated"], mapping = aes(ymin=as.numeric(vaxorder))) +
-    labs(title="risk-prioritized RCT") +  labs(alpha="")
+    labs(title="risk-pr. RCT") +  labs(alpha="")
 RCTtu
 
 SimInst <- pnleg +  aes(y=vaxorder, ymin = as.numeric(vaxorder)-0.5+yspacing, ymax = as.numeric(vaxorder)+0.5 - yspacing) +
@@ -143,7 +154,7 @@ SimInst
 SimInstByID <- pnleg +
   geom_rect(mapping = aes(ymax=as.numeric(cluster_id), alpha=factor(ifelse(week <= 3,"protective delay","vaccinated"), levels=states) )) +
   geom_rect(mapping = aes(ymin=as.numeric(cluster_id))) +
-  labs(title="Simultaneous Instant RCT, by Cluster ID") +  labs(alpha="")
+  labs(title="simultaneous instant RCT") +  labs(alpha="")
 SimInstByID
 
 SWCThom <- pnleg +  geom_rect(aes(alpha=status, fill=hazHomogeneous)) +
@@ -154,14 +165,14 @@ RCTnone <- pnleg +
     geom_rect(data=dat[status == "unvaccinated"]) +
     geom_rect(data=dat[status != "unvaccinated"], mapping = aes(ymin=as.numeric(cluster_id))) +
     geom_rect(data=dat[status != "unvaccinated"], mapping = aes(ymax=as.numeric(cluster_id), alpha=status)) +
-    labs(title="random ordered RCT")
+    labs(title="RCT")
 RCTnone
 
 FRCT <- pnleg +
   geom_rect(data=dat[frct_status == "unvaccinated"]) +
   geom_rect(data=dat[frct_status != "unvaccinated"], mapping = aes(ymin=as.numeric(cluster_id))) +
   geom_rect(data=dat[frct_status != "unvaccinated"], mapping = aes(ymax=as.numeric(cluster_id), alpha=frct_status)) +
-  labs(title="random ordered FRCT")
+  labs(title="FRCT")
 FRCT
 
 FRCTByHaz <- pnleg + aes(y=vaxorder, ymin = as.numeric(vaxorder)-0.5+yspacing, ymax = as.numeric(vaxorder)+0.5 - yspacing) +
@@ -182,14 +193,27 @@ FRCTHazOrdByID <- pnleg +
   geom_rect(data=dat[frct_order_status == "unvaccinated"]) +
   geom_rect(data=dat[frct_order_status != "unvaccinated"], mapping = aes(ymin=as.numeric(cluster_id))) +
   geom_rect(data=dat[frct_order_status != "unvaccinated"], mapping = aes(ymax=as.numeric(cluster_id), alpha=frct_order_status)) +
-  labs(title="haz ordered FRCT, underlying order by ID")
+  labs(title="risk-prioritized FRCT")
 FRCTHazOrdByID
 
 pdf('Figures/Fig 3 schematic.pdf', w = 6.5, h = 4)
 multiplot(SWCT, OrigOrderRCTtu, cols = 2)
 graphics.off()
 
-
-pdf('Figures/Fig SX schematic.pdf', w = 6.5, h = 7)
-multiplot(SWCT, RCTnone, OrigOrderRCTtu, SimInstByID, cols = 2)
+pdf('Figures/Fig S1 schematic.pdf', w = 8, h = 7)
+multiplot(SWCT, SimInstByID, RCTnone, OrigOrderRCTtu, FRCT, FRCTHazOrdByID, cols = 3)
 graphics.off()
+
+####################################################################################################
+### LICENSE
+###
+### This code is made available under a Creative Commons Attribution 4.0
+### International License. You are free to reuse this code provided that you
+### give appropriate credit, provide a link to the license, and indicate if
+### changes were made.
+### You may do so in any reasonable manner, but not in any way that suggests
+### the licensor endorses you or your use. Giving appropriate credit includes
+### citation of the above publication *and* providing a link to this repository:
+###
+### https://github.com/sbellan61/EbolaVaccPowerSL
+####################################################################################################

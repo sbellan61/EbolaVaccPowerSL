@@ -1,10 +1,25 @@
+####################################################################################################
+## Functions to set up a trial population, with time-varying hazards by cluster, individual hazard
+## variation, set up individuals' vaccination schedules for a specified study design, and simulate
+## infections.
+####################################################################################################
+## Code base accompanying:
+## 
+## Bellan, SE, JRC Pulliam, CAB Pearson, DChampredon, SJ Fox, L Skrip, AP Galvani, M Gambhir, BA
+## Lopman, TC Porco, LA Meyers, J Dushoff (2015). The statistical power and validity of Ebola
+## vaccine trials in Sierra Leone: A simulation study of trial design and analysis. _Lancet
+## Infectious Diseases_.
+##
+## Steve Bellan, March 2015
+## License at bottom.
+####################################################################################################
 library(blme); library(survival); library(coxme); library(data.table); library(parallel); library(dplyr); 
 load('data/createHT.Rdata')
 
 yearToDays <- 1/365.25
 monthToDays <- 1/30
 trialTypes <- c('RCT','FRCT','SWCT','CRCT')
-makeParms <- function(
+makeParms <- function( ## Setup simulation and analyis parameters; all stored in the same list object along with analyses
     trial='RCT'
     , trialStartDate = '2015-02-01' ## converted to date below    
     , numClus=20, clusSize=300
@@ -43,7 +58,7 @@ makeParms <- function(
     trialStartDate <- as.Date(trialStartDate)
     if(maxInfectDay < delayUnit*numClus) stop('maxInfectDay too short. Need enough time to rollout vaccines to all clusters')
     if(trial=='FRCT') delayUnit <- delayUnit/2 ## rolling out vaccines as quickly as you would if you were vaccinating whole clusters
-    return(as.list(environment()))
+    return(as.list(environment())) ## return all arguments as a list
 }
 
 ## Make a trial population with a given number of clusters of a given size. Put the people in
@@ -197,7 +212,6 @@ reordCRCT <- function(parms) within(parms, {
         rm(notRandomized,dd,ii,numPairs,currIncOrd,currentRank)
     }
 })
-
 ## p1 <- setHazs(makePop(makeParms('CRCT', clusSize=2, weeklyDecay=.9, weeklyDecayVar=.3, ord='BL')))
 ## p1 <- reordPop(p1)
 ## p1$popH
@@ -257,7 +271,6 @@ simInfection <- function(parms, whichDo='pop', startInfectingDay = 0) ## startIn
         assign(paste0(whichDo,'H'), tmpH)
         rm(tmp, tmpH, dd,alreadyInfected,indivInfDays)
     })
-
 ## p1 <- setHazs(makePop(makeParms(clusSize=300, numClus=20, weeklyDecay=.9, weeklyDecayVar=0, ord='BL')))
 ## p1 <- reordPop(p1)
 ## p1 <- simInfection(p1)
@@ -280,3 +293,23 @@ simTrial <- function(parms=makeParms(), seed = NULL) {
 
 subsArgs <- function(parms, fxn) parms[names(parms) %in% names(formals(fxn))] ## get parameters necessary for a fxn
 
+
+## examine study designs
+simTrial(makeParms('SWCT', numClus = 4, clusSize = 4))$pop[ , list( cluster, vaccDay)]
+simTrial(makeParms('RCT', numClus = 4, clusSize = 4))$pop[ , list( cluster, vaccDay)]
+simTrial(makeParms('FRCT', numClus = 4, clusSize = 4))$pop[ , list( cluster, vaccDay)]
+simTrial(makeParms('CRCT', numClus = 4, clusSize = 4))$pop[ , list( cluster, vaccDay)]
+
+####################################################################################################
+### LICENSE
+###
+### This code is made available under a Creative Commons Attribution 4.0
+### International License. You are free to reuse this code provided that you
+### give appropriate credit, provide a link to the license, and indicate if
+### changes were made.
+### You may do so in any reasonable manner, but not in any way that suggests
+### the licensor endorses you or your use. Giving appropriate credit includes
+### citation of the above publication *and* providing a link to this repository:
+###
+### https://github.com/sbellan61/EbolaVaccPowerSL
+####################################################################################################

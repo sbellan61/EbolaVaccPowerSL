@@ -1,3 +1,5 @@
+## http://www.cookbook-r.com/Graphs/Multiple_graphs_on_one_page_%28ggplot2%29/
+
 multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
   require(grid)
 
@@ -40,6 +42,8 @@ g_legend<-function(a.gplot){
   legend <- tmp$grobs[[leg]] 
   return(legend)} 
 
+
+## https://rpubs.com/sjackman/grid_arrange_shared_legend
 grid_arrange_shared_legend <- function(ncol = 1,...) {
     plots <- list(...)
     g <- ggplotGrob(plots[[1]] + theme(legend.position="bottom"))$grobs

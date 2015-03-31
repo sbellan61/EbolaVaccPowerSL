@@ -1,25 +1,28 @@
-if(grepl('stevebe', Sys.info()['nodename'])) setwd('~/Documents/R Repos/EbolaVaccSim/')
-if(grepl('stevebellan', Sys.info()['login'])) setwd('~/Documents/R Repos/EbolaVaccSim/')
-if(grepl('tacc', Sys.info()['nodename'])) setwd('/home1/02413/sbellan/VaccEbola/')
+####################################################################################################
+## Plot power & false positive rates from main analyses.
+####################################################################################################
+## Code base accompanying:
+## 
+## Bellan, SE, JRC Pulliam, CAB Pearson, DChampredon, SJ Fox, L Skrip, AP Galvani, M Gambhir, BA
+## Lopman, TC Porco, LA Meyers, J Dushoff (2015). The statistical power and validity of Ebola
+## vaccine trials in Sierra Leone: A simulation study of trial design and analysis. _Lancet
+## Infectious Diseases_.
+##
+## Steve Bellan, March 2015
+## License at bottom.
+####################################################################################################
 library(RColorBrewer); library(data.table); library(ggplot2); library(dplyr); library(grid)
-##load(file=file.path('BigResults','powFin.Rdata'))
-percent <- function(x) paste0(formatC(x*100), '%')
-labs <- c('','log')
-
-load(file=file.path('Results','powFin_All.Rdata'))
-
+thing <- 'All'
+load(file=file.path('Results',paste0('powFin_',thing,'.Rdata')))
+source('ggplotTheme.R')
 pf[vaccEff==.5 & trial=='RCT' & propInTrial==.025 & mod=='CoxME']
-gg_color_hue <- function(n) {
-  hues = seq(15, 375, length=n+1)
-  hcl(h=hues, l=65, c=100)[1:n]
-}
-group.colors <- c(RCT = "#333BFF", FRCT = "#CC6600", SWT ="#9633FF")
-group.colors[c(1,3,2)] <- gg_color_hue(3)
-group.colors['SWCT'] <- 'orange'
-pf$trial <- factor(pf$trial, levels=levels(pf$trial)[c(2,1,3)])
-pf[, biasNAR:=biasNAR/vaccEff]
-levels(pf$order)[1] <- 'random'
-levels(pf$order)[2] <- 'risk-prioritized'
+
+## look at all simulation types (36 of each from 4 vaccine efficacies X 9 models)
+arrange(pf[, length(meanNAR), list(trial, remProtDel, remStartFin,propInTrial, ord, delayUnit, immunoDelay)], propInTrial)
+nlevels(pf$mod)
+unique(pf$vaccEff)
+
+nrow(pf)*2040/9 ## 399,840 simulations, with 9 models each
 
 ## Set up line types for ease
 pf$analysis <- 1
@@ -38,29 +41,8 @@ levels(pf$modLab2)[levels(pf$modLab2) %in% c('CoxME','bootCoxME','relabCoxME')] 
 pf$mainAn <- pf[, trial!='SWCT' | (trial=='SWCT' & as.numeric(analysis)==1) & propInTrial <= .1]
 
 ####################################################################################################
-## them for ms
-thax <- element_text(colour = 'black', size = 8)
-thsb <- theme(axis.text.x = thax, axis.text.y = thax, plot.title = element_text(vjust=1),
-              axis.title.y = element_text(vjust = 1), axis.title.x = element_text(vjust = -.5),
-              axis.line = element_line(), axis.ticks = element_line(color='black'),
-              panel.margin = unit(1, "lines"), legend.key.height=unit(2,"line")
-              , strip.background = element_rect(fill = NA)
-              ,legend.position = 'right'
-              , axis.line = element_blank()
-              ,panel.grid.major = element_blank()
-              , panel.grid.minor = element_blank()
-              ,panel.border = element_blank()
-              ,panel.background = element_blank()
-              , legend.background =  element_blank()
-              , legend.key =  element_blank()
-              , legend.key.width=unit(2,"line")
-              ## ,legend.justification=c(1,0), legend.position=c(1,0)
-              )
-theme_set(theme_grey(base_size = 12))
-##thsb <- thsb + theme_bw()#
-
+## Figure 4 - False positive rates by design & analysis.
 ####################################################################################################
-## Figure 4 - Type I errors
 subs <- pf[, mainAn==T & trial %in% c('SWCT','RCT') & vaccEff==0 & mod %in% c('CoxME','bootCoxME','relabCoxME') & immunoDelay==21]
 subs <- subs & pf[,!(trial=='RCT' & grepl('boot',mod))]
 p.tmp <- ggplot(pf[subs], 
@@ -72,14 +54,15 @@ p.tmp <- ggplot(pf[subs],
     geom_line(size=1) + facet_wrap(~modLab2, scales = "free_y") + scale_color_manual(values=group.colors)
 p.tmpunt <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,.15))
 p.tmpunt
-for(typ in c('.png','.pdf')) ggsave(paste0('Figures/Fig 4 - Type I by analysis',typ), p.tmpunt, w = 8.5, h = 3.5)
+for(typ in c('.png','.pdf')) ggsave(paste0('Figures/Figure 4 - Type I by analysis',typ), p.tmpunt, w = 8.5, h = 3.5)
 
 subs <- pf[, mainAn==T & trial %in% c('SWCT','RCT') & vaccEff==0 & mod %in% c('CoxME','GLMFclus', 'bootCoxME','bootGLMFclus', 'relabCoxME') & immunoDelay==21]
 subs <- subs & pf[,!(trial=='RCT' & grepl('boot',mod))]
 pf[vaccEff==0 & immunoDelay==21 & subs & pit=='10%', list(trial, stoppedNAR,mod)]
 
 ####################################################################################################
-## Comparison of SWCT pt stuff
+## Figure S3 - SWCT false positive rates by person-time included
+####################################################################################################
 subs <- pf[, trial %in% c('SWCT') & vaccEff==0 & mod %in% c('CoxME','GLMFclus','bootCoxME','relabCoxME') & immunoDelay==21]
 p.tmp <- ggplot(pf[subs], 
                 aes(propInTrial, stoppedNAR, linetype=analysis)) + thsb +
@@ -90,10 +73,10 @@ p.tmp <- ggplot(pf[subs],
     geom_line(size=1, colour = group.colors['SWCT']) + facet_wrap(~mod, scales = "free_y", nrow = 1) + scale_color_manual(values=group.colors)
 p.tmpunt <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,.2))
 p.tmpunt
-for(typ in c('.png','.pdf')) ggsave(paste0('Figures/type I by SWCT person-time',typ), p.tmpunt, w = 12, h = 3.5)
+for(typ in c('.png','.pdf')) ggsave(paste0('Figures/Figure S3 - type I by SWCT person-time',typ), p.tmpunt, w = 12, h = 3.5)
 
 ####################################################################################################
-## Figure 4B - Type I errors panels by trial type
+## Type I errors panels by trial type
 thax <- element_text(colour = 'black', size = 8)
 subs <- pf[, mainAn==T & trial %in% c('SWCT','RCT') & vaccEff==0 & mod %in% c('CoxME','bootCoxME','relabCoxME') & immunoDelay==21]
 subs <- subs & pf[,!(trial=='RCT' & grepl('boot',mod))]
@@ -112,6 +95,7 @@ for(typ in c('.png','.pdf')) ggsave(paste0('Figures/Type I by trial SL', typ), p
 
 ####################################################################################################
 ## Figure 5 - Power
+####################################################################################################
 subs <- pf[,  mainAn==T & vaccEff>0 &  immunoDelay==21 & ((trial == 'SWCT' & mod=='relabCoxME') | (trial %in% c('RCT','FRCT') & mod =='CoxME'))]
 thax <- element_text(colour = 'black', size = 8)
 p.tmp <- ggplot(pf[subs], aes(vaccEff, vaccGoodNAR, colour=trial, linetype=order)) + thsb +
@@ -123,18 +107,19 @@ p.tmp <- ggplot(pf[subs], aes(vaccEff, vaccGoodNAR, colour=trial, linetype=order
     scale_color_manual(values=group.colors)
 p.tmpunt <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,1), breaks=seq(0,1,by=.1), minor_breaks = NULL) #seq(0,1,.05))
 p.tmpunt
-for(typ in c('.png','.pdf'))    ggsave(paste0('Figures/Fig 5 - Power SL', typ), p.tmpunt, w = 9, h = 4)
+for(typ in c('.png','.pdf'))    ggsave(paste0('Figures/Figure 5 - Power SL', typ), p.tmpunt, w = 9, h = 4)
 
 tmpS <- arrange(pf[subs & trial=='SWCT', list(trial, vaccEff, vaccGoodNAR, order,pit)],pit)
 tmpR <- arrange(pf[subs & trial=='RCT' & order=='risk-prioritized', list(trial, vaccEff, vaccGoodNAR, order,pit)], pit)
-range(tmpR$vaccGoodNAR/tmpS$vaccGoodNAR) ## range of fold increasee in power of RCT vs SWCT
+range(tmpR$vaccGoodNAR/tmpS$vaccGoodNAR, na.rm=T) ## range of fold increased in power of RCT vs SWCT
+## 3-10X
 
 ####################################################################################################
-##  Power by immunedelay
+## Figure 10 - Power by protective delay
+####################################################################################################
 for(ii in 1:2) {
-    if(ii==1) pdf('Figures/Fig 5 - Power by seroconversion delay SL.pdf', w = 4, h=5)
-    if(ii==2) png('Figures/Fig 5 - Power by seroconversion delay SL.png', w = 4, h=5, res = 300, units='in')
-##    layout(matrix(1:2,ncol=2), w = c(1,.5))
+    if(ii==1) pdf('Figures/Figure 10 - Power by seroconversion delay SL.pdf', w = 4, h=5)
+    if(ii==2) png('Figures/Figure 10 - Power by seroconversion delay SL.png', w = 4, h=5, res = 300, units='in')
     par(mar = c(5,4,0,0))
     subs <- pf[, propInTrial==.05 & vaccEff == .9 & ((trial == 'SWCT' & mod=='relabCoxME') | (trial=='RCT' & order=='risk-prioritized' & mod =='CoxME'))]
     pf[subs]
@@ -146,10 +131,6 @@ for(ii in 1:2) {
     with(pf[subs & trial=='SWCT' & as.numeric(analysis)==1], lines(immunoDelay, vaccGoodNAR, col = group.colors['SWCT'], lty = 1, lwd = 3))
     with(pf[subs & trial=='SWCT' & as.numeric(analysis)==2], lines(immunoDelay, vaccGoodNAR, col = group.colors['SWCT'], lty = 2, lwd = 3))
     with(pf[subs & trial=='SWCT' & as.numeric(analysis)==3], lines(immunoDelay, vaccGoodNAR, col = group.colors['SWCT'], lty = 3, lwd = 3))
-    ## par(mar=rep(0,4))
-    ## plot.new()
-    ## legend('top', leg = c('risk-prioritized RCT', levels(pf$analysis)),
-    ##        col = c(group.colors['RCT'], rep(group.colors['SWCT'],3)), lty = c(2,1:3), lwd = 3, bty = 'n', ncol = 2, cex = .8)
     graphics.off()
 }
 
@@ -171,7 +152,8 @@ p.tmp <- ggplot(pf[subs], aes(vaccEff, vaccGoodNAR, linetype=analysis)) + thsb +
 p.tmpunt <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,1), breaks=seq(0,1,by=.1), minor_breaks = NULL) #seq(0,1,.05))
 p.tmpunt
 for(typ in c('.png','.pdf'))    ggsave(paste0('Figures/Power by SWCT pt', typ), p.tmpunt, w = 9, h = 8)
- 
+
+####################################################################################################
 ##  Power by SWCT design permutation
 subs <- pf[, vaccEff>0 & propInTrial <= .1 & immunoDelay==21 & (trial == 'SWCT' & mod %in% 'relabCoxME')]
 thax <- element_text(colour = 'black', size = 8)
@@ -185,7 +167,7 @@ p.tmp <- ggplot(pf[subs], aes(vaccEff, vaccGoodNAR, linetype=analysis)) + thsb +
     scale_color_manual(values=group.colors)
 p.tmpunt <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,.43), breaks=seq(0,.4,by=.1), minor_breaks = NULL) #seq(0,1,.05))
 p.tmpunt
-for(typ in c('.png','.pdf'))    ggsave(paste0('Figures/Power by SWCT pt (CoxME)', typ), p.tmpunt, w = 9, h = 3.5)
+for(typ in c('.png','.pdf'))    ggsave(paste0('Figures/Power by SWCT pt (permutation)', typ), p.tmpunt, w = 9, h = 3.5)
 
 ####################################################################################################
 ##  Prob rej null by SWCT design
@@ -205,7 +187,8 @@ p.tmplog
 for(typ in c('.png','.pdf'))    ggsave(paste0('Figures/CoxPH Prob rej null by SWCT pt log', typ), p.tmplog, w = 9, h = 8)
 
 ####################################################################################################
-## Figure SX - Power by model
+## Figure S5 - Power by model
+####################################################################################################
 pf$modelLab <- pf$model
 pf$class <- 'parametric'
 pf[grepl('boot',mod), class:='bootstrap']
@@ -228,63 +211,12 @@ p.tmp <- ggplot(pf[subs], aes(vaccEff, vaccGoodNAR, colour=class, linetype=model
 #p.tmp <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,1), breaks=seq(0,1,by=.1), minor_breaks = NULL) #seq(0,1,.05))
 p.tmpunt <- p.tmp + scale_y_continuous(labels = formatC, limits=c(0,1))
 p.tmplog <- p.tmp + scale_y_log10(labels = formatC, breaks = c(.01, .025, .05, .1, .25, .5, 1), limits = c(.005,1), minor_breaks=NULL) 
-for(typ in c('.png','.pdf')) ggsave(paste0('Figures/Power by model class',typ), p.tmpunt, w = 8, h = 6)
-for(typ in c('.png','.pdf')) ggsave(paste0('Figures/Power by model class log',typ), p.tmplog, w = 8, h = 6)
-
-##################################################
-## Cases
-subs <- pf[, mainAn==T & immunoDelay==21 & ((trial == 'SWCT' & mod=='relabCoxME') | (trial %in% c('RCT','FRCT') & mod =='CoxME'))]
-thax <- element_text(colour = 'black', size = 8)
-p.tmp <- ggplot(pf[subs], aes(vaccEff, caseTot, colour=trial, linetype=order)) + thsb + 
-    scale_x_continuous(labels = formatC, limits=c(0,.9), breaks = pf[,unique(vaccEff)],minor_breaks=NULL) +  
-    xlab('vaccine efficacy') + ylab('# EVD cases') +
-    scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
-    geom_line(size=1) + facet_wrap(~pit, scale='free_y', nrow=1) + 
-    ggtitle('% of district-level cases in trial population')  + scale_color_manual(values=group.colors) + 
-    scale_y_continuous(labels = formatC, limits=c(0,100)) 
-## subs <- pf[, swctPT=='remPD_SF' & immunoDelay==21 & (trial == 'SWCT' & mod=='relabCoxME')]
-## p.tmp <- p.tmp + geom_line(aes(vaccEff, caseTot), data = pf[subs], linetype = 4, col = 'orange', size = 1.3)
-for(typ in c('.png','.pdf')) ggsave(paste0('Figures/Cases SL ALL',typ), p.tmp, w = 9, h = 3.5)
-
-subs <- pf[,vaccEff==0 & (delayUnit==0 | (trial=='SWCT')) & mod =='CoxME']
-pf[subs, list(caseTot,caseC,caseV,pit,trial,delayUnit,vaccEff)]
+for(typ in c('.png','.pdf')) ggsave(paste0('Figures/Figure S5 - Power by model class',typ), p.tmpunt, w = 8, h = 6)
+for(typ in c('.png','.pdf')) ggsave(paste0('Figures/Figure S5 - Power by model class log',typ), p.tmplog, w = 8, h = 6)
 
 ####################################################################################################
-## abstract #'s and tables
-pf <- arrange(pf, immunoDelay, trial, propInTrial, mod)
-
-subs <- pf[,mainAn==T & immunoDelay==21 & (trial=='SWCT' & mod=='relabCoxME') | (trial=='RCT' & ord=='TU' & mod=='CoxME')]
-pf[subs & vaccEff==.9, list(trial, ord, delayUnit, mod, vaccGoodNAR, propInTrial,vaccEff, immunoDelay)]
-
-subs <- pf[,immunoDelay==21 & mainAn==T  & mod %in% c('CoxME') & vaccEff>.7 &  (trial=='SWCT' | ( trial=='FRCT' & ord=='TU'))]
-pf[subs, list(trial, ord, mod, vaccGoodNAR,cvr, biasNAR, propInTrial,vaccEff)]
-
-## Chosen models
-subs <- pf[,immunoDelay==21 & mainAn==T  & vaccEff>.7 & 
-           ((mod %in% c('CoxME','GLMFclus','bootCoxME','bootGLMFclus','relabCoxME') & trial=='SWCT' ) | 
-           (mod %in% c('CoxME') & trial=='RCT' & ord=='TU' ))]
-pf[subs, list(trial, ord, mod, vaccGoodNAR,cvr, biasNAR, propInTrial,vaccEff)]
-## note GLMFclus has better coverage here & less bias, but since Cox is more flexible for non-monotonic trends, let's stick with it
-
-subs <- pf[,immunoDelay==21 & mainAn==T  & vaccEff>.7 & 
-           ((mod %in% c('CoxME','relabCoxME') & trial=='SWCT' ) | 
-           (mod %in% c('CoxME') & trial=='RCT' & ord=='TU' ))]
-pf[subs, list(trial, ord, mod, vaccGoodNAR,cvr, biasNAR, propInTrial,vaccEff)]
-
-tab1 <- pf[subs, list(trial, mod, pit, cvr, biasNAR, vaccEff)]
-tab1
-tab1[, list(trial, cvr, biasNAR)]
-tab1[trial=='SWCT', cvr:= cvr[!is.na(cvr)], list(pit,vaccEff)]
-tab1 <- tab1[!(trial=='SWCT' & mod=='CoxME')]
-tab1[, c('cvr','biasNAR') := list(signif(cvr,4), signif(biasNAR,4))]
-tab1
-
-tab1 <- data.table(tab1[trial=='RCT',list(pit, cvr,biasNAR)], tab1[trial=='SWCT',list(cvr,biasNAR)])
-tab1
-write.csv(tab1, file='Results/biasCoverage.csv')
-
+## Figure S8 - Show power by # of cases
 ####################################################################################################
-## Show power by # of cases
 subs <- pf[,  propInTrial<=.1 & mainAn==T & vaccEff==.9 & immunoDelay==21 & ((trial == 'SWCT' & mod=='relabCoxME') | (trial %in% c('RCT') & mod =='CoxME'))]
 pf$type <- pf[, paste(order,trial)]
 pf[grepl('SWCT',type), type:='SWCT']
@@ -296,9 +228,70 @@ p.tmp <- ggplot(pf[subs], aes(caseTot, vaccGoodNAR, colour=type)) + thsb +
     geom_point(aes(caseTot, vaccGoodNAR, colour=type, shape=pit), size = 5) +
     scale_color_manual(values=group.colors2) + scale_shape_manual(values=c(15:18)) + 
     scale_y_continuous(labels = formatC, limits=c(0,1), breaks=seq(0,1,by=.1), minor_breaks = NULL) 
-## subs <- pf[,  propInTrial<=.1  & as.numeric(analysis)==2 & vaccEff==.9 & immunoDelay==21 & (trial == 'SWCT' & mod=='relabCoxME')]
-## p.tmp <- p.tmp + geom_point(aes(caseTot, vaccGoodNAR, shape=pit), data = pf[subs], size = 5) +
-##     geom_line(aes(caseTot, vaccGoodNAR), data = pf[subs], linetype=2, size = 1.3, colour=group.colors['SWCT'])
-for(typ in c('.png','.pdf')) ggsave(paste0('Figures/Fig SX - Power by cases',typ), p.tmp, w = 8, h = 4)
+for(typ in c('.png','.pdf')) ggsave(paste0('Figures/Fig S8 - Power by cases',typ), p.tmp, w = 8, h = 4)
 
+####################################################################################################
+## Figure S9 - Cases by trial type.
+####################################################################################################
+subs <- pf[, mainAn==T & immunoDelay==21 & ((trial == 'SWCT' & mod=='relabCoxME') | (trial %in% c('RCT','FRCT') & mod =='CoxME'))]
+thax <- element_text(colour = 'black', size = 8)
+p.tmp <- ggplot(pf[subs], aes(vaccEff, caseTot, colour=trial, linetype=order)) + thsb + 
+    scale_x_continuous(labels = formatC, limits=c(0,.9), breaks = pf[,unique(vaccEff)],minor_breaks=NULL) +  
+    xlab('vaccine efficacy') + ylab('# EVD cases') +
+    scale_linetype_manual(breaks=levels(pf$order), values=1:3) +
+    geom_line(size=1) + facet_wrap(~pit, scale='free_y', nrow=1) + 
+    ggtitle('% of district-level cases in trial population')  + scale_color_manual(values=group.colors) + 
+    scale_y_continuous(labels = formatC, limits=c(0,100)) 
+## subs <- pf[, swctPT=='remPD_SF' & immunoDelay==21 & (trial == 'SWCT' & mod=='relabCoxME')]
+## p.tmp <- p.tmp + geom_line(aes(vaccEff, caseTot), data = pf[subs], linetype = 4, col = 'orange', size = 1.3)
+for(typ in c('.png','.pdf')) ggsave(paste0('Figures/Figure S9 - Cases by trial',typ), p.tmp, w = 9, h = 3.5)
 
+subs <- pf[,vaccEff==0 & (delayUnit==0 | (trial=='SWCT')) & mod =='CoxME']
+pf[subs, list(caseTot,caseC,caseV,pit,trial,delayUnit,vaccEff)]
+
+####################################################################################################
+## Get abstract & discussion #'s.
+####################################################################################################
+pf <- arrange(pf, immunoDelay, trial, propInTrial, mod)
+
+subs <- pf[,mainAn==T & immunoDelay==21 & (trial=='SWCT' & mod=='relabCoxME') | (trial=='RCT' & ord=='TU' & mod=='CoxME')]
+pf[subs & vaccEff==.9, list(trial, ord, delayUnit, mod, vaccGoodNAR, propInTrial,vaccEff, immunoDelay)]
+
+subs <- pf[,immunoDelay==21 & mainAn==T  & mod %in% c('CoxME') & vaccEff>.7 &  (trial=='SWCT' | ( trial=='FRCT' & ord=='TU'))]
+pf[subs, list(trial, ord, mod, vaccGoodNAR,cvr, biasNAR, propInTrial,vaccEff)]
+
+####################################################################################################
+## Table S1 - Bias & coverage
+####################################################################################################
+subs <- pf[,immunoDelay==21 & mainAn==T  & vaccEff>.7 & 
+           ((mod %in% c('CoxME','GLMFclus','bootCoxME','bootGLMFclus','relabCoxME') & trial=='SWCT' ) | 
+           (mod %in% c('CoxME') & trial=='RCT' & ord=='TU' ))]
+pf[subs, list(trial, ord, mod, vaccGoodNAR,cvr, biasNAR, propInTrial,vaccEff)]
+## note GLMFclus has better coverage here & less bias, but since Cox is more flexible for non-monotonic trends, let's stick with it
+subs <- pf[,immunoDelay==21 & mainAn==T  & vaccEff>.7 & 
+           ((mod %in% c('CoxME','relabCoxME') & trial=='SWCT' ) | 
+           (mod %in% c('CoxME') & trial=='RCT' & ord=='TU' ))]
+pf[subs, list(trial, ord, mod, vaccGoodNAR,cvr, biasNAR, propInTrial,vaccEff)]
+
+tab1 <- pf[subs, list(trial, mod, pit, cvr, biasNAR, vaccEff)]
+tab1[, list(trial, cvr, biasNAR)]
+tab1[trial=='SWCT', cvr:= cvr[!is.na(cvr)], list(pit,vaccEff)]
+tab1 <- tab1[!(trial=='SWCT' & mod=='CoxME')]
+tab1[, c('cvr','biasNAR') := list(signif(cvr,4), signif(biasNAR,4))]
+tab1 <- data.table(tab1[trial=='RCT',list(pit, cvr,biasNAR)], tab1[trial=='SWCT',list(cvr,biasNAR)])
+tab1
+write.csv(tab1, file='Results/biasCoverage.csv')
+
+####################################################################################################
+### LICENSE
+###
+### This code is made available under a Creative Commons Attribution 4.0
+### International License. You are free to reuse this code provided that you
+### give appropriate credit, provide a link to the license, and indicate if
+### changes were made.
+### You may do so in any reasonable manner, but not in any way that suggests
+### the licensor endorses you or your use. Giving appropriate credit includes
+### citation of the above publication *and* providing a link to this repository:
+###
+### https://github.com/sbellan61/EbolaVaccPowerSL
+####################################################################################################

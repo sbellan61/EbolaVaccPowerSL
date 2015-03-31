@@ -1,11 +1,20 @@
-if(grepl('stevebe', Sys.info()['nodename'])) setwd('~/Documents/R Repos/EbolaVaccSim/')
-if(grepl('stevebellan', Sys.info()['login'])) setwd('~/Documents/R Repos/EbolaVaccSim/')
-if(grepl('tacc', Sys.info()['nodename'])) setwd('/home1/02413/sbellan/VaccEbola/')
-library(RColorBrewer); library(boot)
-## Simulate SWCT vs RCT vs CRCT for SL
+####################################################################################################
+## Collect results of simulation ensembles from HPC cluster and put into analyzeable data tables.
+####################################################################################################
+## Code base accompanying:
+## 
+## Bellan, SE, JRC Pulliam, CAB Pearson, DChampredon, SJ Fox, L Skrip, AP Galvani, M Gambhir, BA
+## Lopman, TC Porco, LA Meyers, J Dushoff (2015). The statistical power and validity of Ebola
+## vaccine trials in Sierra Leone: A simulation study of trial design and analysis. _Lancet
+## Infectious Diseases_.
+##
+## Steve Bellan, March 2015
+## License at bottom.
+####################################################################################################
+
 sapply(c('simFuns.R','AnalysisFuns.R','CoxFxns.R','EndTrialFuns.R'), source)
 
-thing <- 'SLSimsFinalPTCorr'
+thing <- 'All'
 batchdirnm <- file.path('BigResults',thing)
 fls <- list.files(batchdirnm, pattern='.Rdata', full.names = T)
 fls <- fls[grepl('pit', fls)]
@@ -39,11 +48,6 @@ finTrials[, sum(is.na(lci)), mod]
 finTrials[, length(lci), list(propInTrial, mod)]
 finTrials[mod=='coxME' & is.na(p), err:=1] ## sometimes cox returns NaNs, or partial NA's for certain values
 finTrials$vaccEff <- as.numeric(finTrials$vaccEff)
-
-## ## Simulations with less than 10 cases are considered to not have any power
-## finTrials$tooSmall <- finTrials[, (caseCXimmGrpEnd + caseVXimmGrpEnd) < 10]
-## finTrials[tooSmall==T, c('vaccGood','vaccBad','stopped') := F]
-## finTrials[tooSmall==T, c('lci','uci','p') := list(-Inf,1,1)]
     
 ## Determine if stopped
 finTrials[grepl('boot',mod), stopped := lci > 0 | uci < 0]
@@ -127,26 +131,16 @@ levels(pf$model) <- paste0(rep(c('', 'bootstrap over\n', 'permutation test over\
 
 save(pf, file=file.path('Results',paste0('powFin_',thing,'.Rdata')))
 
-## to delete a range of jobs
-## qdel echo `seq -f "%.0f" 2282389 2282404`
-
-## Combine results from several analysis for plotting
-thing <- 'SLSimsFinal'
-load(file=file.path('Results',paste0('powFin_',thing,'.Rdata')))
-pfOld <- pf
-pfOld$remStartFin <- pfOld$remProtDel <- as.logical(NA)
-pfOld[trial=='SWCT', c('remStartFin','remProtDel') := F]
-
-thing <- 'SLSimsFinalPTCorr' ## adding results with new SWCT pt calculations
-load(file=file.path('Results',paste0('powFin_',thing,'.Rdata')))
-pfNew <- pf
-arrange(pfNew[immunoDelay==21, length(design), list(trial, remProtDel, remStartFin,propInTrial,immunoDelay)], propInTrial)
-
-thing <- 'SWCTkeepStartFin' ## adding results with new SWCT pt calculations
-load(file=file.path('Results',paste0('powFin_',thing,'.Rdata')))
-pfSF <- pf
-arrange(pfSF[immunoDelay==21, length(design), list(trial, remProtDel, remStartFin,propInTrial,immunoDelay)], propInTrial)
-
-pf <- rbindlist(list(pfOld, pfNew, pfSF), use.names=T, fill=T)
-arrange(pf[trial=='SWCT' & immunoDelay==21, length(mean), list(trial, remProtDel,remStartFin,propInTrial)], propInTrial)
-save(pf, file=file.path('Results','powFin_All.Rdata'))
+####################################################################################################
+### LICENSE
+###
+### This code is made available under a Creative Commons Attribution 4.0
+### International License. You are free to reuse this code provided that you
+### give appropriate credit, provide a link to the license, and indicate if
+### changes were made.
+### You may do so in any reasonable manner, but not in any way that suggests
+### the licensor endorses you or your use. Giving appropriate credit includes
+### citation of the above publication *and* providing a link to this repository:
+###
+### https://github.com/sbellan61/EbolaVaccPowerSL
+####################################################################################################

@@ -1,3 +1,21 @@
+####################################################################################################
+## Functions to take as input a simulated trial object and return as output data objects of the form
+## analyzable by survival analysis or by cluster-level Poisson regressions. Also includes functions
+## to truncate/censor data based on trial design and analysis, plot trial designs, compile output
+## statistics of interest, and finally to perform an entire trial simulation and analysis from start
+## to finish.
+####################################################################################################
+## Code base accompanying:
+## 
+## Bellan, SE, JRC Pulliam, CAB Pearson, DChampredon, SJ Fox, L Skrip, AP Galvani, M Gambhir, BA
+## Lopman, TC Porco, LA Meyers, J Dushoff (2015). The statistical power and validity of Ebola
+## vaccine trials in Sierra Leone: A simulation study of trial design and analysis. _Lancet
+## Infectious Diseases_.
+##
+## Steve Bellan, March 2015
+## License at bottom.
+####################################################################################################
+
 ## Construct survival data from waiting times
 makeSurvDat <- function(parms,  whichDo='pop') within(parms, {
     if(verbose ==1.5) browser()
@@ -173,38 +191,7 @@ summTrial <- function(st) list(summarise(group_by(st, cluster), sum(infected))
                                , summarise(group_by(st, immuneGrp), sum(infected))
                                )
 
-## Check whether stopping point has been reached at intervals
-seqStop <- function(parms, start = parms$immunoDelayThink + 14, checkIncrement = 7, minCases = 15,
-                    fullSeq = F, maxDay = parms$maxInfectDay) {
-    trialOngoing <- T
-    checkDay <- start
-    first <- T
-    while(trialOngoing) {
-        if(parms$verbose>1) browser()
-        if(parms$verbose>0) print(checkDay)
-        tmp <- censSurvDat(parms, checkDay)
-        vaccEffEst <- try(doCoxPH(tmp), silent=T) ## converting midDay to days from months
-        ## if cox model has enough info to converge check for stopping criteria
-        if(!inherits(vaccEffEst, 'try-error') & !is.nan(vaccEffEst['p'])) { 
-            newout <- compileStopInfo(checkDay, vaccEffEst, tmp) 
-            if(first) out <- newout else out <- rbind(out, newout)
-            first <- F
-            numCases <- newout['caseCXimmGrpEnd'] + newout['caseVXimmGrpEnd']
-            if(!fullSeq & !is.na(newout['p']) & numCases > minCases)
-                if(newout['p'] < .05)
-                    trialOngoing <- F
-        }
-        checkDay <- checkDay + 7
-        if(checkDay > maxDay) trialOngoing <- F
-    }
-    rownames(out) <- NULL
-    out <- as.data.table(out)
-    parms$weeklyAns <- out
-    parms$endTrialDay <- tail(out$stopDay,1)
-    parms$vaccEffEst <- vaccEffEst
-    return(parms)
-}
-
+##  Tests if there are zero cases in a treatment arm.
 testZeros <- function(parmsTmp) {
     tmpCSD <- censSurvDat(parmsTmp)
     casesXgroup <- tmpCSD[,list(cases = sum(infected)), immuneGrp]
@@ -228,7 +215,7 @@ getEndResults <- function(parms, bump = T) {
     if(!testZeros(parms)) {
         parmsE <- parms
         parmsE$bump <- F
-    }else{
+    }else{ ## if there are zero cases in a treatment arm, add one case to both arms.
         parmsE <- infBump(parms)
         parmsE$bump <- T
     }
@@ -237,8 +224,8 @@ getEndResults <- function(parms, bump = T) {
     within(parmsE, {
         if(verbose==2.9) browser()
         vaccEE_ME <- doCoxME(parmsE, tmpCSDE, bump = bump)
-        ## vaccEE_GEEclusAR1 <- doGEEclusAR1(clusDat, csd=tmpCSDE, bump = bump)
-        ## vaccEE_GLMMclus <- doGLMMclus(parmsE,, csd=tmpCSDE, bump = bump)
+        ## vaccEE_GEEclusAR1 <- doGEEclusAR1(clusDat, csd=tmpCSDE, bump = bump) ##  these did not perform well, with divergent fits or causing segmentation faults 
+        ## vaccEE_GLMMclus <- doGLMMclus(parmsE,, csd=tmpCSDE, bump = bump) ## ditto above
         vaccEE_GLMclus <- doGLMclus(parmsE, csd=tmpCSDE, bump = bump)
         vaccEE_GLMFclus <- doGLMFclus(parmsE, csd=tmpCSDE, bump = bump)
         vaccEE_MErelab <- doRelabel(parms, csd=tmpCSD, bump=F, nboot=nboot, verbFreqRelab=10)
@@ -263,7 +250,7 @@ getEndResults <- function(parms, bump = T) {
     })
 }
 
-simNtrials <- function(seed = 1, parms=makeParms(), N = 2, returnAll = F,
+simNtrials <- function(seed = 1, parms=makeParms(), N = 2, 
                        doSeqStops = F, showSeqStops = F, flnm='test', verbFreq=10) {
     set.seed(seed)
     caseXVaccRandGrpList <- caseXPT_ImmuneList <- weeklyAnsList <- list()
@@ -284,47 +271,22 @@ simNtrials <- function(seed = 1, parms=makeParms(), N = 2, returnAll = F,
         finMods <- rbind(finMods, finTmp)
         finITmp <- data.frame(sim = ss, res$finInfo)
         finInfo <- rbind(finInfo, finITmp)
-        if(doSeqStops) {
-            res <- seqStop(res)
-            ## if(showSeqStops) {
-            ##     resfull <- seqStop(res, fullSeq = T)
-            ##     showSeqStop(resfull)
-            ## }
-            res <- endT(res)
-            res <- makeCaseSummary(res)
-            stopPt <- as.data.frame(tail(res$weeklyAns,1)) ## active cases by immmune grouping at time of case at end of trial
-            stopPt <- with(res, {
-                cbind(stopPt
-                      , caseCXrandFinA = casesXVaccRandGrp[type=='EVstActive', contCases] ## active cases by vaccination randomization group at final
-                      , caseVXrandFinA = casesXVaccRandGrp[type=='EVstActive', vaccCases]
-                      , hazCXrandFinA = casesXVaccRandGrp[type=='EVstActive', contCases/contPT]/yearToDays
-                      , hazVXrandFinA = casesXVaccRandGrp[type=='EVstActive', vaccCases/vaccPT]/yearToDays
-                      , caseCXrandFin = casesXVaccRandGrp[type=='EVst', contCases]         ## total cases by vaccination randomization group at final
-                      , caseVXrandFin = casesXVaccRandGrp[type=='EVst', vaccCases]
-                      , hazCXrandFin = casesXVaccRandGrp[type=='EVst', contCases/contPT]/yearToDays
-                      , hazVXrandFin = casesXVaccRandGrp[type=='EVst', vaccCases/vaccPT]/yearToDays
-                      )
-            })
-            stopPoints <- rbind(stopPoints, stopPt)
-        }
-        if(returnAll) {
-            weeklyAnsList[[ss]] <- as.data.frame(res$weeklyAns)
-            caseXVaccRandGrpList[[ss]] <- as.data.frame(res$casesXVaccRandGrp)
-            caseXPT_ImmuneList[[ss]] <- as.data.frame(res$casesXPT_Immune)
-        }
         rm(res)
         gc()
     }
-    if(returnAll)
-        return(list(
-            stopPoints = stopPoints
-            , weeklyAnsList = weeklyAnsList
-            , caseXVaccRandGrpList = caseXVaccRandGrpList
-            , caseXPT_ImmuneList = caseXPT_ImmuneList
-            , finPoint=finPoint
-            ))
-    if(!returnAll)
-        return(list(stopPoints=stopPoints, finMods=finMods, finInfo=finInfo))
+    return(list(stopPoints=stopPoints, finMods=finMods, finInfo=finInfo))
 }
 
-
+################################################################################
+### LICENSE
+###
+### This code is made available under a Creative Commons Attribution 4.0
+### International License. You are free to reuse this code provided that you
+### give appropriate credit, provide a link to the license, and indicate if
+### changes were made.
+### You may do so in any reasonable manner, but not in any way that suggests
+### the licensor endorses you or your use. Giving appropriate credit includes
+### citation of the above publication *and* providing a link to this repository:
+###
+### https://github.com/sbellan61/EbolaVaccPowerSL
+################################################################################

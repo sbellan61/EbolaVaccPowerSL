@@ -1,3 +1,16 @@
+####################################################################################################
+## Functions to analyze simulated trial data.
+####################################################################################################
+## Code base accompanying:
+## 
+## Bellan, SE, JRC Pulliam, CAB Pearson, DChampredon, SJ Fox, L Skrip, AP Galvani, M Gambhir, BA
+## Lopman, TC Porco, LA Meyers, J Dushoff (2015). The statistical power and validity of Ebola
+## vaccine trials in Sierra Leone: A simulation study of trial design and analysis. _Lancet
+## Infectious Diseases_.
+##
+## Steve Bellan, March 2015
+## License at bottom.
+####################################################################################################
 
 library(geepack)
 
@@ -36,8 +49,10 @@ infBump <- function(parms) {
     return(parmsE)
 }
 
+##  permutation P value
 permP <- function(x,na.rm=T) min(mean(x>=x[1],na.rm=na.rm), mean(x<=x[1],na.rm=na.rm))
 
+##  permutation tests
 doRelabel <- function(parms, csd, bump=F, nboot=200, doMods=modsToDo, verbFreqRelab=10, minCases=0) {
     if(parms$verbose==3.45) browser()
     if(parms$verbose>0) print(paste('doing relabeled models:', paste(unlist(modsToDo), collapse=', ')))
@@ -104,6 +119,7 @@ doRelabel <- function(parms, csd, bump=F, nboot=200, doMods=modsToDo, verbFreqRe
     return(bootVee)
 }
 
+##  cluster-level bootstrap
 doBoot <- function(parms, csd, nboot=200, bump=F, doMods=modsToDo, verbFreqBoot=10, minCases=0) {
     if(parms$verbose==3.4) browser()
     if(parms$verbose>0) print(paste('doing bootstrapped models:', paste(unlist(modsToDo), collapse=', ')))
@@ -138,7 +154,6 @@ doBoot <- function(parms, csd, nboot=200, bump=F, doMods=modsToDo, verbFreqBoot=
             parmsB$verbose <- 0 ## don't want printouts within resampling
             for(ii in 1:nmods) set(veeBoot, i=as.integer(bb), j=ii, doFXNs[[ii]](parms=parmsB, csd=csdB, bump=F)[1,'mean'])
         }
-
         bootVee <- data.frame(mean = as.numeric(veeBoot[1])
                               , lci = apply(veeBoot[-1], 2, function(x) quantile(x,.025,na.rm=T)) ## [-1] exclude real estimate
                               , uci = apply(veeBoot[-1], 2, function(x) quantile(x,.975,na.rm=T)) 
@@ -154,6 +169,7 @@ doBoot <- function(parms, csd, nboot=200, bump=F, doMods=modsToDo, verbFreqBoot=
     return(bootVee)
 }
 
+##  If running infection bumps,  adjust confidence interval bounds accordingly.
 bumpAdjust <- function(vee, csd, bump, nonpar=F) {
     if(bump) {
         zeroVacc <- csd[,list(oneBumped = sum(infectDay!=Inf)==1), immuneGrp]
@@ -175,6 +191,7 @@ bumpAdjust <- function(vee, csd, bump, nonpar=F) {
     return(vee)
 }
 
+## Cox PH gamma frailty
 doCoxME <- function(parms, csd, bump = F) { ## take censored survival object and return vacc effectiveness estimates
     if(parms$verbose==3.1) browser()
     if(parms$verbose>0) print('fitting vanilla coxME')
@@ -196,7 +213,7 @@ doCoxME <- function(parms, csd, bump = F) { ## take censored survival object and
 
 ## Cluster level data with one observation per time unit (not for RCTs bc two different covariates
 ## classes within cluster level, would need individual approach for that)
-doGEEclusAR1 <- function(parms, csd, bump=F) { 
+doGEEclusAR1 <- function(parms, csd, bump=F) { ## PROBLEMATIC, crashed on cluster repeatedly, failed to converge, exhibited poor coverage & inflated false positives
     if(parms$verbose==3.6) browser()
     if(parms$verbose>0) print('fitting GEEclusAR1')
     if(trial %in% c('SWCT','CRCT')) {
@@ -218,10 +235,11 @@ doGEEclusAR1 <- function(parms, csd, bump=F) {
     return(vaccEffEst)
 }
 
+##  Mixed effects Poisson regression
 doGLMMclusFr <- function(parms, csd, bump=F) doGLMMclus(parms, csd, bump, bayes=F) 
 doGLMMclusBy <- function(parms, csd, bump=F) doGLMMclus(parms, csd, bump, bayes=T) 
 doGLMMclus <- function(parms, csd, bump=F, bayes=T) {
-    if(parms$verbose==3.7) browser()
+    if(parms$verbose==3.7) browser() ## PROBLEMATIC, crashed on cluster repeatedly (segmentation faults), failed to converge
     if(parms$verbose>0) print('fitting GLMMclus')
     if(!bayes) mod <- try(glmer(cases ~ immuneGrp + day + (1|cluster) + offset(log(atRisk)), 
                                 data = parms$clusDat, family = poisson), silent = T)
@@ -239,6 +257,7 @@ doGLMMclus <- function(parms, csd, bump=F, bayes=T) {
     return(vaccEffEst)
 }
 
+##  Fixed effects Poisson regression
 doGLMclus <- function(parms, csd, bump=F) {
     if(parms$verbose==3.75) browser()
     if(parms$verbose>0) print('fitting GLMclus')
@@ -255,6 +274,7 @@ doGLMclus <- function(parms, csd, bump=F) {
     return(vaccEffEst)
 }
 
+##  Fixed effects Poisson regression with cluster-level fixed effects
 doGLMFclus <- function(parms, csd, bump=F) {
     if(parms$verbose==3.76) browser()
     if(parms$verbose>0) print('fitting GLMFclus')
@@ -271,3 +291,17 @@ doGLMFclus <- function(parms, csd, bump=F) {
     }
     return(vaccEffEst)
 }
+
+####################################################################################################
+### LICENSE
+###
+### This code is made available under a Creative Commons Attribution 4.0
+### International License. You are free to reuse this code provided that you
+### give appropriate credit, provide a link to the license, and indicate if
+### changes were made.
+### You may do so in any reasonable manner, but not in any way that suggests
+### the licensor endorses you or your use. Giving appropriate credit includes
+### citation of the above publication *and* providing a link to this repository:
+###
+### https://github.com/sbellan61/EbolaVaccPowerSL
+####################################################################################################

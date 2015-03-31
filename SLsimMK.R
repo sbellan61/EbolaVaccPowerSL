@@ -1,19 +1,28 @@
-if(grepl('stevebe', Sys.info()['nodename'])) setwd('~/Documents/R Repos/EbolaVaccSim/')
-if(grepl('stevebellan', Sys.info()['login'])) setwd('~/Documents/R Repos/EbolaVaccSim/')
-if(grepl('tacc', Sys.info()['nodename'])) setwd('/home1/02413/sbellan/VaccEbola/')
-sapply(c('simFuns.R','AnalysisFuns.R','CoxFxns.R','EndTrialFuns.R'), source)
+####################################################################################################
+## Set up R CMD BATCH scripts for running on HPC cluster: Main analysis.
+####################################################################################################
+## Code base accompanying:
+## 
+## Bellan, SE, JRC Pulliam, CAB Pearson, DChampredon, SJ Fox, L Skrip, AP Galvani, M Gambhir, BA
+## Lopman, TC Porco, LA Meyers, J Dushoff (2015). The statistical power and validity of Ebola
+## vaccine trials in Sierra Leone: A simulation study of trial design and analysis. _Lancet
+## Infectious Diseases_.
+##
+## Steve Bellan, March 2015
+## License at bottom.
+####################################################################################################
+
+sapply(c('simFuns.R','AnalysisFuns.R','CoxFxns.R'), source)
  
-batchdirnm <- file.path('BigResults','SLSimsFinalPTCorr')
+batchdirnm <- file.path('BigResults','All')
 routdirnm <- file.path(batchdirnm,'Routs')
 if(!file.exists(batchdirnm)) dir.create(batchdirnm)
 if(!file.exists(routdirnm)) dir.create(routdirnm)
-tnms <- c('SWCT')#,'RCT','FRCT')#,'CRCT')
+tnms <- c('SWCT','RCT','FRCT')
 numEach <- 12*10
 
 ves <- c(0, seq(.5, .9, by = .2))
-## ves <- 0
-##pits <- c(.025, .05, .075, .1)##
-pits <- c(.15,.2,.3)
+pits <- c(.025, .05, .075, .1, .15,.2,.3)
 parmsMat <- as.data.table(expand.grid(
     seed =  1:numEach
     , trial = tnms
@@ -23,15 +32,22 @@ parmsMat <- as.data.table(expand.grid(
     , delayUnit = c(0,7)
     , immunoDelay = c(5, 21)
     , vaccEff = ves
+    , remStartFin = c(F,T)
+    , remProtDel = c(F,T)    
     ))
-parmsMat$remStartFin <- TRUE ##***
-parmsMat$remProtDel <- TRUE
 parmsMat <- parmsMat[!(trial=='SWCT' & (delayUnit==0 | ord=='TU'))] ## SWCT must have delay and cannot be ordered
 parmsMat <- parmsMat[!(delayUnit==0 & ord=='TU')] ## ordering is meaningless with simultaneous instant vacc
 parmsMat <- parmsMat[ !(delayUnit==0 & trial=='FRCT')]  ## FRCT = RCT when delayUnit=0
+parmsMat <- parmsMat[ !(propInTrial>.1 & trial!='SWCT')] ## only for SWCT sensitivity analysis
+parmsMat <- parmsMat[!(remProtDel==F & remStartFin==T)] ## not an option considered for SWCT persontime
+parmsMat <- parmsMat[!(trial!='SWCT' & (remProtDel!=F | remStartFin!=F))] ## parameters only apply to SWCT
+parmsMat[trial!='SWCT', remProtDel := NA]
+parmsMat[trial!='SWCT', remStartFin := NA]
+parmsMat <- parmsMat[!(immunoDelay==5 & propInTrial!=0.05)] ## only doing this sensitivity analysis for propInTrial of 5%
+
 parmsMat$simNum <- 1:nrow(parmsMat)
 parmsMat$batchdirnm <- batchdirnm
-nmtmp <- 'simSL-bigPit-'
+nmtmp <- 'simSL-main-'
 parmsMat$saveNm <- nmtmp
 parmsMat$nsims <- 17 ## 17*12 is ~ 2000 simulations each (2040 but we'll round)
 parmsMat$reordLag <- 14
@@ -39,14 +55,7 @@ parmsMat$nboot <- 200
 parmsMat$trialStartDate <- '2015-02-18'
 nrow(parmsMat)
 
-## fls <- list.files(batchdirnm, pattern=nmtmp)
-## flsfull <- list.files(batchdirnm, pattern=nmtmp, full.names=T)
-## sz <- unlist(sapply(fls, function(x) file.info(file.path(batchdirnm, x))['size']))
-## fls <- fls[sz>6000]
-## done <- gsub(nmtmp, '', fls)
-## done <- as.numeric(gsub('.Rdata', '', done))
-## parmsMat <- parmsMat[simNum[!simNum %in% done]]
-## length(done)
+nrow(parmsMat)*17 ## 399,840 simulations
 
 addParm <- function(x, parmsMat,ii) {
     for(pp in 1:length(parmsMat)) {
@@ -91,3 +100,17 @@ jn <- 0
 ## }
 
 jbs
+
+####################################################################################################
+### LICENSE
+###
+### This code is made available under a Creative Commons Attribution 4.0
+### International License. You are free to reuse this code provided that you
+### give appropriate credit, provide a link to the license, and indicate if
+### changes were made.
+### You may do so in any reasonable manner, but not in any way that suggests
+### the licensor endorses you or your use. Giving appropriate credit includes
+### citation of the above publication *and* providing a link to this repository:
+###
+### https://github.com/sbellan61/EbolaVaccPowerSL
+####################################################################################################
