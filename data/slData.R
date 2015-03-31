@@ -1,12 +1,8 @@
-if(grepl('stevebe', Sys.info()['nodename'])) setwd('~/Documents/R Repos/EbolaVaccSim/')
-if(grepl('stevebellan', Sys.info()['login'])) setwd('~/Documents/R Repos/EbolaVaccSim/')
-if(grepl('tacc', Sys.info()['nodename'])) setwd('/home1/02413/sbellan/VaccEbola/')
 # slData.R
 setwd('data')
 require(gdata); require(data.table); library(RColorBrewer); library(mgcv)
 
 # Data from: https://data.hdx.rwlabs.org/dataset/rowca-ebola-cases
-
 if(file.exists("allEbolaData.Rdata")){
 	load("allEbolaData.Rdata")
 }else{
