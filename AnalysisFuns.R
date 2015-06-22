@@ -141,9 +141,11 @@ makeGEEDat <- function(parms, whichDo='popH') within(parms, {
             popHTmp[, firstActive := min(immuneDayThink), cluster]
     }
     popHTmp$active <- popHTmp[,day>=firstActive]
-    clusD <- popHTmp[active==T, list(cases = sum(!is.na(infectDayRCens))), list(cluster, day, immuneGrp, vaccDay, immuneDayThink)]
+    clusD <- popHTmp[, list(cases = sum(!is.na(infectDayRCens)), atRisk = length(idByClus)), 
+                     list(cluster, day, active, immuneGrp, vaccDay, immuneDayThink)]
     clusD <- clusD[order(cluster, day)]
-    clusD <- mutate(group_by(clusD, cluster), atRisk = clusSize - c(0, cumsum(cases[-length(cases)])))
+    clusD[, atRisk := atRisk - c(0L, cumsum(cases[-length(cases)])), cluster]
+    clusD <- clusD[active==T]
     if(!includeAllControlPT & trial == 'SWCT') {
         if(remStartFin) {
             firstDayAnyoneImmune <- popHTmp[, min(immuneDayThink)]
